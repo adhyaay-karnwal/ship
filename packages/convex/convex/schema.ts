@@ -2,8 +2,25 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
 
-export default defineSchema({
+// Override authAccounts to include accessToken
+const customAuthTables = {
   ...authTables,
+  authAccounts: defineTable({
+    userId: v.id("users"),
+    provider: v.string(),
+    providerAccountId: v.string(),
+    secret: v.optional(v.string()),
+    emailVerified: v.optional(v.string()),
+    phoneVerified: v.optional(v.string()),
+    accessToken: v.optional(v.string()),
+    refreshToken: v.optional(v.string()),
+  })
+    .index("userIdAndProvider", ["userId", "provider"])
+    .index("providerAndAccountId", ["provider", "providerAccountId"]),
+};
+
+export default defineSchema({
+  ...customAuthTables,
 
   users: defineTable({
     name: v.optional(v.string()),

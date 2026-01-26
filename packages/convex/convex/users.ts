@@ -12,9 +12,6 @@ export const current = query({
     if (!user) {
       return null;
     }
-
-    // Return user - githubAccessToken should be stored during OAuth callback
-    // If not available, it will be synced via the auth callback
     return user;
   },
 });
@@ -30,12 +27,26 @@ export const viewer = query({
     if (!user) {
       return null;
     }
+
     return {
       id: user._id,
       name: user.name,
       email: user.email,
       image: user.image,
       githubUsername: user.githubUsername,
+      hasGithubToken: !!user.githubAccessToken,
     };
+  },
+});
+
+export const getGithubToken = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) {
+      return null;
+    }
+    const user = await ctx.db.get(userId);
+    return user?.githubAccessToken ?? null;
   },
 });

@@ -1,54 +1,30 @@
 import GitHub from "@auth/core/providers/github";
-import { convexAuth } from "@convex-dev/auth/server";
-import type { Id } from "./_generated/dataModel";
+import { convexAuth, getAuthUserId } from "@convex-dev/auth/server";
 
-// Type guard for GitHub profile
-function isGitHubProfile(profile: unknown): profile is {
-  id?: number;
-  login?: string;
-  name?: string;
-  email?: string;
-  avatar_url?: string;
-} {
-  if (!profile || typeof profile !== "object") return false;
-  const p = profile as Record<string, unknown>;
-  return (
-    (p.id === undefined || typeof p.id === "number") &&
-    (p.login === undefined || typeof p.login === "string") &&
-    (p.name === undefined || typeof p.name === "string") &&
-    (p.email === undefined || typeof p.email === "string") &&
-    (p.avatar_url === undefined || typeof p.avatar_url === "string")
-  );
-}
-
-// Extract access token from args safely
-function getAccessToken(args: Record<string, unknown>): string | undefined {
-  const account = args.account;
-  if (!account || typeof account !== "object") return undefined;
-  const acc = account as Record<string, unknown>;
-  return typeof acc.access_token === "string" ? acc.access_token : undefined;
-}
-
-// Get string field from profile safely
-function getProfileString(profile: unknown, field: string): string | undefined {
-  if (!profile || typeof profile !== "object") return undefined;
-  const p = profile as Record<string, unknown>;
-  const value = p[field];
-  return typeof value === "string" ? value : undefined;
-}
+const GitHubWithToken = GitHub({
+  clientId: process.env.AUTH_GITHUB_ID,
+  clientSecret: process.env.AUTH_GITHUB_SECRET,
+  authorization: {
+    params: {
+      scope: "read:user user:email repo",
+    },
+  },
+  profile(profile, tokens) {
+    return {
+      id: String(profile.id),
+      name: profile.name ?? profile.login,
+      email: profile.email,
+      image: profile.avatar_url,
+      // Custom fields passed through profile
+      githubUsername: profile.login,
+      githubId: String(profile.id),
+      githubAccessToken: tokens.access_token,
+    };
+  },
+});
 
 export const { auth, signIn, signOut, store } = convexAuth({
-  providers: [
-    GitHub({
-      clientId: process.env.AUTH_GITHUB_ID,
-      clientSecret: process.env.AUTH_GITHUB_SECRET,
-      authorization: {
-        params: {
-          scope: "read:user user:email repo",
-        },
-      },
-    }),
-  ],
+  providers: [GitHubWithToken],
   callbacks: {
     async redirect({ redirectTo }) {
       const allowedOrigins = [
@@ -61,50 +37,72 @@ export const { auth, signIn, signOut, store } = convexAuth({
         const urlObj = new URL(redirectTo);
         const isAllowed = allowedOrigins.some(
           (origin) =>
-            urlObj.origin === origin || urlObj.origin === new URL(origin).origin
+            urlObj.origin === origin ||
+            urlObj.origin === new URL(origin).origin,
         );
 
         if (isAllowed) {
-          return redirectTo;
+          const cleanUrl = new URL(redirectTo);
+          cleanUrl.search = "";
+          return cleanUrl.toString();
         }
       } catch {
-        // Invalid URL, fall back to SITE_URL
+        // Invalid URL
       }
 
       return process.env.SITE_URL || "https://ship.dylansteck.com";
     },
-    async createOrUpdateUser(ctx, args): Promise<Id<"users">> {
+    async createOrUpdateUser(ctx, args) {
       const { existingUserId, profile, provider } = args;
-      const accessToken = getAccessToken(args as Record<string, unknown>);
 
-      if (provider?.id === "github" && profile && isGitHubProfile(profile)) {
-        const userData = {
-          name: profile.name ?? profile.login ?? "User",
-          email: profile.email,
-          image: profile.avatar_url,
-          githubId: profile.id !== undefined ? String(profile.id) : undefined,
-          githubUsername: profile.login,
-          githubAccessToken: accessToken,
+      // Log what we receive to debug
+      console.log("createOrUpdateUser called with profile keys:", profile ? Object.keys(profile) : "no profile");
+      console.log("profile data:", JSON.stringify(profile, null, 2));
+
+      if (provider?.id === "github" && profile) {
+        const p = profile as {
+          id: string;
+          name?: string;
+          email?: string;
+          image?: string;
+          githubUsername?: string;
+          githubId?: string;
+          githubAccessToken?: string;
         };
+
+        // Store token directly on user record
+        const userData = {
+          name: p.name ?? "User",
+          email: p.email,
+          image: p.image,
+          githubUsername: p.githubUsername,
+          githubId: p.githubId,
+          githubAccessToken: p.githubAccessToken, // Store on user
+        };
+
+        console.log("userData to save:", JSON.stringify(userData, null, 2));
 
         if (existingUserId) {
           const user = await ctx.db.get(existingUserId);
-          if (!user) {
-            return await ctx.db.insert("users", userData);
+          if (user) {
+            await ctx.db.patch(existingUserId, userData);
+            return existingUserId;
           }
-
-          await ctx.db.patch(existingUserId, userData);
-          return existingUserId;
         }
 
         return await ctx.db.insert("users", userData);
       }
 
-      // Fallback for non-GitHub providers
+      // Fallback
+      if (existingUserId) {
+        return existingUserId;
+      }
       return await ctx.db.insert("users", {
-        name: getProfileString(profile, "name") ?? "User",
-        email: getProfileString(profile, "email"),
+        name: (profile?.name as string) ?? "User",
+        email: profile?.email as string | undefined,
       });
     },
   },
 });
+
+export { getAuthUserId };
