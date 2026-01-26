@@ -9,6 +9,8 @@ import { useRef } from "react";
 import Link from "next/link";
 import { ChatContainer } from "@/components/chat";
 import { AppShell } from "@/components/layout";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 export default function SessionPage() {
@@ -20,14 +22,13 @@ export default function SessionPage() {
   const session = useQuery(api.sessions.get, { id: sessionId });
   const stopSession = useMutation(api.sessions.stop);
 
-  // Get initial prompt from URL if present
   const initialPrompt = searchParams.get("prompt") || undefined;
   const initialPromptSentRef = useRef(false);
 
   if (isLoading || !isAuthenticated) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-accent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />
       </div>
     );
   }
@@ -36,10 +37,10 @@ export default function SessionPage() {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center space-y-4">
-          <p className="text-text-secondary">Session not found</p>
-          <Link href="/" className="text-accent hover:underline text-sm">
-            Back to home
-          </Link>
+          <p className="text-muted-foreground">Session not found</p>
+          <Button variant="link" asChild>
+            <Link href="/">Back to home</Link>
+          </Button>
         </div>
       </div>
     );
@@ -48,7 +49,7 @@ export default function SessionPage() {
   if (session === undefined) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-accent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />
       </div>
     );
   }
@@ -65,21 +66,24 @@ export default function SessionPage() {
     }
   };
 
-  // Session info for top nav
   const sessionInfo = (
-    <div className="flex items-center gap-4">
+    <div className="flex items-center gap-3">
       <div className="flex items-center gap-2">
         <StatusDot status={session.status} />
         <span className="text-sm font-medium">{session.repoName}</span>
-        <span className="text-xs text-text-secondary">· {session.branch}</span>
+        <Badge variant="secondary" className="text-xs font-normal">
+          {session.branch}
+        </Badge>
       </div>
       {(session.status === "running" || session.status === "idle") && (
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           onClick={handleStop}
-          className="text-xs text-error hover:text-error/80 transition-colors px-3 py-1.5 rounded-lg border border-error/30 hover:bg-error/10"
+          className="text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
         >
           Stop
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -109,8 +113,8 @@ function StatusDot({ status }: { status: SessionStatus }) {
         status === "running" && "bg-success animate-pulse-dot",
         status === "idle" && "bg-success",
         status === "starting" && "bg-warning animate-pulse-dot",
-        status === "stopped" && "bg-text-secondary/50",
-        status === "error" && "bg-error"
+        status === "stopped" && "bg-muted-foreground/40",
+        status === "error" && "bg-destructive"
       )}
     />
   );

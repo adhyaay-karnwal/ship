@@ -3,6 +3,8 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { PlusIcon, SearchIcon } from "@/components/ui/icons";
 import { SidebarSessionItem } from "./sidebar-session-item";
 
@@ -26,7 +28,6 @@ interface SidebarProps {
 export function Sidebar({ sessions, activeSessionId, isOpen, onClose }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Filter and group sessions
   const { thisMonth, earlier, filteredSessions } = useMemo(() => {
     if (!sessions) {
       return { thisMonth: [], earlier: [], filteredSessions: [] };
@@ -52,7 +53,7 @@ export function Sidebar({ sessions, activeSessionId, isOpen, onClose }: SidebarP
       {/* Mobile overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
           onClick={onClose}
         />
       )}
@@ -60,7 +61,7 @@ export function Sidebar({ sessions, activeSessionId, isOpen, onClose }: SidebarP
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed lg:relative inset-y-0 left-0 z-50 w-[260px] bg-sidebar-bg border-r border-sidebar-border flex flex-col sidebar-transition",
+          "fixed lg:relative inset-y-0 left-0 z-50 w-[260px] bg-sidebar border-r border-sidebar-border flex flex-col sidebar-transition",
           "lg:translate-x-0",
           isOpen ? "translate-x-0" : "-translate-x-full lg:w-0 lg:border-r-0 lg:overflow-hidden"
         )}
@@ -69,45 +70,43 @@ export function Sidebar({ sessions, activeSessionId, isOpen, onClose }: SidebarP
           {/* Search */}
           <div className="p-3">
             <div className="relative">
-              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
-              <input
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search sessions..."
-                className="w-full h-9 pl-9 pr-3 rounded-lg bg-bg-primary border border-sidebar-border text-sm placeholder:text-text-secondary focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
+                className="pl-9 h-9 bg-background border-sidebar-border"
               />
             </div>
           </div>
 
           {/* New Session button */}
           <div className="px-3 pb-3">
-            <Link
-              href="/new"
-              onClick={onClose}
-              className="flex items-center justify-center gap-2 w-full h-9 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent/90 transition-colors"
-            >
-              <PlusIcon className="h-4 w-4" />
-              New Session
-            </Link>
+            <Button asChild className="w-full" size="sm">
+              <Link href="/new" onClick={onClose}>
+                <PlusIcon className="h-4 w-4 mr-2" />
+                New Session
+              </Link>
+            </Button>
           </div>
 
           {/* Sessions list */}
           <div className="flex-1 overflow-y-auto px-3 pb-3">
             {sessions === undefined ? (
               <div className="flex items-center justify-center py-8">
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-sidebar-border border-t-accent" />
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-sidebar-border border-t-sidebar-primary" />
               </div>
             ) : filteredSessions.length === 0 ? (
-              <div className="text-center py-8 text-sm text-text-secondary">
+              <div className="text-center py-8 text-sm text-muted-foreground">
                 {searchQuery ? "No sessions found" : "No sessions yet"}
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {/* This Month */}
                 {thisMonth.length > 0 && (
                   <div>
-                    <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wider px-3 mb-2">
+                    <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider px-3 mb-2">
                       This Month
                     </h3>
                     <div className="space-y-0.5">
@@ -129,7 +128,7 @@ export function Sidebar({ sessions, activeSessionId, isOpen, onClose }: SidebarP
                 {/* Earlier */}
                 {earlier.length > 0 && (
                   <div>
-                    <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wider px-3 mb-2">
+                    <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider px-3 mb-2">
                       Earlier
                     </h3>
                     <div className="space-y-0.5">

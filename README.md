@@ -52,11 +52,17 @@ ANTHROPIC_API_KEY=your-anthropic-key
 # NEXT_PUBLIC_CONVEX_URL=your-convex-url
 # NEXT_PUBLIC_API_URL=http://localhost:3000  # For local dev
 
-# 7. Run dev servers
+# 7. Run dev servers (from root directory)
 pnpm dev
+# This starts both:
+# - Web app on http://localhost:3001
+# - API on http://localhost:3000
+# They are automatically configured to work together in dev mode
 ```
 
 Open http://localhost:3001
+
+**Note:** The web app automatically points to `http://localhost:3000` for the API in development (no need to set `NEXT_PUBLIC_API_URL` locally).
 
 ## Deployment
 

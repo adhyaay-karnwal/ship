@@ -6,6 +6,9 @@ import { api } from "@ship/convex/convex/_generated/api";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/layout";
 import { RepoDropdown, BranchDropdown } from "@/components/repo-selector";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 interface Repo {
@@ -40,7 +43,6 @@ export default function HomePage() {
   const [isLoadingBranches, setIsLoadingBranches] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
-  // Fetch repos when we have the token
   useEffect(() => {
     if (!currentUser?.githubAccessToken) return;
 
@@ -64,7 +66,6 @@ export default function HomePage() {
     fetchRepos();
   }, [currentUser?.githubAccessToken]);
 
-  // Fetch branches when repo changes
   useEffect(() => {
     if (!selectedRepo || !currentUser?.githubAccessToken) {
       setBranches([]);
@@ -99,14 +100,12 @@ export default function HomePage() {
 
     setIsCreating(true);
     try {
-      // Create session in Convex
       const sessionId = await createSession({
         repoUrl: selectedRepo.cloneUrl,
         repoName: selectedRepo.fullName,
         branch: selectedBranch,
       });
 
-      // Trigger sandbox creation
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
       await fetch(`${apiUrl}/sessions`, {
         method: "POST",
@@ -119,7 +118,6 @@ export default function HomePage() {
         }),
       });
 
-      // Navigate to session with the initial prompt
       router.push(`/session/${sessionId}?prompt=${encodeURIComponent(prompt.trim())}`);
     } catch (error) {
       console.error("Failed to create session:", error);
@@ -144,7 +142,7 @@ export default function HomePage() {
   return (
     <AppShell>
       <div className="flex-1 flex flex-col items-center justify-center p-8">
-        <div className="w-full max-w-2xl space-y-6">
+        <div className="w-full max-w-2xl space-y-8">
           {/* Repo/Branch selectors */}
           <div className="flex items-center justify-center gap-3">
             <RepoDropdown
@@ -163,66 +161,65 @@ export default function HomePage() {
           </div>
 
           {/* Main prompt area */}
-          <div className="bg-bg-elevated border border-border rounded-xl overflow-hidden">
-            <div className="p-4">
-              <label className="block text-sm text-text-secondary mb-2">
+          <div className="bg-card border border-border rounded-lg overflow-hidden shadow-sm">
+            <div className="p-5">
+              <label className="block text-sm font-medium text-muted-foreground mb-3">
                 What would you like to build?
               </label>
-              <textarea
+              <Textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Describe what you want to accomplish..."
-                className="w-full h-32 bg-transparent text-text-primary placeholder:text-text-secondary/50 text-sm resize-none focus:outline-none"
+                className="min-h-[120px] resize-none border-0 bg-transparent p-0 text-base focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/50"
               />
             </div>
 
             {/* Footer with submit */}
-            <div className="px-4 py-3 border-t border-border flex items-center justify-between bg-bg-secondary/50">
-              <span className="text-xs text-text-secondary">
+            <div className="px-5 py-3 border-t border-border flex items-center justify-between bg-muted/30">
+              <span className="text-xs text-muted-foreground">
                 {selectedRepo ? (
                   <>
-                    {selectedRepo.fullName}
-                    {selectedBranch && ` · ${selectedBranch}`}
+                    <span className="font-medium text-foreground">{selectedRepo.fullName}</span>
+                    {selectedBranch && <span> · {selectedBranch}</span>}
                   </>
                 ) : (
                   "Select a repository to get started"
                 )}
               </span>
-              <button
+              <Button
                 onClick={handleStartSession}
                 disabled={!selectedRepo || !selectedBranch || !prompt.trim() || isCreating}
-                className={cn(
-                  "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
-                  "bg-accent text-white hover:bg-accent/90",
-                  "disabled:opacity-50 disabled:cursor-not-allowed"
-                )}
+                size="sm"
               >
                 {isCreating ? (
                   <span className="flex items-center gap-2">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
                     Starting...
                   </span>
                 ) : (
                   <>
                     Start Session
-                    <span className="ml-2 text-xs opacity-70">⌘↵</span>
+                    <kbd className="ml-2 pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100">
+                      <span className="text-xs">⌘</span>↵
+                    </kbd>
                   </>
                 )}
-              </button>
+              </Button>
             </div>
           </div>
 
           {/* Quick actions */}
           <div className="flex items-center justify-center gap-2 flex-wrap">
             {quickActions.map((action) => (
-              <button
+              <Badge
                 key={action.label}
+                variant="outline"
+                className="cursor-pointer hover:bg-accent transition-colors px-3 py-1.5"
                 onClick={() => setPrompt(action.prompt)}
-                className="px-3 py-1.5 rounded-full border border-border text-sm text-text-secondary hover:text-text-primary hover:bg-hover-bg transition-colors"
               >
                 {action.label}
-              </button>
+              </Badge>
             ))}
           </div>
         </div>

@@ -6,7 +6,12 @@ import { api } from "@ship/convex/convex/_generated/api";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { GithubIcon, CheckIcon, UserIcon, SettingsIcon } from "@/components/ui/icons";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { GithubIcon, CheckIcon, UserIcon, SettingsIcon, ArrowLeftIcon } from "@/components/ui/icons";
 
 type DashboardTab = "overview" | "settings";
 
@@ -30,7 +35,7 @@ export default function DashboardPage() {
   if (isLoading || !isAuthenticated || !mounted) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-accent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />
       </div>
     );
   }
@@ -41,29 +46,24 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="flex h-screen overflow-hidden bg-bg-primary">
+    <div className="flex h-screen overflow-hidden bg-background">
       {/* Dashboard Sidebar */}
-      <aside className="w-[260px] bg-sidebar-bg border-r border-sidebar-border flex flex-col shrink-0">
+      <aside className="w-[260px] bg-sidebar border-r border-sidebar-border flex flex-col shrink-0">
         {/* User info */}
         <div className="p-4 border-b border-sidebar-border">
           <div className="flex items-center gap-3">
-            {user?.image ? (
-              <img
-                src={user.image}
-                alt={user.name || "User"}
-                className="h-12 w-12 rounded-full"
-              />
-            ) : (
-              <div className="h-12 w-12 rounded-full bg-bg-elevated flex items-center justify-center text-text-secondary">
+            <Avatar className="h-11 w-11">
+              <AvatarImage src={user?.image || undefined} alt={user?.name || "User"} />
+              <AvatarFallback>
                 {user?.name?.[0]?.toUpperCase() || "U"}
-              </div>
-            )}
+              </AvatarFallback>
+            </Avatar>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-text-primary truncate">
+              <p className="text-sm font-medium truncate">
                 {user?.name || "User"}
               </p>
               {user?.githubUsername && (
-                <p className="text-xs text-text-secondary truncate">
+                <p className="text-xs text-muted-foreground truncate">
                   @{user.githubUsername}
                 </p>
               )}
@@ -79,10 +79,10 @@ export default function DashboardPage() {
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
                 className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
+                  "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
                   activeTab === item.id
-                    ? "bg-accent/10 text-text-primary"
-                    : "text-text-secondary hover:bg-hover-bg hover:text-text-primary"
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
                 )}
               >
                 <item.icon className="h-4 w-4" />
@@ -94,12 +94,14 @@ export default function DashboardPage() {
 
         {/* Back to sessions */}
         <div className="p-3 border-t border-sidebar-border">
-          <button
+          <Button
+            variant="ghost"
+            className="w-full justify-start"
             onClick={() => router.push("/")}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-hover-bg transition-colors"
           >
-            ← Back to Sessions
-          </button>
+            <ArrowLeftIcon className="h-4 w-4 mr-2" />
+            Back to Sessions
+          </Button>
         </div>
       </aside>
 
@@ -109,54 +111,49 @@ export default function DashboardPage() {
           {activeTab === "overview" && (
             <div className="space-y-8">
               <div>
-                <h1 className="text-2xl font-semibold mb-2">Account</h1>
-                <p className="text-text-secondary">
+                <h1 className="text-2xl font-semibold tracking-tight">Account</h1>
+                <p className="text-muted-foreground mt-1">
                   Manage your account settings and integrations.
                 </p>
               </div>
 
               {/* Profile section */}
-              <section className="space-y-4">
-                <h2 className="text-sm font-medium text-text-secondary uppercase tracking-wider">
-                  Profile
-                </h2>
-                <div className="bg-bg-elevated border border-border rounded-xl p-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Profile</CardTitle>
+                </CardHeader>
+                <CardContent>
                   <div className="flex items-center gap-4">
-                    {user?.image ? (
-                      <img
-                        src={user.image}
-                        alt={user.name || "User"}
-                        className="h-16 w-16 rounded-full"
-                      />
-                    ) : (
-                      <div className="h-16 w-16 rounded-full bg-bg-secondary flex items-center justify-center text-text-secondary text-xl">
+                    <Avatar className="h-16 w-16">
+                      <AvatarImage src={user?.image || undefined} alt={user?.name || "User"} />
+                      <AvatarFallback className="text-lg">
                         {user?.name?.[0]?.toUpperCase() || "U"}
-                      </div>
-                    )}
+                      </AvatarFallback>
+                    </Avatar>
                     <div>
                       <p className="text-lg font-medium">{user?.name || "User"}</p>
                       {user?.githubUsername && (
-                        <p className="text-sm text-text-secondary">@{user.githubUsername}</p>
+                        <p className="text-sm text-muted-foreground">@{user.githubUsername}</p>
                       )}
                     </div>
                   </div>
-                </div>
-              </section>
+                </CardContent>
+              </Card>
 
               {/* GitHub Integration */}
-              <section className="space-y-4">
-                <h2 className="text-sm font-medium text-text-secondary uppercase tracking-wider">
-                  Integrations
-                </h2>
-                <div className="bg-bg-elevated border border-border rounded-xl p-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Integrations</CardTitle>
+                </CardHeader>
+                <CardContent>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-lg bg-bg-secondary flex items-center justify-center">
+                      <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
                         <GithubIcon className="h-5 w-5" />
                       </div>
                       <div>
                         <p className="font-medium">GitHub</p>
-                        <p className="text-sm text-text-secondary">
+                        <p className="text-sm text-muted-foreground">
                           {user?.githubUsername ? (
                             <>Connected as @{user.githubUsername}</>
                           ) : (
@@ -166,88 +163,84 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     {user?.githubUsername && (
-                      <div className="flex items-center gap-2 text-success text-sm">
-                        <CheckIcon className="h-4 w-4" />
+                      <Badge variant="outline" className="text-success border-success/50">
+                        <CheckIcon className="h-3 w-3 mr-1" />
                         Connected
-                      </div>
+                      </Badge>
                     )}
                   </div>
-                </div>
-              </section>
+                </CardContent>
+              </Card>
 
-              {/* Danger zone */}
-              <section className="space-y-4">
-                <h2 className="text-sm font-medium text-text-secondary uppercase tracking-wider">
-                  Session
-                </h2>
-                <div className="bg-bg-elevated border border-border rounded-xl p-6">
+              {/* Session */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Session</CardTitle>
+                </CardHeader>
+                <CardContent>
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">Sign out</p>
-                      <p className="text-sm text-text-secondary">
+                      <p className="text-sm text-muted-foreground">
                         Sign out of your account on this device.
                       </p>
                     </div>
-                    <button
-                      onClick={() => signOut()}
-                      className="px-4 py-2 rounded-lg text-sm font-medium border border-border hover:bg-hover-bg transition-colors"
-                    >
+                    <Button variant="outline" onClick={() => signOut()}>
                       Sign out
-                    </button>
+                    </Button>
                   </div>
-                </div>
-              </section>
+                </CardContent>
+              </Card>
             </div>
           )}
 
           {activeTab === "settings" && (
             <div className="space-y-8">
               <div>
-                <h1 className="text-2xl font-semibold mb-2">Settings</h1>
-                <p className="text-text-secondary">
+                <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+                <p className="text-muted-foreground mt-1">
                   Customize your Ship experience.
                 </p>
               </div>
 
               {/* Appearance */}
-              <section className="space-y-4">
-                <h2 className="text-sm font-medium text-text-secondary uppercase tracking-wider">
-                  Appearance
-                </h2>
-                <div className="bg-bg-elevated border border-border rounded-xl p-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Appearance</CardTitle>
+                </CardHeader>
+                <CardContent>
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">Theme</p>
-                      <p className="text-sm text-text-secondary">
+                      <p className="text-sm text-muted-foreground">
                         Choose your preferred color scheme.
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-bg-secondary text-sm">
-                      <span className="h-2 w-2 rounded-full bg-text-primary" />
+                    <Badge variant="secondary">
+                      <span className="h-2 w-2 rounded-full bg-foreground mr-2" />
                       Dark
-                    </div>
+                    </Badge>
                   </div>
-                </div>
-              </section>
+                </CardContent>
+              </Card>
 
               {/* About */}
-              <section className="space-y-4">
-                <h2 className="text-sm font-medium text-text-secondary uppercase tracking-wider">
-                  About
-                </h2>
-                <div className="bg-bg-elevated border border-border rounded-xl p-6">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-text-secondary">Version</span>
-                      <span className="text-sm">1.0.0</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-text-secondary">Built with</span>
-                      <span className="text-sm">Next.js, Convex, Tailwind</span>
-                    </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">About</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Version</span>
+                    <span>1.0.0</span>
                   </div>
-                </div>
-              </section>
+                  <Separator />
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Built with</span>
+                    <span>Next.js, Convex, Tailwind</span>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
         </div>

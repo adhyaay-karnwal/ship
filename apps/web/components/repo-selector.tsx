@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { ChevronDownIcon, RepoIcon, GitBranchIcon, SearchIcon } from "@/components/ui/icons";
 
 interface Repo {
@@ -36,7 +39,6 @@ export function RepoSelector({ githubToken, onSelect }: RepoSelectorProps) {
   const [isLoadingRepos, setIsLoadingRepos] = useState(true);
   const [isLoadingBranches, setIsLoadingBranches] = useState(false);
 
-  // Fetch repos on mount
   useEffect(() => {
     async function fetchRepos() {
       setIsLoadingRepos(true);
@@ -58,7 +60,6 @@ export function RepoSelector({ githubToken, onSelect }: RepoSelectorProps) {
     fetchRepos();
   }, [githubToken]);
 
-  // Fetch branches when repo is selected
   useEffect(() => {
     if (!selectedRepo) {
       setBranches([]);
@@ -105,12 +106,11 @@ export function RepoSelector({ githubToken, onSelect }: RepoSelectorProps) {
       {/* Repository Search */}
       <div>
         <label className="block text-sm font-medium mb-2">Repository</label>
-        <input
+        <Input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search repositories..."
-          className="w-full rounded-lg bg-bg-elevated border border-border px-4 py-2.5 text-sm placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
         />
       </div>
 
@@ -118,10 +118,10 @@ export function RepoSelector({ githubToken, onSelect }: RepoSelectorProps) {
       <div className="max-h-64 overflow-y-auto rounded-lg border border-border">
         {isLoadingRepos ? (
           <div className="flex items-center justify-center py-8">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-border border-t-accent" />
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-border border-t-primary" />
           </div>
         ) : filteredRepos.length === 0 ? (
-          <div className="py-8 text-center text-sm text-text-secondary">
+          <div className="py-8 text-center text-sm text-muted-foreground">
             No repositories found
           </div>
         ) : (
@@ -133,33 +133,31 @@ export function RepoSelector({ githubToken, onSelect }: RepoSelectorProps) {
                 className={cn(
                   "w-full px-4 py-3 text-left transition-colors",
                   selectedRepo?.id === repo.id
-                    ? "bg-accent/10"
-                    : "hover:bg-bg-secondary"
+                    ? "bg-accent"
+                    : "hover:bg-muted"
                 )}
               >
                 <div className="flex items-center gap-2">
-                  <RepoIcon className="h-4 w-4 text-text-secondary shrink-0" />
+                  <RepoIcon className="h-4 w-4 text-muted-foreground shrink-0" />
                   <span className="font-medium text-sm truncate">
                     {repo.fullName}
                   </span>
                   {repo.isPrivate && (
-                    <span className="text-xs bg-bg-secondary px-1.5 py-0.5 rounded">
+                    <Badge variant="secondary" className="text-[10px]">
                       Private
-                    </span>
+                    </Badge>
                   )}
                 </div>
                 {repo.description && (
-                  <p className="text-xs text-text-secondary mt-1 truncate">
+                  <p className="text-xs text-muted-foreground mt-1 truncate">
                     {repo.description}
                   </p>
                 )}
-                <div className="flex items-center gap-3 mt-1">
-                  {repo.language && (
-                    <span className="text-xs text-text-secondary">
-                      {repo.language}
-                    </span>
-                  )}
-                </div>
+                {repo.language && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {repo.language}
+                  </p>
+                )}
               </button>
             ))}
           </div>
@@ -171,15 +169,15 @@ export function RepoSelector({ githubToken, onSelect }: RepoSelectorProps) {
         <div>
           <label className="block text-sm font-medium mb-2">Branch</label>
           {isLoadingBranches ? (
-            <div className="flex items-center gap-2 text-sm text-text-secondary">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-accent" />
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-primary" />
               Loading branches...
             </div>
           ) : (
             <select
               value={selectedBranch}
               onChange={(e) => setSelectedBranch(e.target.value)}
-              className="w-full rounded-lg bg-bg-elevated border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+              className="w-full h-10 rounded-md bg-background border border-input px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
             >
               {branches.map((branch) => (
                 <option key={branch.name} value={branch.name}>
@@ -193,19 +191,13 @@ export function RepoSelector({ githubToken, onSelect }: RepoSelectorProps) {
       )}
 
       {/* Submit Button */}
-      <button
+      <Button
         onClick={handleSubmit}
         disabled={!selectedRepo || !selectedBranch}
-        className={cn(
-          "w-full rounded-lg py-3 font-medium text-sm transition-colors",
-          "bg-accent text-white",
-          "hover:bg-accent/90",
-          "disabled:opacity-50 disabled:cursor-not-allowed",
-          "focus:outline-none focus:ring-2 focus:ring-accent/50"
-        )}
+        className="w-full"
       >
         Start Session
-      </button>
+      </Button>
     </div>
   );
 }
@@ -243,42 +235,40 @@ export function RepoDropdown({ repos, selectedRepo, onSelect, isLoading }: RepoD
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <button
+      <Button
+        variant="outline"
         onClick={() => setIsOpen(!isOpen)}
         disabled={isLoading}
-        className={cn(
-          "flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-bg-elevated text-sm hover:bg-hover-bg transition-colors min-w-[160px]",
-          isLoading && "opacity-50 cursor-not-allowed"
-        )}
+        className="min-w-[160px] justify-between"
       >
-        <RepoIcon className="h-4 w-4 text-text-secondary" />
-        <span className="truncate flex-1 text-left">
-          {isLoading ? "Loading..." : selectedRepo?.name || "Select repo"}
-        </span>
-        <ChevronDownIcon className={cn("h-4 w-4 text-text-secondary transition-transform", isOpen && "rotate-180")} />
-      </button>
+        <div className="flex items-center gap-2">
+          <RepoIcon className="h-4 w-4 text-muted-foreground" />
+          <span className="truncate">
+            {isLoading ? "Loading..." : selectedRepo?.name || "Select repo"}
+          </span>
+        </div>
+        <ChevronDownIcon className={cn("h-4 w-4 text-muted-foreground transition-transform", isOpen && "rotate-180")} />
+      </Button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-72 max-h-80 rounded-lg border border-border bg-bg-elevated shadow-lg overflow-hidden z-50">
-          {/* Search */}
+        <div className="absolute top-full left-0 mt-1 w-72 max-h-80 rounded-lg border border-border bg-popover shadow-lg overflow-hidden z-50">
           <div className="p-2 border-b border-border">
             <div className="relative">
-              <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-secondary" />
-              <input
+              <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search repos..."
-                className="w-full h-8 pl-8 pr-3 rounded-md bg-bg-primary border border-border text-sm placeholder:text-text-secondary focus:outline-none focus:ring-1 focus:ring-accent"
+                className="pl-8 h-8"
                 autoFocus
               />
             </div>
           </div>
 
-          {/* Repo list */}
           <div className="max-h-60 overflow-y-auto">
             {filteredRepos.length === 0 ? (
-              <div className="py-4 text-center text-sm text-text-secondary">
+              <div className="py-4 text-center text-sm text-muted-foreground">
                 No repos found
               </div>
             ) : (
@@ -291,16 +281,16 @@ export function RepoDropdown({ repos, selectedRepo, onSelect, isLoading }: RepoD
                     setSearchQuery("");
                   }}
                   className={cn(
-                    "w-full px-3 py-2 text-left text-sm hover:bg-hover-bg transition-colors flex items-center gap-2",
-                    selectedRepo?.id === repo.id && "bg-accent/10"
+                    "w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors flex items-center gap-2",
+                    selectedRepo?.id === repo.id && "bg-accent"
                   )}
                 >
-                  <RepoIcon className="h-4 w-4 text-text-secondary shrink-0" />
+                  <RepoIcon className="h-4 w-4 text-muted-foreground shrink-0" />
                   <span className="truncate">{repo.fullName}</span>
                   {repo.isPrivate && (
-                    <span className="text-xs bg-bg-secondary px-1.5 py-0.5 rounded shrink-0">
+                    <Badge variant="secondary" className="text-[10px] shrink-0">
                       Private
-                    </span>
+                    </Badge>
                   )}
                 </button>
               ))
@@ -337,26 +327,26 @@ export function BranchDropdown({ branches, selectedBranch, onSelect, isLoading, 
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <button
+      <Button
+        variant="outline"
         onClick={() => setIsOpen(!isOpen)}
         disabled={isLoading || disabled}
-        className={cn(
-          "flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-bg-elevated text-sm hover:bg-hover-bg transition-colors min-w-[140px]",
-          (isLoading || disabled) && "opacity-50 cursor-not-allowed"
-        )}
+        className="min-w-[140px] justify-between"
       >
-        <GitBranchIcon className="h-4 w-4 text-text-secondary" />
-        <span className="truncate flex-1 text-left">
-          {isLoading ? "Loading..." : selectedBranch || "Select branch"}
-        </span>
-        <ChevronDownIcon className={cn("h-4 w-4 text-text-secondary transition-transform", isOpen && "rotate-180")} />
-      </button>
+        <div className="flex items-center gap-2">
+          <GitBranchIcon className="h-4 w-4 text-muted-foreground" />
+          <span className="truncate">
+            {isLoading ? "Loading..." : selectedBranch || "Select branch"}
+          </span>
+        </div>
+        <ChevronDownIcon className={cn("h-4 w-4 text-muted-foreground transition-transform", isOpen && "rotate-180")} />
+      </Button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-56 max-h-60 rounded-lg border border-border bg-bg-elevated shadow-lg overflow-hidden z-50">
+        <div className="absolute top-full left-0 mt-1 w-56 max-h-60 rounded-lg border border-border bg-popover shadow-lg overflow-hidden z-50">
           <div className="max-h-60 overflow-y-auto">
             {branches.length === 0 ? (
-              <div className="py-4 text-center text-sm text-text-secondary">
+              <div className="py-4 text-center text-sm text-muted-foreground">
                 No branches found
               </div>
             ) : (
@@ -368,16 +358,16 @@ export function BranchDropdown({ branches, selectedBranch, onSelect, isLoading, 
                     setIsOpen(false);
                   }}
                   className={cn(
-                    "w-full px-3 py-2 text-left text-sm hover:bg-hover-bg transition-colors flex items-center gap-2",
-                    selectedBranch === branch.name && "bg-accent/10"
+                    "w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors flex items-center gap-2",
+                    selectedBranch === branch.name && "bg-accent"
                   )}
                 >
-                  <GitBranchIcon className="h-4 w-4 text-text-secondary shrink-0" />
+                  <GitBranchIcon className="h-4 w-4 text-muted-foreground shrink-0" />
                   <span className="truncate">{branch.name}</span>
                   {branch.protected && (
-                    <span className="text-xs bg-warning/20 text-warning px-1.5 py-0.5 rounded shrink-0">
+                    <Badge variant="outline" className="text-[10px] text-warning border-warning/50 shrink-0">
                       Protected
-                    </span>
+                    </Badge>
                   )}
                 </button>
               ))
