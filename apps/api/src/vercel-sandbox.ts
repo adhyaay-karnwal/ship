@@ -124,9 +124,8 @@ export async function createSandbox(config: SandboxConfig): Promise<SandboxResul
     console.log("Installing OpenCode...");
     await sandbox.runCommand("npm", ["install", "-g", "opencode-ai"]);
 
-    // Start OpenCode server in background (detached mode)
+    // Determine workspace directory
     // When using source parameter, repo is cloned to /vercel/sandbox
-    // Check what directory was created
     console.log("Determining workspace directory...");
     const listResult = await sandbox.runCommand("ls", ["-la", "/vercel/sandbox"]);
     const lsOutput = await listResult.stdout();
@@ -137,22 +136,120 @@ export async function createSandbox(config: SandboxConfig): Promise<SandboxResul
     // Try the repo name directory first, fallback to /vercel/sandbox
     const workspaceDir = `/vercel/sandbox/${repoName}`;
     
-    console.log(`Starting OpenCode server in ${workspaceDir}...`);
-    await sandbox.runCommand({
+    // Verify workspace directory exists, fallback to /vercel/sandbox if needed
+    let finalWorkspaceDir = workspaceDir;
+    try {
+      const checkDirResult = await sandbox.runCommand("test", ["-d", workspaceDir]);
+      if (checkDirResult.exitCode !== 0) {
+        console.log(`Directory ${workspaceDir} does not exist, using /vercel/sandbox`);
+        finalWorkspaceDir = "/vercel/sandbox";
+      }
+    } catch {
+      console.log(`Could not verify directory ${workspaceDir}, using /vercel/sandbox`);
+      finalWorkspaceDir = "/vercel/sandbox";
+    }
+    
+    console.log(`Starting OpenCode server in ${finalWorkspaceDir}...`);
+    
+    // Find where opencode is installed
+    let opencodePath = "opencode";
+    try {
+      const whichResult = await sandbox.runCommand("which", ["opencode"]);
+      opencodePath = (await whichResult.stdout()).trim();
+      console.log(`OpenCode binary found at: ${opencodePath}`);
+    } catch {
+      // Try common npm global install locations
+      const checkPaths = ["/usr/local/bin/opencode", "/usr/bin/opencode", "/root/.npm-global/bin/opencode"];
+      for (const path of checkPaths) {
+        try {
+          const testResult = await sandbox.runCommand("test", ["-f", path]);
+          if (testResult.exitCode === 0) {
+            opencodePath = path;
+            console.log(`OpenCode binary found at: ${opencodePath}`);
+            break;
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+    
+    // Start OpenCode server in background with proper environment
+    // Ensure Bun is in PATH and use the found opencode path
+    const startCommand = `export BUN_INSTALL="/root/.bun" && export PATH="/root/.bun/bin:$PATH" && cd ${finalWorkspaceDir} && ANTHROPIC_API_KEY=${anthropicApiKey} nohup ${opencodePath} serve --hostname 0.0.0.0 --port ${OPENCODE_PORT} --dir ${finalWorkspaceDir} > /tmp/opencode.log 2>&1 & echo $!`;
+    
+    const startResult = await sandbox.runCommand({
       cmd: "bash",
-      args: [
-        "-c",
-        `ANTHROPIC_API_KEY=${anthropicApiKey} nohup opencode serve --hostname 0.0.0.0 --port ${OPENCODE_PORT} --dir ${workspaceDir} > /tmp/opencode.log 2>&1 &`,
-      ],
-      detached: true,
+      args: ["-c", startCommand],
+      sudo: true,
     });
+    
+    const pid = (await startResult.stdout()).trim();
+    console.log(`OpenCode started with PID: ${pid}`);
 
-    // Wait for OpenCode server to start
+    // Wait for OpenCode server to start and verify it's running
     console.log("Waiting for OpenCode server to start...");
-    await sleep(3000);
-
-    // Get the sandbox URL for the OpenCode port
+    let serverReady = false;
+    const maxAttempts = 30; // 30 seconds max wait
     const sandboxUrl = sandbox.domain(OPENCODE_PORT);
+    
+    for (let i = 0; i < maxAttempts; i++) {
+      await sleep(1000);
+      
+      // Check if process is still running (using pgrep or ps)
+      try {
+        const checkProcess = await sandbox.runCommand("bash", ["-c", `ps -p ${pid} > /dev/null 2>&1`]);
+        if (checkProcess.exitCode !== 0) {
+          console.log(`OpenCode process ${pid} is not running, checking logs...`);
+          const logResult = await sandbox.runCommand("cat", ["/tmp/opencode.log"]);
+          const logs = await logResult.stdout();
+          console.log("OpenCode logs:", logs);
+          throw new Error(`OpenCode process died. Logs: ${logs}`);
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message.includes("OpenCode process died")) {
+          throw error;
+        }
+        // Process check failed, continue to URL check
+      }
+      
+      // Try to connect to the server
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        
+        const statusResponse = await fetch(`${sandboxUrl}/status`, {
+          method: "GET",
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (statusResponse.ok) {
+          const status = await statusResponse.json();
+          console.log("OpenCode server is ready! Status:", status);
+          serverReady = true;
+          break;
+        }
+      } catch (error) {
+        // Server not ready yet, continue waiting
+        if (i === maxAttempts - 1) {
+          // Last attempt failed, check logs
+          const logResult = await sandbox.runCommand("cat", ["/tmp/opencode.log"]);
+          const logs = await logResult.stdout();
+          console.log("OpenCode logs after timeout:", logs);
+          throw new Error(`OpenCode server did not start within ${maxAttempts} seconds. Logs: ${logs}`);
+        }
+      }
+    }
+    
+    if (!serverReady) {
+      const logResult = await sandbox.runCommand("cat", ["/tmp/opencode.log"]);
+      const logs = await logResult.stdout();
+      throw new Error(`OpenCode server failed to start. Logs: ${logs}`);
+    }
+
+    // Get preview URL if available
     let previewUrl: string | undefined;
     try {
       previewUrl = sandbox.domain(PREVIEW_PORT);

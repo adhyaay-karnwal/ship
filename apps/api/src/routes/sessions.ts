@@ -209,9 +209,24 @@ export function createSessionRoutes(convex: ConvexHttpClient) {
       const sessionId = c.req.param("id");
       const { content } = c.req.valid("json");
 
-      const client = openCodeClients.get(sessionId);
+      let client = openCodeClients.get(sessionId);
+      
+      // If client doesn't exist (serverless restart), try to reconnect using stored sandbox URL
       if (!client) {
-        return c.json({ error: "Session not found or not running" }, 404);
+        try {
+          const session = await convex.query(sessionsGet, { id: sessionId });
+          if (session?.sandboxUrl && (session.status === "running" || session.status === "idle")) {
+            console.log(`Reconnecting to sandbox for session ${sessionId} at ${session.sandboxUrl}`);
+            client = new OpenCodeClient(session.sandboxUrl);
+            openCodeClients.set(sessionId, client);
+          }
+        } catch (error) {
+          console.error(`Failed to reconnect to sandbox for session ${sessionId}:`, error);
+        }
+      }
+      
+      if (!client) {
+        return c.json({ error: "Session not found or not running. The sandbox may have timed out." }, 404);
       }
 
       // Set up SSE stream

@@ -129,8 +129,14 @@ export default function HomePage() {
         branch: selectedBranch,
       });
 
+      // Navigate immediately - don't wait for sandbox creation
+      // The session page will show loading state and the sandbox creation happens in background
+      router.push(`/session/${sessionId}?prompt=${encodeURIComponent(prompt.trim())}`);
+
+      // Fire sandbox creation in background (don't await)
+      // The API will update session status when done
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-      const response = await fetch(`${apiUrl}/sessions`, {
+      fetch(`${apiUrl}/sessions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -139,18 +145,10 @@ export default function HomePage() {
           branch: selectedBranch,
           githubToken: currentUser?.githubAccessToken,
         }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: "Failed to create sandbox" }));
+      }).catch((error) => {
         console.error("Sandbox creation failed:", error);
-        setIsCreating(false);
-        // Show error to user
-        alert(`Failed to create sandbox: ${error.error || "Unknown error"}`);
-        return;
-      }
-
-      router.push(`/session/${sessionId}?prompt=${encodeURIComponent(prompt.trim())}`);
+        // Error will be reflected in session status via API
+      });
     } catch (error) {
       console.error("Failed to create session:", error);
       setIsCreating(false);

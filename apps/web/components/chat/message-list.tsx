@@ -9,16 +9,61 @@ interface MessageListProps {
   streamingContent?: string;
   streamingToolCalls?: Array<{ id: string; name: string; arguments: Record<string, unknown> }>;
   streamingToolResults?: Array<{ toolCallId: string; result: unknown }>;
+  isStarting?: boolean;
+  initialPrompt?: string;
 }
 
-export function MessageList({ messages, streamingContent, streamingToolCalls, streamingToolResults }: MessageListProps) {
+export function MessageList({ messages, streamingContent, streamingToolCalls, streamingToolResults, isStarting, initialPrompt }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingContent, streamingToolCalls, streamingToolResults]);
+  }, [messages, streamingContent, streamingToolCalls, streamingToolResults, isStarting]);
+
+  // Show sandbox setup state when starting
+  if (isStarting) {
+    return (
+      <div
+        ref={containerRef}
+        className="flex-1 overflow-y-auto"
+      >
+        <div className="max-w-4xl mx-auto px-4 py-6 divide-y divide-border/50">
+          {/* Show user's initial prompt */}
+          {initialPrompt && (
+            <MessageBubble
+              message={{
+                _id: "initial-prompt",
+                role: "user",
+                content: initialPrompt,
+                createdAt: Date.now(),
+              }}
+            />
+          )}
+          
+          {/* Show sandbox setup as a tool call */}
+          <MessageBubble
+            message={{
+              _id: "setup",
+              role: "assistant",
+              content: "",
+              toolCalls: [
+                {
+                  id: "setup-sandbox",
+                  name: "setup_sandbox",
+                  arguments: { status: "Cloning repository and installing dependencies..." },
+                },
+              ],
+              createdAt: Date.now(),
+            }}
+            isStreaming
+          />
+        </div>
+        <div ref={bottomRef} />
+      </div>
+    );
+  }
 
   if (messages.length === 0 && !streamingContent && !streamingToolCalls) {
     return (

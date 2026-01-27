@@ -150,17 +150,7 @@ export function ChatContainer({ sessionId, initialPrompt, onInitialPromptSent }:
 
   return (
     <div className="flex flex-col h-full">
-      {/* Status Banner */}
-      {isStarting && (
-        <div className="bg-muted/50 border-b border-border px-4 py-2">
-          <div className="max-w-4xl mx-auto flex items-center gap-2">
-            <div className="h-3 w-3 animate-spin rounded-full border-2 border-border border-t-primary" />
-            <span className="text-xs text-muted-foreground">
-              Starting sandbox... This may take a moment while we clone your repo and set up the environment.
-            </span>
-          </div>
-        </div>
-      )}
+      {/* Status Banner - removed, now shown inline in chat */}
 
       {isError && (
         <div className="bg-destructive/10 border-b border-destructive/20 px-4 py-2">
@@ -201,6 +191,8 @@ export function ChatContainer({ sessionId, initialPrompt, onInitialPromptSent }:
         streamingContent={isLoading ? streamingContent : undefined}
         streamingToolCalls={isLoading && streamingToolCalls.length > 0 ? streamingToolCalls : undefined}
         streamingToolResults={isLoading && streamingToolResults.length > 0 ? streamingToolResults : undefined}
+        isStarting={isStarting}
+        initialPrompt={initialPrompt}
       />
 
       {/* Input - always show but disable when not ready */}
