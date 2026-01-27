@@ -4,7 +4,7 @@ Personal background coding agent. Select a repo, spin up a sandboxed VM, and let
 
 ## Stack
 
-- **Frontend**: Next.js + React + Tailwind CSS
+- **Frontend**: Next.js + React + Tailwind CSS + shadcn/ui
 - **Backend**: Hono API
 - **Database**: Convex (real-time)
 - **Auth**: Convex Auth + GitHub OAuth
@@ -26,65 +26,164 @@ ship/
 
 ## Setup
 
-```bash
-# 1. Install dependencies
-pnpm install
+### 1. Install Dependencies
 
-# 2. Set up Convex
+```bash
+pnpm install
+```
+
+### 2. Convex Setup
+
+```bash
 cd packages/convex
 npx convex dev
 # Creates your project and generates .env.local
+```
 
-# 3. Copy Convex URL to web app
-cp packages/convex/.env.local apps/web/.env.local
-# Edit to rename CONVEX_URL → NEXT_PUBLIC_CONVEX_URL
+### 3. GitHub OAuth App (User Login)
 
-# 4. Configure GitHub OAuth in Convex dashboard
-# Add AUTH_GITHUB_ID and AUTH_GITHUB_SECRET
+1. Go to [github.com/settings/developers](https://github.com/settings/developers)
+2. Click **New OAuth App**
+3. Fill in:
+   - **Application name**: `Ship`
+   - **Homepage URL**: `https://ship.yourdomain.com`
+   - **Authorization callback URL**: `https://your-project.convex.site/api/auth/callback/github`
+4. Copy **Client ID** and **Client Secret**
+5. Add to Convex dashboard environment variables:
+   - `AUTH_GITHUB_ID` = Client ID
+   - `AUTH_GITHUB_SECRET` = Client Secret
 
-# 5. Set up API env (apps/api/.env)
-CONVEX_URL=https://your-deployment.convex.cloud
-MODAL_TOKEN_ID=your-modal-token
-MODAL_TOKEN_SECRET=your-modal-secret
-ANTHROPIC_API_KEY=your-anthropic-key
+### 4. GitHub App (Bot Commits)
 
-# 6. Set up web app env (apps/web/.env.local)
-# NEXT_PUBLIC_CONVEX_URL=your-convex-url
-# NEXT_PUBLIC_API_URL=http://localhost:3000  # For local dev
+This allows commits to appear as "Ship[bot]" instead of the user.
 
-# 7. Run dev servers (from root directory)
+1. Go to [github.com/settings/apps/new](https://github.com/settings/apps/new)
+2. Fill in:
+   | Field | Value |
+   |-------|-------|
+   | **GitHub App name** | `Ship` (or `Ship-dev` for testing) |
+   | **Homepage URL** | `https://ship.yourdomain.com` |
+   | **Webhook** | Uncheck "Active" |
+
+3. Set **Repository Permissions**:
+   | Permission | Access |
+   |------------|--------|
+   | **Contents** | Read and write |
+   | **Metadata** | Read-only (auto-selected) |
+
+4. **Where can this app be installed?**: Only on this account
+5. Click **Create GitHub App**
+6. Note the **App ID** (number at top of settings page)
+7. Click **Generate a private key** → downloads a `.pem` file
+8. Convert the private key for env var:
+   ```bash
+   cat ~/Downloads/your-app.private-key.pem | awk 'NF {sub(/\r/, ""); printf "%s\\n", $0}' | pbcopy
+   ```
+9. Click **Install App** in the left sidebar
+10. Install on your account (select repos or all)
+11. Note the **Installation ID** from the URL: `github.com/settings/installations/XXXXX`
+
+### 5. Environment Variables
+
+#### Web App (`apps/web/.env.local`)
+
+```env
+NEXT_PUBLIC_CONVEX_URL=https://your-project.convex.cloud
+NEXT_PUBLIC_API_URL=http://localhost:3000  # For local dev
+```
+
+#### API (`apps/api/.env`)
+
+```env
+# Convex
+CONVEX_URL=https://your-project.convex.cloud
+
+# Anthropic (for Claude)
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Modal (for sandboxes)
+MODAL_TOKEN_ID=...
+MODAL_TOKEN_SECRET=...
+
+# GitHub App (for bot commits)
+GITHUB_APP_ID=your-app-id
+GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----\n"
+GITHUB_APP_INSTALLATION_ID=your-installation-id
+```
+
+#### Convex (`packages/convex/.env.local`)
+
+```env
+AUTH_GITHUB_ID=your-oauth-client-id
+AUTH_GITHUB_SECRET=your-oauth-client-secret
+```
+
+### 6. Modal Setup
+
+```bash
+pip install modal
+modal setup
+```
+
+Get tokens from [modal.com/settings](https://modal.com/settings) and add to API env.
+
+### 7. Run Development
+
+```bash
+# From root directory
 pnpm dev
-# This starts both:
-# - Web app on http://localhost:3001
-# - API on http://localhost:3000
-# They are automatically configured to work together in dev mode
+
+# Or run separately:
+# Terminal 1: Convex
+cd packages/convex && npx convex dev
+
+# Terminal 2: API
+cd apps/api && pnpm dev
+
+# Terminal 3: Web
+cd apps/web && pnpm dev
 ```
 
 Open http://localhost:3001
 
-**Note:** The web app automatically points to `http://localhost:3000` for the API in development (no need to set `NEXT_PUBLIC_API_URL` locally).
+## Build
+
+```bash
+pnpm build                    # Build all
+pnpm build --filter=web       # Build web only
+pnpm build --filter=api       # Build API only
+```
 
 ## Deployment
 
-Both projects are deployed to Vercel:
+### Web App (Vercel)
 
-### Web App (`apps/web`)
-1. Go to Vercel dashboard
-2. Create new project, select this repo
-3. Set **Root Directory** to `apps/web`
-4. Add environment variables:
-   - `NEXT_PUBLIC_CONVEX_URL` - Your Convex deployment URL
-   - `NEXT_PUBLIC_API_URL` - `https://api.ship.dylansteck.com`
+1. Create new Vercel project, select this repo
+2. Set **Root Directory** to `apps/web`
+3. Add environment variables:
+   - `NEXT_PUBLIC_CONVEX_URL`
+   - `NEXT_PUBLIC_API_URL` = `https://api.ship.yourdomain.com`
 
-### API (`apps/api`)
-1. Go to Vercel dashboard
-2. Create new project, select this repo
-3. Set **Root Directory** to `apps/api`
-4. Add environment variables:
-   - `CONVEX_URL` - Your Convex deployment URL
-   - `ANTHROPIC_API_KEY` - Your Anthropic API key
-   - `MODAL_TOKEN_ID` - Your Modal token ID
-   - `MODAL_TOKEN_SECRET` - Your Modal token secret
+### API (Vercel)
+
+1. Create new Vercel project, select this repo
+2. Set **Root Directory** to `apps/api`
+3. Add environment variables:
+   - `CONVEX_URL`
+   - `ANTHROPIC_API_KEY`
+   - `MODAL_TOKEN_ID`
+   - `MODAL_TOKEN_SECRET`
+   - `GITHUB_APP_ID`
+   - `GITHUB_APP_PRIVATE_KEY`
+   - `GITHUB_APP_INSTALLATION_ID`
+
+### Convex
+
+```bash
+cd packages/convex && npx convex deploy
+```
+
+Or configure automatic deploys via Vercel integration.
 
 ## Production URLs
 
