@@ -6,24 +6,91 @@ import { OpenCodeClient, type StreamEvent } from "../opencode.js";
 import type { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
 
-// Function references for Convex API
-const sessionsInternalUpdateStatus = makeFunctionReference<
-  "mutation",
-  { id: string; status: string; modalSandboxId?: string; errorMessage?: string },
-  void
->("sessions:internalUpdateStatus");
+// Get Convex URL and API key for HTTP calls
+const getConvexUrl = () => {
+  return process.env.CONVEX_URL || process.env.NEXT_PUBLIC_CONVEX_URL || "";
+};
 
+const getApiKey = () => {
+  return process.env.API_KEY || "";
+};
+
+// Function references for Convex API (public functions)
 const sessionsGet = makeFunctionReference<
   "query",
   { id: string },
   { modalSandboxId?: string; status: string; repoName: string; branch: string } | null
 >("sessions:get");
 
-const messagesInternalAdd = makeFunctionReference<
-  "mutation",
-  { sessionId: string; role: string; content: string; toolCalls?: unknown[]; toolResults?: unknown[] },
-  string
->("messages:internalAdd");
+// Helper to call Convex HTTP action for updating session status
+async function updateSessionStatus(
+  sessionId: string,
+  status: string,
+  modalSandboxId?: string,
+  errorMessage?: string
+) {
+  const convexUrl = getConvexUrl();
+  const apiKey = getApiKey();
+  
+  if (!convexUrl) {
+    throw new Error("CONVEX_URL not configured");
+  }
+
+  const response = await fetch(`${convexUrl}/api/sessions/updateStatus`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-Key": apiKey,
+    },
+    body: JSON.stringify({
+      id: sessionId,
+      status,
+      modalSandboxId,
+      errorMessage,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to update session: ${error}`);
+  }
+}
+
+// Helper to call Convex HTTP action for adding messages
+async function addMessage(
+  sessionId: string,
+  role: string,
+  content: string,
+  toolCalls?: unknown[],
+  toolResults?: unknown[]
+) {
+  const convexUrl = getConvexUrl();
+  const apiKey = getApiKey();
+  
+  if (!convexUrl) {
+    throw new Error("CONVEX_URL not configured");
+  }
+
+  const response = await fetch(`${convexUrl}/api/messages/add`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-Key": apiKey,
+    },
+    body: JSON.stringify({
+      sessionId,
+      role,
+      content,
+      toolCalls,
+      toolResults,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to add message: ${error}`);
+  }
+}
 
 // Store active OpenCode clients by session ID
 const openCodeClients = new Map<string, OpenCodeClient>();
@@ -62,12 +129,12 @@ export function createSessionRoutes(convex: ConvexHttpClient) {
 
         // Check if we got a tunnel URL - this is required for the session to work
         if (!result.tunnelUrl) {
-          await convex.mutation(sessionsInternalUpdateStatus, {
-            id: sessionId,
-            status: "error",
-            modalSandboxId: result.sandboxId,
-            errorMessage: "Failed to establish connection to sandbox - no tunnel URL available",
-          });
+          await updateSessionStatus(
+            sessionId,
+            "error",
+            result.sandboxId,
+            "Failed to establish connection to sandbox - no tunnel URL available"
+          );
 
           return c.json({
             error: "Failed to establish connection to sandbox",
@@ -79,11 +146,11 @@ export function createSessionRoutes(convex: ConvexHttpClient) {
         openCodeClients.set(sessionId, new OpenCodeClient(result.tunnelUrl));
 
         // Update session with sandbox ID - only set to running if we have a working connection
-        await convex.mutation(sessionsInternalUpdateStatus, {
-          id: sessionId,
-          status: "running",
-          modalSandboxId: result.sandboxId,
-        });
+        await updateSessionStatus(
+          sessionId,
+          "running",
+          result.sandboxId
+        );
 
         return c.json({
           success: true,
@@ -94,11 +161,12 @@ export function createSessionRoutes(convex: ConvexHttpClient) {
         const message = error instanceof Error ? error.message : "Unknown error";
 
         // Update session with error
-        await convex.mutation(sessionsInternalUpdateStatus, {
-          id: sessionId,
-          status: "error",
-          errorMessage: message,
-        });
+        await updateSessionStatus(
+          sessionId,
+          "error",
+          undefined,
+          message
+        );
 
         return c.json({ error: message }, 500);
       }
@@ -149,20 +217,19 @@ export function createSessionRoutes(convex: ConvexHttpClient) {
               } else if (event.type === "tool_result") {
                 toolResults.push(event.data);
               } else if (event.type === "done") {
-                // Save assistant message to Convex
-                convex.mutation(messagesInternalAdd, {
+                // Save assistant message to Convex (fire and forget)
+                addMessage(
                   sessionId,
-                  role: "assistant",
-                  content: fullContent,
-                  toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-                  toolResults: toolResults.length > 0 ? toolResults : undefined,
-                });
+                  "assistant",
+                  fullContent,
+                  toolCalls.length > 0 ? toolCalls : undefined,
+                  toolResults.length > 0 ? toolResults : undefined
+                ).catch((err) => console.error("Failed to add message:", err));
 
-                // Update session status to idle
-                convex.mutation(sessionsInternalUpdateStatus, {
-                  id: sessionId,
-                  status: "idle",
-                });
+                // Update session status to idle (fire and forget)
+                updateSessionStatus(sessionId, "idle").catch((err) =>
+                  console.error("Failed to update session status:", err)
+                );
               }
             });
 
@@ -206,10 +273,7 @@ export function createSessionRoutes(convex: ConvexHttpClient) {
       }
 
       // Update session status
-      await convex.mutation(sessionsInternalUpdateStatus, {
-        id: sessionId,
-        status: "stopped",
-      });
+      await updateSessionStatus(sessionId, "stopped");
 
       return c.json({ success: true });
     } catch (error) {

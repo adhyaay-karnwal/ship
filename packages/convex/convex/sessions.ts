@@ -98,8 +98,24 @@ export const updateStatus = mutation({
     ),
     modalSandboxId: v.optional(v.string()),
     errorMessage: v.optional(v.string()),
+    // Optional API key for server-side calls
+    apiKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Check if API key is provided (for server-side calls)
+    const expectedApiKey = process.env.API_KEY;
+    if (args.apiKey && expectedApiKey && args.apiKey === expectedApiKey) {
+      // API key auth - allow update without user check
+      await ctx.db.patch(args.id, {
+        status: args.status,
+        modalSandboxId: args.modalSandboxId,
+        errorMessage: args.errorMessage,
+        updatedAt: Date.now(),
+      });
+      return;
+    }
+
+    // Otherwise, require user authentication
     const userId = await auth.getUserId(ctx);
     if (!userId) {
       throw new Error("Not authenticated");

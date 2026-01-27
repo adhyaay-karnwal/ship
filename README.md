@@ -98,6 +98,10 @@ NEXT_PUBLIC_API_URL=http://localhost:3000  # For local dev
 # Convex
 CONVEX_URL=https://your-project.convex.cloud
 
+# API Key (shared secret with Convex - must match Convex API_KEY)
+# Generate with: openssl rand -hex 32
+API_KEY=your-api-key-secret
+
 # Anthropic (for Claude)
 ANTHROPIC_API_KEY=sk-ant-...
 
@@ -116,6 +120,9 @@ GITHUB_APP_INSTALLATION_ID=your-installation-id
 ```env
 AUTH_GITHUB_ID=your-oauth-client-id
 AUTH_GITHUB_SECRET=your-oauth-client-secret
+
+# API Key (shared secret with API server - must match API API_KEY)
+API_KEY=your-api-key-secret
 ```
 
 ### 6. Modal Setup
