@@ -135,8 +135,7 @@ export function AppSidebar({ sessions, user, searchQuery, onSearchChange, curren
                   Settings
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onSelect={(event) => {
-                    event.preventDefault()
+                  onSelect={() => {
                     window.location.href = '/api/auth/logout'
                   }}
                   className="cursor-pointer"
