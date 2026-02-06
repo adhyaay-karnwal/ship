@@ -20,6 +20,12 @@ Thanks for your interest in contributing to Ship! Here's how to get started.
    - Copy `.dev.vars.example` to `.dev.vars` in `apps/api/`
    - Fill in the required values
 
+   For production, set `ALLOWED_ORIGINS` on your Cloudflare Worker (comma-separated origins):
+   ```bash
+   npx wrangler secret put ALLOWED_ORIGINS --env production
+   # Enter: http://localhost:3000,https://your-domain.com
+   ```
+
 4. **Run the dev server**
    ```bash
    pnpm dev

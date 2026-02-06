@@ -14,7 +14,14 @@ import {
   cn,
 } from '@ship/ui'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { ArrowDown01Icon, AttachmentIcon, ArrowUp02Icon, GithubIcon, PlusSignIcon, Tick02Icon } from '@hugeicons/core-free-icons'
+import {
+  ArrowDown01Icon,
+  AttachmentIcon,
+  ArrowUp02Icon,
+  GithubIcon,
+  PlusSignIcon,
+  Tick02Icon,
+} from '@hugeicons/core-free-icons'
 import type { GitHubRepo, ModelInfo } from '@/lib/api'
 
 type ChatComposerProps = {
@@ -102,25 +109,16 @@ export function ChatComposer({
               />
               <DropdownMenuContent align="start" className="w-[280px] max-h-[300px] overflow-y-auto">
                 {reposLoading ? (
-                  <div className="p-3 text-center text-sm text-muted-foreground">
-                    Loading repos...
-                  </div>
+                  <div className="p-3 text-center text-sm text-muted-foreground">Loading repos...</div>
                 ) : repos.length === 0 ? (
-                  <div className="p-3 text-center text-sm text-muted-foreground">
-                    No repos found
-                  </div>
+                  <div className="p-3 text-center text-sm text-muted-foreground">No repos found</div>
                 ) : (
                   <DropdownMenuGroup>
-                    {repos.slice(0, 20).map((repo) => (
-                      <DropdownMenuItem
-                        key={repo.id}
-                        onClick={() => onRepoSelect(repo)}
-                      >
+                    {repos.slice(0, 100).map((repo) => (
+                      <DropdownMenuItem key={repo.id} onClick={() => onRepoSelect(repo)}>
                         <HugeiconsIcon icon={GithubIcon} strokeWidth={2} />
                         <span className="truncate flex-1">{repo.fullName}</span>
-                        {repo.private && (
-                          <span className="text-[10px] text-muted-foreground">private</span>
-                        )}
+                        {repo.private && <span className="text-[10px] text-muted-foreground">private</span>}
                         {selectedRepo?.id === repo.id && (
                           <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="text-foreground" />
                         )}
@@ -163,8 +161,11 @@ export function ChatComposer({
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <Button variant="ghost" className="h-5 gap-1 px-1.5 text-[10px] text-muted-foreground hover:text-foreground">
-                {modelsLoading ? 'Loading...' : (selectedModel?.name || 'Select model')}
+              <Button
+                variant="ghost"
+                className="h-5 gap-1 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+              >
+                {modelsLoading ? 'Loading...' : selectedModel?.name || 'Select model'}
                 <HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={2} className="text-muted-foreground size-3.5" />
               </Button>
             }
@@ -176,10 +177,13 @@ export function ChatComposer({
                 <DropdownMenuLabel className="text-xs text-muted-foreground capitalize font-normal">
                   {provider}
                 </DropdownMenuLabel>
-                <DropdownMenuRadioGroup value={selectedModel?.id || ''} onValueChange={(value) => {
-                  const model = providerModels.find(m => m.id === value)
-                  if (model) onModelSelect(model)
-                }}>
+                <DropdownMenuRadioGroup
+                  value={selectedModel?.id || ''}
+                  onValueChange={(value) => {
+                    const model = providerModels.find((m) => m.id === value)
+                    if (model) onModelSelect(model)
+                  }}
+                >
                   {providerModels.map((model) => (
                     <DropdownMenuRadioItem key={model.id} value={model.id}>
                       {model.name}

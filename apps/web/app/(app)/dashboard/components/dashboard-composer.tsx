@@ -168,13 +168,11 @@ export function DashboardComposer({
                         <div className="p-3 text-center text-sm text-muted-foreground">No repos found</div>
                       ) : (
                         <DropdownMenuGroup>
-                          {repos.slice(0, 20).map((repo) => (
+                          {repos.slice(0, 100).map((repo) => (
                             <DropdownMenuItem key={repo.id} onClick={() => onRepoSelect(repo)}>
                               <HugeiconsIcon icon={GithubIcon} strokeWidth={2} />
                               <span className="truncate flex-1">{repo.fullName}</span>
-                              {repo.private && (
-                                <span className="text-[10px] text-muted-foreground">private</span>
-                              )}
+                              {repo.private && <span className="text-[10px] text-muted-foreground">private</span>}
                             </DropdownMenuItem>
                           ))}
                         </DropdownMenuGroup>
