@@ -17,17 +17,6 @@ import type { Env } from '../env.d'
 
 const app = new Hono<{ Bindings: Env }>()
 
-// Debug endpoint to verify deployment and test logging
-app.get('/debug', (c) => {
-  console.log('[chat:debug] Debug endpoint called')
-  return c.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    version: 'v2-refactor',
-    env: c.env.ENVIRONMENT,
-  })
-})
-
 // POST /chat/:sessionId - Send message and receive streaming response
 app.post('/:sessionId', async (c) => {
   const sessionId = c.req.param('sessionId')
@@ -277,7 +266,7 @@ app.post('/:sessionId', async (c) => {
 
             // Configure git
             await sandbox.commands.run(`cd ${repoPath} && git config user.name "Ship Agent"`)
-            await sandbox.commands.run(`cd ${repoPath} && git config user.email "agent@ship.dylansteck.com"`)
+            await sandbox.commands.run(`cd ${repoPath} && git config user.email "agent@ship.dev"`)
             await sandbox.commands.run(`cd ${repoPath} && git checkout -b ${branchName}`)
 
             // Save repo info

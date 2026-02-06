@@ -21,4 +21,5 @@ export interface Env {
   ANTHROPIC_API_KEY: string;
   API_SECRET: string;
   E2B_API_KEY: string;
+  ALLOWED_ORIGINS?: string;
 }

@@ -16,13 +16,14 @@ import type { Env } from './env.d'
 const app = new Hono<{ Bindings: Env }>()
 
 // CORS middleware
-const allowedOrigins = new Set(['http://localhost:3000', 'https://ship.dylansteck.com'])
-
 app.use(
   '/*',
   cors({
-    origin: (origin) => {
+    origin: (origin, c) => {
       if (!origin) return undefined
+      const allowedOrigins = new Set(
+        (c.env.ALLOWED_ORIGINS ?? 'http://localhost:3000').split(',').map((s: string) => s.trim()),
+      )
       return allowedOrigins.has(origin) ? origin : undefined
     },
     credentials: true,
