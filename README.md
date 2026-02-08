@@ -1,8 +1,38 @@
 # Ship
 
-A background agent platform for building software. Sign in with GitHub, chat with an AI agent (powered by OpenCode SDK) that works on code in sandboxed environments. Tasks come from Linear issues or chat conversations. Sessions contain conversations with one or many tasks — the agent writes code, runs tests, and deploys while you focus on other things.
+A background agent platform for building software. Sign in with GitHub, chat with an AI agent (powered by OpenCode SDK) that works on code in sandboxed environments. Tasks come from Linear issues or chat conversations. Sessions contain conversations with one or many tasks — the agent writes code, runs tests, and deploys while you focus on other things.Heavily inspired by Ramp's internal [Inspect background coding agent](https://builders.ramp.com/post/why-we-built-our-background-agent). Built by [@dylsteck](https://github.com/dylsteck).
 
 **Core Value**: The agent works autonomously in the background on real coding tasks while you do other things — you come back to working code, not just suggestions.
+
+## Demo
+
+<video src="https://github.com/user-attachments/assets/8ca7aa09-9004-4d4d-8d83-d086403afa63" controls></video>
+
+## Architecture
+
+```mermaid
+graph TD
+    A[Next.js Web App] -->|SSE Streaming| B[Cloudflare Worker API]
+    B -->|Durable Objects| C[Session State]
+    B -->|OpenCode SDK| D[AI Agent]
+    D -->|E2B Sandbox| E[Code Execution]
+    D -->|GitHub API| F[PR Creation]
+    
+    subgraph Frontend
+        A --> G[Dashboard]
+        G --> H[Chat + Streaming]
+        G --> I[Session Panel]
+        G --> J[Composer]
+    end
+    
+    subgraph Chat UI
+        H --> K[UIMessage Adapter]
+        K --> L[SSE Parser]
+        K --> M[Tool Blocks]
+        K --> N[Reasoning]
+        K --> O[Permissions / Questions]
+    end
+```
 
 ## Tech Stack
 
