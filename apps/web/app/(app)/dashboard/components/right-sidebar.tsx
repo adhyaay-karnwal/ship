@@ -8,22 +8,7 @@ import {
   SheetDescription,
 } from '@ship/ui'
 import { SessionPanel } from '@/components/chat/session-panel'
-import type { SessionInfo } from '@/lib/sse-types'
-import type { UIMessage } from '@/lib/ai-elements-adapter'
-import type { GitHubRepo, ModelInfo } from '@/lib/api'
-interface SessionPanelData {
-  sessionId: string
-  selectedRepo: GitHubRepo | null
-  selectedModel: ModelInfo | null
-  mode: 'build' | 'plan'
-  lastStepCost: { cost: number; tokens: { input: number; output: number; reasoning: number; cache: { read: number; write: number } } } | null
-  totalCost: number
-  sessionTodos: Array<{ id: string; content: string; status: 'pending' | 'in_progress' | 'completed' | 'cancelled'; priority: 'high' | 'medium' | 'low' }>
-  fileDiffs: Array<{ filename: string; additions: number; deletions: number }>
-  openCodeUrl: string
-  sessionInfo: SessionInfo | null
-  messages: UIMessage[]
-}
+import type { SessionPanelData } from '../types'
 
 interface RightSidebarProps {
   data: SessionPanelData

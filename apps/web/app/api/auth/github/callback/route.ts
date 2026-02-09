@@ -51,7 +51,7 @@ export async function GET(request: Request): Promise<Response> {
 
       if (emailsResponse.ok) {
         const emails = await emailsResponse.json()
-        const primaryEmail = emails.find((e: any) => e.primary)
+        const primaryEmail = emails.find((e: { email: string; primary: boolean; verified: boolean }) => e.primary)
         email = primaryEmail?.email ?? null
       }
     }

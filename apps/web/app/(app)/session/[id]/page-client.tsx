@@ -9,8 +9,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { AppSidebar } from '@/components/app-sidebar'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@ship/ui'
 import type { ChatSession, User } from '@/lib/api'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787'
+import { API_URL } from '@/lib/config'
 
 interface SessionPageClientProps {
   sessionId: string

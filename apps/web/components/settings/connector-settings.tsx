@@ -2,8 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { Button, Badge, cn } from '@ship/ui'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787'
+import { API_URL } from '@/lib/config'
 
 interface ConnectorStatus {
   name: 'github' | 'linear' | 'vercel'

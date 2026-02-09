@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect } from 'react'
-import type { ChatSession, GitHubRepo, ModelInfo } from '@/lib/api'
+import type { ChatSession } from '@/lib/api/server'
+import type { GitHubRepo, ModelInfo } from '@/lib/api/types'
 
 interface UseSessionSyncParams {
   /** URL search params (from useSearchParams) */

@@ -60,7 +60,7 @@ export interface UIMessage {
 /**
  * Maps OpenCode tool states → our ToolInvocation states
  */
-function mapToolState(status: string | undefined): ToolInvocationState {
+function mapSSEToolState(status: string | undefined): ToolInvocationState {
   switch (status) {
     case 'pending':
       return 'partial-call'
@@ -85,7 +85,7 @@ export function createToolInvocation(toolPart: ToolPart): ToolInvocation {
   return {
     toolCallId: toolPart.callID,
     toolName: toolPart.tool,
-    state: mapToolState(toolPart.state?.status),
+    state: mapSSEToolState(toolPart.state?.status),
     args: toolPart.state?.input || {},
     result: toolPart.state?.output,
     duration,
@@ -462,6 +462,27 @@ export function mapApiMessagesToUI(apiMessages: ApiMessage[]): UIMessage[] {
     }
     return uiMsg
   })
+}
+
+// ============ UI Tool State Mapping ============
+
+/**
+ * Maps our ToolInvocation state to the Tool UI component's status.
+ * Used by both dashboard-messages and ai-message-list.
+ */
+export function mapToolState(state: string): 'pending' | 'in_progress' | 'completed' | 'failed' {
+  switch (state) {
+    case 'partial-call':
+      return 'pending'
+    case 'call':
+      return 'in_progress'
+    case 'result':
+      return 'completed'
+    case 'error':
+      return 'failed'
+    default:
+      return 'pending'
+  }
 }
 
 // ============ Status Helpers ============

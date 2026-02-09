@@ -5,7 +5,7 @@
  * from Server Components and Server Actions.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.API_BASE_URL || 'http://localhost:8787'
+import { API_URL } from '@/lib/config'
 
 // Session types matching API response
 export interface ChatSession {
@@ -148,30 +148,18 @@ export async function getChatMessages(
  */
 export async function sendChatMessage(sessionId: string, content: string, mode?: 'build' | 'plan'): Promise<Response> {
   const url = `${API_URL}/chat/${encodeURIComponent(sessionId)}`
-  console.log(`[api] Sending chat message to ${url}`)
-  console.log(`[api] Request body:`, { content: content.slice(0, 50), mode })
 
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
-      },
-      body: JSON.stringify({ content, mode }),
-      // Ensure we can read the stream
-      cache: 'no-store',
-    })
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+    },
+    body: JSON.stringify({ content, mode }),
+    cache: 'no-store',
+  })
 
-    console.log(`[api] Response status: ${response.status}`)
-    console.log(`[api] Response headers:`, Object.fromEntries(response.headers.entries()))
-    console.log(`[api] Response body exists: ${!!response.body}`)
-
-    return response
-  } catch (error) {
-    console.error(`[api] Fetch error:`, error)
-    throw error
-  }
+  return response
 }
 
 /**

@@ -3,10 +3,8 @@
  * Base fetcher and utilities for SWR hooks
  */
 
-export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  process.env.API_BASE_URL ||
-  'http://localhost:8787'
+export { API_URL } from '@/lib/config'
+import { API_URL } from '@/lib/config'
 
 // Type-safe fetcher for SWR
 export async function fetcher<T>(url: string, init?: RequestInit): Promise<T> {

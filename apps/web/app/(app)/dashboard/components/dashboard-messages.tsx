@@ -5,15 +5,8 @@ import { Markdown } from '@/components/chat/markdown'
 import { ErrorMessage } from '@/components/chat/error-message'
 import { PermissionPrompt } from './permission-prompt'
 import { QuestionPrompt } from './question-prompt'
-import type { UIMessage } from '@/lib/ai-elements-adapter'
-import { getStreamingStatus } from '@/lib/ai-elements-adapter'
-
-interface TodoItem {
-  id: string
-  content: string
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled'
-  priority: 'high' | 'medium' | 'low'
-}
+import { type UIMessage, getStreamingStatus, mapToolState } from '@/lib/ai-elements-adapter'
+import type { TodoItem } from '../types'
 
 interface DashboardMessagesProps {
   activeSessionId: string | null
@@ -221,20 +214,3 @@ export function DashboardMessages({
   )
 }
 
-/**
- * Map our ToolInvocation state to the Tool component's status
- */
-function mapToolState(state: string): 'pending' | 'in_progress' | 'completed' | 'failed' {
-  switch (state) {
-    case 'partial-call':
-      return 'pending'
-    case 'call':
-      return 'in_progress'
-    case 'result':
-      return 'completed'
-    case 'error':
-      return 'failed'
-    default:
-      return 'pending'
-  }
-}

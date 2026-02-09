@@ -4,15 +4,18 @@ import { useState, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { SidebarProvider, SidebarInset, cn } from '@ship/ui'
 import { AppSidebar } from '@/components/app-sidebar'
-import { CreateSessionDialog } from '@/components/session/create-session-dialog'
-import { useGitHubRepos, useModels, useCreateSession, type ChatSession, type GitHubRepo, type ModelInfo, type User } from '@/lib/api'
+import { useGitHubRepos } from '@/lib/api/hooks/use-repos'
+import { useModels } from '@/lib/api/hooks/use-models'
+import { useCreateSession } from '@/lib/api/hooks/use-sessions'
+import type { ChatSession } from '@/lib/api/server'
+import type { GitHubRepo, ModelInfo, User } from '@/lib/api/types'
 import { useDashboardChat } from './hooks/use-dashboard-chat'
 import { useDashboardSSE } from './hooks/use-dashboard-sse'
 import { useRightSidebar } from './hooks/use-right-sidebar'
 import { useSessionSync } from './hooks/use-session-sync'
 import { DashboardHeader } from './components/dashboard-header'
 import { DashboardMessages } from './components/dashboard-messages'
-import { DashboardComposer } from './components/dashboard-composer'
+import { DashboardComposer } from './components/composer'
 import { RightSidebar } from './components/right-sidebar'
 
 interface DashboardClientProps {
@@ -257,7 +260,6 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
         </div>
       </SidebarInset>
 
-      <CreateSessionDialog isOpen={false} onClose={() => {}} onCreate={handleCreate} userId={userId} />
     </SidebarProvider>
   )
 }

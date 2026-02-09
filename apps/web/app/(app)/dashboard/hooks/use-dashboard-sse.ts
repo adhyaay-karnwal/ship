@@ -1,23 +1,30 @@
 'use client'
 
 import { useCallback, useRef } from 'react'
-import { sendChatMessage } from '@/lib/api'
+import { sendChatMessage } from '@/lib/api/server'
 import { parseSSEEvent } from '@/lib/sse-parser'
-import type { ToolPart as SSEToolPart, StepFinishPart, SessionInfo } from '@/lib/sse-types'
+import type { SessionInfo } from '@/lib/sse-types'
+import type { TodoItem, FileDiff, StepCostInfo } from '../types'
 import {
   type UIMessage,
-  processPartUpdated,
   createUserMessage,
   createAssistantPlaceholder,
   createErrorMessage,
-  createPermissionMessage,
-  createQuestionMessage,
-  createSystemMessage,
-  updatePromptStatus,
   classifyError,
-  parseErrorMessage,
-  extractStepCost,
 } from '@/lib/ai-elements-adapter'
+import {
+  type SSEHandlerContext,
+  handleMessagePartUpdated,
+  handleDoneOrIdle,
+  handleSessionError,
+  handleGenericError,
+  handlePermissionAsked,
+  handlePermissionResolved,
+  handleQuestionAsked,
+  handleQuestionResolved,
+  handleOpenCodeUrl,
+  handleRawDataFallbacks,
+} from './sse-event-handlers'
 
 interface UseDashboardSSEParams {
   activeSessionId: string | null
@@ -26,20 +33,9 @@ interface UseDashboardSSEParams {
   setIsStreaming: (value: boolean) => void
   setMessages: React.Dispatch<React.SetStateAction<UIMessage[]>>
   setTotalCost: React.Dispatch<React.SetStateAction<number>>
-  setLastStepCost: React.Dispatch<React.SetStateAction<{ cost: number; tokens: StepFinishPart['tokens'] } | null>>
-  setSessionTodos: React.Dispatch<
-    React.SetStateAction<
-      Array<{
-        id: string
-        content: string
-        status: 'pending' | 'in_progress' | 'completed' | 'cancelled'
-        priority: 'high' | 'medium' | 'low'
-      }>
-    >
-  >
-  setFileDiffs: React.Dispatch<
-    React.SetStateAction<Array<{ filename: string; additions: number; deletions: number }>>
-  >
+  setLastStepCost: React.Dispatch<React.SetStateAction<StepCostInfo | null>>
+  setSessionTodos: React.Dispatch<React.SetStateAction<TodoItem[]>>
+  setFileDiffs: React.Dispatch<React.SetStateAction<FileDiff[]>>
   setMessageQueue: React.Dispatch<React.SetStateAction<string[]>>
   setOpenCodeUrl: React.Dispatch<React.SetStateAction<string>>
   setSessionTitle: React.Dispatch<React.SetStateAction<string>>
@@ -72,6 +68,10 @@ export function useDashboardSSE({
   const flushRef = useRef<number | null>(null)
   const streamStartTimeRef = useRef<number | null>(null)
 
+  // Fix stale closure: track isStreaming via ref
+  const isStreamingRef = useRef(isStreaming)
+  isStreamingRef.current = isStreaming
+
   const scheduleFlush = useCallback(() => {
     if (flushRef.current !== null) return
     flushRef.current = requestAnimationFrame(() => {
@@ -98,7 +98,7 @@ export function useDashboardSSE({
       const targetSessionId = sessionIdOverride || activeSessionId
       if (!targetSessionId) return
 
-      if (isStreaming) {
+      if (isStreamingRef.current) {
         setMessageQueue((q) => [...q, content])
         return
       }
@@ -111,14 +111,29 @@ export function useDashboardSSE({
       streamStartTimeRef.current = now
       setStreamStartTime(now)
 
-      // Add user message
       const userMessage = createUserMessage(content)
       setMessages((prev) => [...prev, userMessage])
 
-      // Add assistant placeholder
       const assistantMessage = createAssistantPlaceholder()
       streamingMessageRef.current = assistantMessage.id
       setMessages((prev) => [...prev, assistantMessage])
+
+      const ctx: SSEHandlerContext = {
+        setMessages,
+        setIsStreaming,
+        setTotalCost,
+        setLastStepCost,
+        setSessionTodos,
+        setFileDiffs,
+        setOpenCodeUrl,
+        setSessionTitle,
+        setSessionInfo,
+        setStreamStartTime,
+        streamingMessageRef,
+        assistantTextRef,
+        reasoningRef,
+        targetSessionId,
+      }
 
       try {
         const response = await sendChatMessage(targetSessionId, content, modeOverride ?? mode)
@@ -170,67 +185,27 @@ export function useDashboardSSE({
                 if (!event) continue
 
                 switch (event.type) {
-                  case 'message.part.updated': {
-                    const part = event.properties.part
-                    const delta = event.properties.delta
-
-                    if (part.type === 'text' || part.type === 'reasoning') {
-                      // Accumulate in refs and batch via rAF for smooth rendering
-                      if (part.type === 'text') {
-                        if (typeof delta === 'string') {
-                          assistantTextRef.current += delta
-                        } else if ((part as { text?: string }).text) {
-                          assistantTextRef.current = (part as { text: string }).text
-                        }
-                      } else {
-                        if (typeof delta === 'string') {
-                          reasoningRef.current += delta
-                        } else if ((part as { text?: string }).text) {
-                          reasoningRef.current = (part as { text: string }).text
-                        }
-                      }
-                      scheduleFlush()
-                    } else {
-                      // Tools, step-finish etc. — update immediately via adapter
-                      setMessages((prev) =>
-                        processPartUpdated(part, delta, streamingMessageRef.current!, prev, assistantTextRef, reasoningRef),
-                      )
-                    }
-
-                    // Extract cost from step-finish
-                    if (part.type === 'step-finish') {
-                      const costInfo = extractStepCost(part)
-                      if (costInfo) {
-                        setLastStepCost(costInfo)
-                        setTotalCost((prev) => prev + costInfo.cost)
-                      }
-                    }
+                  case 'message.part.updated':
+                    handleMessagePartUpdated(event as any, ctx, scheduleFlush)
                     break
-                  }
 
-                  case 'message.updated': {
-                    // Message completed - update metadata if needed
+                  case 'message.updated':
                     break
-                  }
 
-                  case 'message.removed': {
-                    const messageID = event.properties.messageID
-                    setMessages((prev) => prev.filter((m) => m.id !== messageID))
+                  case 'message.removed':
+                    setMessages((prev) => prev.filter((m) => m.id !== (event as any).properties.messageID))
                     break
-                  }
 
-                  case 'todo.updated': {
-                    setSessionTodos(event.properties.todos)
+                  case 'todo.updated':
+                    setSessionTodos((event as any).properties.todos)
                     break
-                  }
 
-                  case 'session.diff': {
-                    setFileDiffs(event.properties.diff)
+                  case 'session.diff':
+                    setFileDiffs((event as any).properties.diff)
                     break
-                  }
 
                   case 'session.updated': {
-                    const info = event.properties.info
+                    const info = (event as any).properties.info
                     if (info) {
                       if (info.title) setSessionTitle(info.title)
                       setSessionInfo(info)
@@ -240,105 +215,46 @@ export function useDashboardSSE({
 
                   case 'opencode-url': {
                     const url = (event as { url?: string }).url
-                    if (url) {
-                      setOpenCodeUrl(url)
-                      try { localStorage.setItem(`opencode-url-${targetSessionId}`, url) } catch {}
-                    }
+                    if (url) handleOpenCodeUrl(url, ctx)
                     break
                   }
 
-                  case 'permission.asked': {
-                    const props = event.properties
-                    setMessages((prev) => [
-                      ...prev,
-                      createPermissionMessage(props.id, props.permission, props.description, props.patterns),
-                    ])
+                  case 'permission.asked':
+                    handlePermissionAsked((event as any).properties, ctx)
                     break
-                  }
 
-                  case 'permission.granted': {
-                    setMessages((prev) => updatePromptStatus(event.properties.id, 'granted', prev))
+                  case 'permission.granted':
+                    handlePermissionResolved((event as any).properties.id, 'granted', ctx)
                     break
-                  }
 
-                  case 'permission.denied': {
-                    setMessages((prev) => updatePromptStatus(event.properties.id, 'denied', prev))
+                  case 'permission.denied':
+                    handlePermissionResolved((event as any).properties.id, 'denied', ctx)
                     break
-                  }
 
-                  case 'question.asked': {
-                    const props = event.properties
-                    setMessages((prev) => [...prev, createQuestionMessage(props.id, props.text)])
+                  case 'question.asked':
+                    handleQuestionAsked((event as any).properties, ctx)
                     break
-                  }
 
-                  case 'question.replied': {
-                    setMessages((prev) => updatePromptStatus(event.properties.id, 'replied', prev))
+                  case 'question.replied':
+                    handleQuestionResolved((event as any).properties.id, 'replied', ctx)
                     break
-                  }
 
-                  case 'question.rejected': {
-                    setMessages((prev) => updatePromptStatus(event.properties.id, 'rejected', prev))
+                  case 'question.rejected':
+                    handleQuestionResolved((event as any).properties.id, 'rejected', ctx)
                     break
-                  }
 
                   case 'done':
-                  case 'session.idle': {
-                    // Flush any remaining batched text before ending
-                    if (flushRef.current !== null) {
-                      cancelAnimationFrame(flushRef.current)
-                      flushRef.current = null
-                    }
-                    // Final flush of accumulated text + stamp wall-clock elapsed
-                    const finalMsgId = streamingMessageRef.current
-                    if (finalMsgId) {
-                      const finalText = assistantTextRef.current
-                      const finalReasoning = reasoningRef.current
-                      const elapsed = streamStartTimeRef.current
-                        ? Date.now() - streamStartTimeRef.current
-                        : 0
-                      setMessages((prev) =>
-                        prev.map((m) => {
-                          if (m.id !== finalMsgId) return m
-                          return {
-                            ...m,
-                            content: finalText,
-                            ...(finalReasoning ? { reasoning: [finalReasoning] } : {}),
-                            elapsed,
-                          }
-                        }),
-                      )
-                    }
-                    setIsStreaming(false)
-                    setStreamStartTime(null)
-                    streamingMessageRef.current = null
+                  case 'session.idle':
+                    handleDoneOrIdle(ctx, flushRef, streamStartTimeRef)
                     break
-                  }
 
-                  case 'session.error': {
-                    const errorData = event.properties.error
-                    let errorMessage = 'An error occurred'
-                    if (errorData?.data?.message) {
-                      errorMessage = errorData.data.message
-                    } else if (errorData?.message) {
-                      errorMessage = errorData.message
-                    }
-
-                    const { category, retryable } = classifyError(errorMessage)
-                    setMessages((prev) => [...prev, createErrorMessage(errorMessage, category, retryable)])
-                    setIsStreaming(false)
-                    streamingMessageRef.current = null
+                  case 'session.error':
+                    handleSessionError((event as any).properties.error, ctx)
                     break
-                  }
 
-                  case 'error': {
-                    const errorMessage = parseErrorMessage(event.error)
-                    const { category, retryable } = classifyError(errorMessage)
-                    setMessages((prev) => [...prev, createErrorMessage(errorMessage, category, retryable)])
-                    setIsStreaming(false)
-                    streamingMessageRef.current = null
+                  case 'error':
+                    handleGenericError((event as any).error, ctx)
                     break
-                  }
 
                   case 'status':
                   case 'session.status':
@@ -350,7 +266,6 @@ export function useDashboardSSE({
                   case 'command.executed':
                   case 'server.connected':
                   case 'server.heartbeat':
-                    // These events are informational - no message state changes needed
                     break
 
                   default: {
@@ -361,41 +276,7 @@ export function useDashboardSSE({
                   }
                 }
 
-                // Handle wrapped event fallbacks
-                if (rawData.type === 'event' && rawData.properties) {
-                  const innerEvent = rawData.properties as { type?: string; error?: unknown }
-                  if (innerEvent.type === 'session.error') {
-                    const errorData = innerEvent.error as { name?: string; data?: { message?: string }; message?: string }
-                    let errorMessage = 'An error occurred'
-                    if (errorData?.data?.message) {
-                      errorMessage = errorData.data.message
-                    } else if (errorData?.message) {
-                      errorMessage = errorData.message
-                    }
-
-                    const { category, retryable } = classifyError(errorMessage)
-                    setMessages((prev) => [...prev, createErrorMessage(errorMessage, category, retryable)])
-                    setIsStreaming(false)
-                    streamingMessageRef.current = null
-                  }
-                }
-
-                if (rawData.type === 'assistant') {
-                  setMessages((prev) =>
-                    prev.map((m) =>
-                      m.id === streamingMessageRef.current
-                        ? { ...m, content: rawData.content, id: rawData.id || m.id }
-                        : m,
-                    ),
-                  )
-                }
-
-                if (rawData.prUrl) {
-                  setMessages((prev) => [
-                    ...prev,
-                    createSystemMessage(`Draft PR created: ${rawData.prUrl}`, 'pr-notification'),
-                  ])
-                }
+                handleRawDataFallbacks(rawData, ctx)
               } catch {
                 // Ignore parse errors
               }
@@ -421,7 +302,7 @@ export function useDashboardSSE({
         streamingMessageRef.current = null
       }
     },
-    [activeSessionId, isStreaming, mode],
+    [activeSessionId, mode],
   )
 
   return { handleSend }

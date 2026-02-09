@@ -6,7 +6,7 @@ import { Markdown } from './markdown'
 import { cn } from '@ship/ui'
 import { SubagentSheet } from './subagent-sheet'
 import { SubagentProvider, useSubagent } from '@/lib/subagent/subagent-context'
-import type { UIMessage } from '@/lib/ai-elements-adapter'
+import { type UIMessage, mapToolState } from '@/lib/ai-elements-adapter'
 
 interface AIMessageListProps {
   messages: UIMessage[]
@@ -15,21 +15,6 @@ interface AIMessageListProps {
   streamingLabel?: string
   onRetryError?: (messageId: string) => void
   className?: string
-}
-
-function mapToolState(state: string): 'pending' | 'in_progress' | 'completed' | 'failed' {
-  switch (state) {
-    case 'partial-call':
-      return 'pending'
-    case 'call':
-      return 'in_progress'
-    case 'result':
-      return 'completed'
-    case 'error':
-      return 'failed'
-    default:
-      return 'pending'
-  }
 }
 
 // Inner component that uses the subagent context

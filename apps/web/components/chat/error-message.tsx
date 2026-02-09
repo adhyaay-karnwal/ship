@@ -1,5 +1,6 @@
 'use client'
 
+import { Button } from '@ship/ui'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Alert01Icon } from '@hugeicons/core-free-icons'
 
@@ -154,12 +155,9 @@ export function ErrorMessage({
           {/* Action buttons */}
           {retryable && onRetry && (
             <div className="flex flex-wrap gap-2 mt-3">
-              <button
-                onClick={onRetry}
-                className="text-xs px-3 py-1.5 rounded bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              >
+              <Button variant="outline" size="sm" onClick={onRetry}>
                 Retry
-              </button>
+              </Button>
             </div>
           )}
         </div>

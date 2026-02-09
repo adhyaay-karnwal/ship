@@ -20,8 +20,7 @@ import {
   getStreamingStatus,
 } from '@/lib/ai-elements-adapter'
 import type { Message } from '@/lib/api'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787'
+import { API_URL } from '@/lib/config'
 
 interface ChatInterfaceProps {
   sessionId: string

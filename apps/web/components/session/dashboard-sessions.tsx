@@ -6,6 +6,7 @@ import { SessionList } from './session-list'
 import { CreateSessionDialog } from './create-session-dialog'
 import { Button } from '@ship/ui'
 import type { ChatSession } from '@/lib/api'
+import { API_URL } from '@/lib/config'
 
 interface DashboardSessionsProps {
   initialSessions: ChatSession[]
@@ -21,8 +22,6 @@ export function DashboardSessions({ initialSessions, userId }: DashboardSessions
   const router = useRouter()
 
   const handleCreate = async (data: { repoOwner: string; repoName: string }) => {
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787'
-
     const res = await fetch(`${API_URL}/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -42,8 +41,6 @@ export function DashboardSessions({ initialSessions, userId }: DashboardSessions
   }
 
   const handleDelete = async (id: string) => {
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787'
-
     const res = await fetch(`${API_URL}/sessions/${id}`, {
       method: 'DELETE',
     })
