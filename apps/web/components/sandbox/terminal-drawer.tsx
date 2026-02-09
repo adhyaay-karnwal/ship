@@ -70,7 +70,7 @@ export function TerminalDrawer({ sandboxId, isOpen, onOpenChange }: TerminalDraw
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[400px] p-0">
+      <SheetContent side="bottom" className="h-[50vh] sm:h-[400px] p-0">
         <SheetHeader className="border-b px-4 py-2">
           <div className="flex items-center justify-between">
             <SheetTitle>Terminal</SheetTitle>

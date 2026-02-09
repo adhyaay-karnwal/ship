@@ -37,7 +37,7 @@ export function DashboardMessages({
 
   return (
     <Conversation className="h-full">
-      <div className="mx-auto w-full max-w-3xl px-6 py-6">
+      <div className="mx-auto w-full max-w-3xl px-3 py-4 sm:px-6 sm:py-6">
         {/* Empty state */}
         {!hasContent && !isStreaming && (
           <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">

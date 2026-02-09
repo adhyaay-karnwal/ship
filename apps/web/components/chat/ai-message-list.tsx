@@ -79,7 +79,7 @@ function MessageListContent({
   return (
     <>
       <Conversation className={cn('flex-1', className)}>
-        <div className="max-w-3xl mx-auto py-6">
+        <div className="max-w-3xl mx-auto px-3 py-4 sm:px-4 sm:py-6">
           {messages.map((msg) => {
             // Handle error messages
             if (msg.type === 'error') {

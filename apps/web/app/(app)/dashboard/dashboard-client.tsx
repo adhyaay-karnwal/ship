@@ -260,7 +260,7 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
         isStreaming={isStreaming}
       />
       <SidebarInset>
-        <div className="flex h-screen relative overflow-hidden">
+        <div className="flex h-screen h-[100dvh] relative overflow-hidden">
           {/* Main column: header + content + composer */}
           <div className="flex-1 flex flex-col min-w-0">
             <DashboardHeader

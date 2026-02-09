@@ -30,7 +30,7 @@ export function VSCodeDrawer({ sandboxId, isOpen, onOpenChange }: VSCodeDrawerPr
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-[800px] p-0">
+      <SheetContent side="right" className="w-[95vw] sm:w-[800px] sm:max-w-[800px] p-0">
         <SheetHeader className="border-b">
           <SheetTitle>VS Code</SheetTitle>
         </SheetHeader>

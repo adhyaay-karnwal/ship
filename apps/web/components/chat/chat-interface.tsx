@@ -357,7 +357,7 @@ export function ChatInterface({
     : undefined
 
   return (
-    <div className="flex h-full flex-col bg-white dark:bg-background">
+    <div className="flex h-full flex-col bg-background">
       {/* Connection status indicator */}
       {wsStatus !== 'connected' && (
         <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-sm text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-200">
@@ -380,7 +380,7 @@ export function ChatInterface({
       />
 
       {/* Input Area */}
-      <div className="border-t bg-white dark:bg-background p-4">
+      <div className="border-t bg-white dark:bg-background p-3 sm:p-4">
         <div className="max-w-3xl mx-auto">
           <EnhancedPromptInput
             onSend={handleSend}
