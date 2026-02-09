@@ -189,6 +189,7 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
               activeSessionId={chat.activeSessionId}
               sessionTitle={displayTitle}
               wsStatus={chat.wsStatus}
+              sandboxStatus={chat.sandboxStatus}
               rightSidebarOpen={rightSidebar.desktopOpen}
               onToggleRightSidebar={rightSidebar.toggle}
             />

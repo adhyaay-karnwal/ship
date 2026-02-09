@@ -6,8 +6,7 @@ import { Markdown } from './markdown'
 import { cn } from '@ship/ui'
 import { SubagentSheet } from './subagent-sheet'
 import { SubagentProvider, useSubagent } from '@/lib/subagent/subagent-context'
-import { isSubagentToolInvocation, extractSubagentSessionId } from '@/lib/subagent/utils'
-import type { UIMessage, ToolInvocation } from '@/lib/ai-elements-adapter'
+import type { UIMessage } from '@/lib/ai-elements-adapter'
 
 interface AIMessageListProps {
   messages: UIMessage[]
@@ -42,11 +41,7 @@ function MessageListContent({
   onRetryError,
   className,
 }: AIMessageListProps) {
-  const { openSubagent, closeSubagent, viewState } = useSubagent()
-
-  const handleViewSubagent = (sessionId: string, toolCallId: string, toolName: string) => {
-    openSubagent(sessionId, toolCallId, toolName)
-  }
+  const { closeSubagent, viewState } = useSubagent()
 
   if (messages.length === 0 && !isStreaming) {
     return (
@@ -108,11 +103,7 @@ function MessageListContent({
                 {/* Assistant tools - inline */}
                 {msg.role === 'assistant' && msg.toolInvocations && msg.toolInvocations.length > 0 && (
                   <div className="space-y-1">
-                    {msg.toolInvocations.map((tool) => {
-                      const sessionId = extractSubagentSessionId(tool)
-                      const isSubagent = isSubagentToolInvocation(tool)
-
-                      return (
+                    {msg.toolInvocations.map((tool) => (
                         <Tool
                           key={tool.toolCallId}
                           name={tool.toolName}
@@ -120,16 +111,8 @@ function MessageListContent({
                           input={tool.args}
                           output={tool.result}
                           duration={tool.duration}
-                          sessionId={sessionId || undefined}
-                          onViewSubagent={
-                            isSubagent && sessionId
-                              ? (sid) => handleViewSubagent(sid, tool.toolCallId, tool.toolName)
-                              : undefined
-                          }
-                          subagentLabel="View details"
                         />
-                      )
-                    })}
+                    ))}
                   </div>
                 )}
 

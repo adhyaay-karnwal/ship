@@ -34,6 +34,7 @@ export function useDashboardChat(initialSessions: ChatSession[]) {
   const [sessionTitle, setSessionTitle] = useState<string>('')
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null)
   const [streamStartTime, setStreamStartTime] = useState<number | null>(null)
+  const [sandboxStatus, setSandboxStatus] = useState<string>('unknown')
 
   const wsRef = useRef<ReturnType<typeof createReconnectingWebSocket> | null>(null)
   const streamingMessageRef = useRef<string | null>(null)
@@ -106,7 +107,8 @@ export function useDashboardChat(initialSessions: ChatSession[]) {
         }
 
         if (event.type === 'sandbox-status') {
-          // Sidebar info only
+          const status = (event as { status?: string }).status
+          if (status) setSandboxStatus(status)
         }
       },
       onStatusChange: setWsStatus,
@@ -145,6 +147,9 @@ export function useDashboardChat(initialSessions: ChatSession[]) {
 
       const savedTitle = localStorage.getItem(`session-title-${activeSessionId}`)
       if (savedTitle) setSessionTitle(savedTitle)
+
+      const savedSandboxStatus = localStorage.getItem(`sandbox-status-${activeSessionId}`)
+      if (savedSandboxStatus) setSandboxStatus(savedSandboxStatus)
     } catch {}
 
     // Load historical messages
@@ -170,8 +175,9 @@ export function useDashboardChat(initialSessions: ChatSession[]) {
       if (lastStepCost) localStorage.setItem(`step-cost-${activeSessionId}`, JSON.stringify(lastStepCost))
       if (sessionInfo) localStorage.setItem(`session-info-${activeSessionId}`, JSON.stringify(sessionInfo))
       if (sessionTitle) localStorage.setItem(`session-title-${activeSessionId}`, sessionTitle)
+      if (sandboxStatus) localStorage.setItem(`sandbox-status-${activeSessionId}`, sandboxStatus)
     } catch {}
-  }, [activeSessionId, totalCost, lastStepCost, sessionInfo, sessionTitle])
+  }, [activeSessionId, totalCost, lastStepCost, sessionInfo, sessionTitle, sandboxStatus])
 
   const handleStop = useCallback(async () => {
     if (!activeSessionId) return
@@ -212,6 +218,8 @@ export function useDashboardChat(initialSessions: ChatSession[]) {
     setSessionInfo,
     streamStartTime,
     setStreamStartTime,
+    sandboxStatus,
+    setSandboxStatus,
     wsRef,
     streamingMessageRef,
     assistantTextRef,
