@@ -12,18 +12,18 @@ export function TasksSection({ todos, messages }: { todos: Todo[]; messages: UIM
   if (allTodos.length === 0) return null
 
   return (
-    <>
-      <div className="px-4 py-3">
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium mb-2">
-          Tasks ({activeTodos.length}/{allTodos.length})
-        </div>
-        <div className="space-y-0.5">
-          {allTodos.map((todo) => (
-            <TaskItem key={todo.id} todo={todo} messages={messages} />
-          ))}
-        </div>
+    <div className="px-3 py-2 border-t border-border/10">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[10px] text-muted-foreground/50">Tasks</span>
+        <span className="text-[9px] text-muted-foreground/40 font-mono">
+          {completedTodos.length}/{allTodos.length}
+        </span>
       </div>
-      <div className="mx-4 border-t border-border/20" />
-    </>
+      <div className="space-y-0.5">
+        {allTodos.map((todo) => (
+          <TaskItem key={todo.id} todo={todo} messages={messages} />
+        ))}
+      </div>
+    </div>
   )
 }

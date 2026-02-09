@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import { cn } from '@ship/ui/utils'
 import type { UIMessage } from '@/lib/ai-elements-adapter'
 import type { SessionPanelProps, TokenInfo } from './types'
-import { StatRow, formatTokenCount, formatCost, formatDate, formatRelative } from './helpers'
+import { formatTokenCount, formatCost } from './helpers'
 import { ContextBreakdownBar } from './context-breakdown'
 
 export function StatsSection({
@@ -27,68 +27,77 @@ export function StatsSection({
   const usagePercent = tokens ? Math.min((totalTokens / contextLimit) * 100, 100) : 0
 
   return (
-    <>
-      <div className="px-4 py-3 space-y-0.5">
-        <StatRow label="Session" value={sessionInfo?.id?.slice(0, 8) || sessionId.slice(0, 8)} mono />
-        <StatRow label="Messages" value={messageCounts.total} />
+    <div className="px-3 py-2 space-y-2.5">
+      {/* Model & Repo row */}
+      {(model || repo) && (
+        <div className="space-y-1">
+          {model && (
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-muted-foreground/50">Model</span>
+              <span className="text-[10px] text-foreground/70 font-mono truncate ml-2 max-w-[60%] text-right">
+                {model.name || model.id}
+              </span>
+            </div>
+          )}
+          {model?.mode && (
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-muted-foreground/50">Mode</span>
+              <span className={cn(
+                'text-[9px] font-medium px-1.5 py-0.5 rounded-full',
+                model.mode === 'build' ? 'bg-green-500/10 text-green-500' : 'bg-blue-500/10 text-blue-500',
+              )}>
+                {model.mode}
+              </span>
+            </div>
+          )}
+          {repo && (
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-muted-foreground/50">Repo</span>
+              <span className="text-[10px] text-foreground/70 font-mono truncate ml-2 max-w-[60%] text-right">
+                {repo.owner}/{repo.name}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
-        {model && (
-          <>
-            {model.provider && <StatRow label="Provider" value={model.provider} />}
-            <StatRow label="Model" value={model.name || model.id} />
-            {model.mode && (
-              <div className="flex items-baseline justify-between py-0.5">
-                <span className="text-[10px] text-muted-foreground/50 uppercase tracking-wide">Mode</span>
-                <span className={cn(
-                  'text-[10px] font-medium px-1.5 py-0.5 rounded',
-                  model.mode === 'build' ? 'bg-green-500/10 text-green-500' : 'bg-blue-500/10 text-blue-500',
-                )}>
-                  {model.mode}
-                </span>
-              </div>
-            )}
-          </>
+      {/* Token usage — compact */}
+      {tokens && totalTokens > 0 && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-muted-foreground/50">Tokens</span>
+            <span className="text-[10px] text-foreground/70 font-mono">
+              {formatTokenCount(totalTokens)} / {formatTokenCount(contextLimit)}
+            </span>
+          </div>
+          {/* Compact usage bar */}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-1 bg-muted/40 rounded-full overflow-hidden">
+              <div
+                className={cn(
+                  'h-full rounded-full transition-all',
+                  usagePercent >= 80 ? 'bg-red-500' : usagePercent >= 60 ? 'bg-yellow-500' : 'bg-primary/60',
+                )}
+                style={{ width: `${usagePercent}%` }}
+              />
+            </div>
+            <span className="text-[9px] text-muted-foreground/40 font-mono w-7 text-right">
+              {usagePercent.toFixed(0)}%
+            </span>
+          </div>
+          <ContextBreakdownBar tokens={tokens} />
+        </div>
+      )}
+
+      {/* Cost + Messages — inline row */}
+      <div className="flex items-center gap-3 text-[10px] text-muted-foreground/50">
+        {messageCounts.total > 0 && (
+          <span>{messageCounts.total} msgs</span>
         )}
-
-        {repo && <StatRow label="Repo" value={`${repo.owner}/${repo.name}`} mono />}
-
-        {tokens && (
-          <>
-            <div className="pt-1.5 mt-1.5 border-t border-border/10" />
-            <StatRow label="Context Limit" value={formatTokenCount(contextLimit)} mono />
-            <StatRow label="Total Tokens" value={formatTokenCount(totalTokens)} mono />
-            <StatRow label="Usage" value={`${usagePercent.toFixed(0)}%`} />
-            <StatRow label="Input" value={formatTokenCount(tokens.input)} mono />
-            <StatRow label="Output" value={formatTokenCount(tokens.output)} mono />
-            {tokens.reasoning > 0 && <StatRow label="Reasoning" value={formatTokenCount(tokens.reasoning)} mono />}
-            {(tokens.cache.read > 0 || tokens.cache.write > 0) && (
-              <StatRow label="Cache" value={formatTokenCount(tokens.cache.read + tokens.cache.write)} mono />
-            )}
-            <StatRow label="User Msgs" value={messageCounts.user} />
-            <StatRow label="Asst Msgs" value={messageCounts.assistant} />
-          </>
-        )}
-
-        {cost !== undefined && cost > 0 && <StatRow label="Total Cost" value={formatCost(cost)} mono />}
-
-        {sessionInfo?.time && (
-          <>
-            <div className="pt-1.5 mt-1.5 border-t border-border/10" />
-            <StatRow label="Created" value={formatDate(sessionInfo.time.created)} />
-            <StatRow label="Last Activity" value={formatRelative(sessionInfo.time.updated)} />
-          </>
+        {cost !== undefined && cost > 0 && (
+          <span className="font-mono">{formatCost(cost)}</span>
         )}
       </div>
-
-      {tokens && totalTokens > 0 && (
-        <>
-          <div className="mx-4 border-t border-border/20" />
-          <div className="px-4 py-3">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium mb-2">Context Breakdown</div>
-            <ContextBreakdownBar tokens={tokens} />
-          </div>
-        </>
-      )}
-    </>
+    </div>
   )
 }

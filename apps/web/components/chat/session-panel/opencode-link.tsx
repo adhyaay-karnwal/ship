@@ -4,28 +4,19 @@ export function OpenCodeLink({ url }: { url: string }) {
   if (!url) return null
 
   return (
-    <>
-      <div className="mx-4 border-t border-border/20" />
-      <div className="px-4 py-3">
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium mb-1">OpenCode</div>
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-primary/70 hover:text-primary hover:underline truncate text-[11px] font-mono block"
-          title={url}
-        >
-          {(() => {
-            try {
-              const parsed = new URL(url)
-              const path = parsed.pathname.length > 20 ? parsed.pathname.slice(0, 17) + '...' : parsed.pathname
-              return parsed.host + path
-            } catch {
-              return url.replace(/^https?:\/\//, '').slice(0, 30)
-            }
-          })()}
-        </a>
-      </div>
-    </>
+    <div className="px-3 py-2 border-t border-border/10">
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-1.5 text-[10px] text-muted-foreground/50 hover:text-primary transition-colors group"
+        title={url}
+      >
+        <svg className="w-3 h-3 shrink-0 text-muted-foreground/30 group-hover:text-primary/70" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+        </svg>
+        <span className="truncate">OpenCode</span>
+      </a>
+    </div>
   )
 }

@@ -15,6 +15,8 @@ interface UseSessionSyncParams {
   models: ModelInfo[]
   selectedModel: ModelInfo | null
   setSelectedModel: (model: ModelInfo) => void
+  /** User's saved default model ID from settings */
+  defaultModelId: string | null
   /** Repo data */
   repos: GitHubRepo[]
   localSessions: ChatSession[]
@@ -29,7 +31,7 @@ interface UseSessionSyncParams {
 /**
  * Handles side-effects that sync external state into the dashboard:
  * - Activating a session from the URL param (?session=xxx)
- * - Setting the default model when models load
+ * - Setting the default model when models load (uses saved default from settings)
  * - Syncing selectedRepo when active session changes
  * - Processing queued messages when streaming completes
  */
@@ -41,6 +43,7 @@ export function useSessionSync({
   models,
   selectedModel,
   setSelectedModel,
+  defaultModelId,
   repos,
   localSessions,
   setSelectedRepo,
@@ -58,16 +61,15 @@ export function useSessionSync({
     }
   }, [sessionParam, activeSessionId, setActiveSessionId, connectWebSocket])
 
-  // Set default model once loaded
+  // Set default model once loaded — prefer user's saved default from settings
   useEffect(() => {
     if (!selectedModel && models.length > 0) {
-      const preferredDefault = models.find(
-        (m) => m.id === 'opencode/kimi-k2.5-free' || m.id === 'kimi-k2.5-free',
-      )
+      // Priority: 1) user's saved default from settings, 2) API-marked default, 3) first model
+      const savedDefault = defaultModelId ? models.find((m) => m.id === defaultModelId) : null
       const markedDefault = models.find((m) => m.isDefault)
-      setSelectedModel(preferredDefault || markedDefault || models[0])
+      setSelectedModel(savedDefault || markedDefault || models[0])
     }
-  }, [models, selectedModel, setSelectedModel])
+  }, [models, selectedModel, setSelectedModel, defaultModelId])
 
   // Update selectedRepo when activeSessionId changes
   useEffect(() => {

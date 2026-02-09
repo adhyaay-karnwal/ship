@@ -25,6 +25,12 @@ export {
   useFilteredGitHubRepos,
 } from './use-repos'
 
+// Default Repo
+export {
+  useDefaultRepo,
+  useSetDefaultRepo,
+} from './use-default-repo'
+
 // Connectors
 export {
   useConnectors,

@@ -1,8 +1,6 @@
 'use client'
 
 import { Button } from '@ship/ui'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { Alert01Icon } from '@hugeicons/core-free-icons'
 
 /**
  * Error category for styling and behavior
@@ -30,32 +28,33 @@ function formatErrorMessage(message: string): string {
       message = parsed.message || parsed.error
     }
   } catch {
-    // Not JSON, continue with formatting
+    // Not JSON
   }
 
-  // Clean up common error patterns
   let formatted = message
 
   // Remove technical prefixes
   formatted = formatted.replace(/^APIError\s*-\s*/, '')
   formatted = formatted.replace(/^Error:\s*/, '')
 
-  // Handle Anthropic API errors specifically
-  if (formatted.includes('credit balance') || formatted.includes('Anthropic API')) {
-    return 'Your Anthropic API credit balance is too low. Please add credits to your account to continue using the agent.'
+  const lower = formatted.toLowerCase()
+
+  if (lower.includes('credit balance') || lower.includes('anthropic api')) {
+    return 'Your Anthropic API credit balance is too low. Please add credits to continue.'
   }
 
-  // Handle rate limiting
-  if (formatted.includes('rate limit') || formatted.includes('too many requests')) {
-    return 'Rate limit exceeded. Please wait a moment before trying again.'
+  if (lower.includes('rate limit') || lower.includes('too many requests') || lower.includes('too many api requests') || lower.includes('worker invocation')) {
+    return 'Rate limited. The agent will retry automatically.'
   }
 
-  // Handle network/connectivity issues
-  if (formatted.includes('network') || formatted.includes('connection') || formatted.includes('timeout')) {
-    return 'Network error. Please check your connection and try again.'
+  if (lower.includes('overloaded') || lower.includes('529')) {
+    return 'The API is temporarily overloaded. It will retry shortly.'
   }
 
-  // Truncate very long errors
+  if (lower.includes('network') || lower.includes('connection') || lower.includes('timeout')) {
+    return 'Network error. Please check your connection.'
+  }
+
   if (formatted.length > 300) {
     formatted = formatted.slice(0, 300) + '...'
   }
@@ -64,75 +63,10 @@ function formatErrorMessage(message: string): string {
 }
 
 /**
- * Get error title based on category
- */
-function getErrorTitle(category: ErrorCategory): string {
-  switch (category) {
-    case 'transient':
-      return 'Temporary Error'
-    case 'user-action':
-      return 'Action Required'
-    case 'persistent':
-      return 'Error'
-    case 'fatal':
-      return 'Critical Error'
-    default:
-      return 'Error'
-  }
-}
-
-/**
- * Get error styling based on category
- */
-function getErrorStyles(category: ErrorCategory): {
-  container: string
-  icon: string
-  title: string
-} {
-  switch (category) {
-    case 'transient':
-      // Yellow/amber warning style
-      return {
-        container: 'border-yellow-500/50 bg-yellow-50 dark:bg-yellow-900/10',
-        icon: 'text-yellow-600 dark:text-yellow-500',
-        title: 'text-yellow-900 dark:text-yellow-200',
-      }
-    case 'user-action':
-      // Blue info style
-      return {
-        container: 'border-blue-500/50 bg-blue-50 dark:bg-blue-900/10',
-        icon: 'text-blue-600 dark:text-blue-500',
-        title: 'text-blue-900 dark:text-blue-200',
-      }
-    case 'persistent':
-      // Red destructive style
-      return {
-        container: 'border-red-500/50 bg-red-50 dark:bg-red-900/10',
-        icon: 'text-red-600 dark:text-red-500',
-        title: 'text-red-900 dark:text-red-200',
-      }
-    case 'fatal':
-      // Red with stronger emphasis
-      return {
-        container: 'border-red-600 bg-red-100 dark:bg-red-900/20',
-        icon: 'text-red-700 dark:text-red-400',
-        title: 'text-red-900 dark:text-red-100 font-semibold',
-      }
-    default:
-      return {
-        container: 'border-gray-500/50 bg-gray-50 dark:bg-gray-900/10',
-        icon: 'text-gray-600 dark:text-gray-500',
-        title: 'text-gray-900 dark:text-gray-200',
-      }
-  }
-}
-
-/**
  * ErrorMessage component
  *
- * Displays error inline in chat with category-based styling and action buttons.
- *
- * Pattern: Inline in chat (not modal) to keep context
+ * Displays error inline in chat with category-based styling.
+ * Transient errors are compact/subtle. Persistent/fatal are more prominent.
  */
 export function ErrorMessage({
   message,
@@ -140,21 +74,57 @@ export function ErrorMessage({
   retryable,
   onRetry,
 }: ErrorMessageProps) {
-  const styles = getErrorStyles(category)
-  const title = getErrorTitle(category)
   const formattedMessage = formatErrorMessage(message)
 
-  return (
-    <div className={`rounded-lg border p-4 ${styles.container}`}>
-      <div className="flex items-start gap-3">
-        <HugeiconsIcon icon={Alert01Icon} strokeWidth={2} className={`size-5 mt-0.5 flex-shrink-0 ${styles.icon}`} />
-        <div className="flex-1 min-w-0">
-          <p className={`font-medium ${styles.title}`}>{title}</p>
-          <p className="text-sm text-foreground mt-1 whitespace-pre-wrap">{formattedMessage}</p>
+  // Transient errors: compact, subtle inline notice
+  if (category === 'transient') {
+    return (
+      <div className="flex items-center gap-2 py-1.5 px-3 rounded-md bg-muted/40 border border-border/20 text-xs text-muted-foreground">
+        <svg className="w-3.5 h-3.5 shrink-0 text-yellow-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+        <span>{formattedMessage}</span>
+        {retryable && onRetry && (
+          <button onClick={onRetry} className="text-primary hover:text-primary/80 font-medium ml-1">
+            Retry
+          </button>
+        )}
+      </div>
+    )
+  }
 
-          {/* Action buttons */}
+  // User-action: blue info style
+  if (category === 'user-action') {
+    return (
+      <div className="rounded-lg border border-blue-500/50 bg-blue-50 dark:bg-blue-900/10 p-3">
+        <div className="flex items-start gap-2.5">
+          <svg className="w-4 h-4 mt-0.5 shrink-0 text-blue-600 dark:text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-blue-900 dark:text-blue-200">Action Required</p>
+            <p className="text-sm text-foreground mt-1">{formattedMessage}</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Persistent / fatal: red error card
+  const isFatal = category === 'fatal'
+  return (
+    <div className={`rounded-lg border p-3 ${isFatal ? 'border-red-600 bg-red-100 dark:bg-red-900/20' : 'border-red-500/50 bg-red-50 dark:bg-red-900/10'}`}>
+      <div className="flex items-start gap-2.5">
+        <svg className={`w-4 h-4 mt-0.5 shrink-0 ${isFatal ? 'text-red-700 dark:text-red-400' : 'text-red-600 dark:text-red-500'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-medium ${isFatal ? 'text-red-900 dark:text-red-100' : 'text-red-900 dark:text-red-200'}`}>Error</p>
+          <p className="text-sm text-foreground mt-1">{formattedMessage}</p>
           {retryable && onRetry && (
-            <div className="flex flex-wrap gap-2 mt-3">
+            <div className="mt-2">
               <Button variant="outline" size="sm" onClick={onRetry}>
                 Retry
               </Button>

@@ -10,7 +10,6 @@ import { ChangesSection } from './changes-section'
 import { OpenCodeLink } from './opencode-link'
 import { SessionActionsSection } from './session-actions-section'
 import { VCSSection } from './vcs-section'
-import { RawMessagesSection } from './raw-messages-section'
 
 export function SessionPanel({
   sessionId,
@@ -40,19 +39,22 @@ export function SessionPanel({
   }, [messages])
 
   return (
-    <div className={cn('flex flex-col text-xs overflow-y-auto', className)}>
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-border/20">
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium mb-1">Context</div>
-        {sessionInfo?.title && (
-          <div className="text-foreground font-medium text-[12px] leading-snug" title={sessionInfo.title}>
+    <div className={cn('flex flex-col text-xs', className)}>
+      {/* Session title */}
+      <div className="px-3 pt-3 pb-2">
+        {sessionInfo?.title ? (
+          <div className="text-[12px] font-medium text-foreground leading-snug" title={sessionInfo.title}>
             {sessionInfo.title}
           </div>
+        ) : (
+          <div className="text-[11px] text-muted-foreground/50">Session</div>
         )}
       </div>
 
+      {/* Active tools — always show when present */}
       <ActiveToolsSection tools={activeTools} />
-      <TasksSection todos={todos || []} messages={messages} />
+
+      {/* Primary info group */}
       <StatsSection
         sessionId={sessionId}
         model={model}
@@ -62,22 +64,25 @@ export function SessionPanel({
         messages={messages}
         sessionInfo={sessionInfo}
       />
-      <ChangesSection diffs={diffs || []} />
-      <VCSSection sessionInfo={sessionInfo} />
-      <SessionActionsSection tokens={tokens} sessionCreatedAt={sessionInfo?.time?.created} />
-      {openCodeUrl && <OpenCodeLink url={openCodeUrl} />}
 
-      {/* Raw Messages */}
-      {messages.length > 0 && (
-        <>
-          <div className="mx-4 border-t border-border/20" />
-          <RawMessagesSection messages={messages} />
-        </>
-      )}
+      {/* Tasks */}
+      <TasksSection todos={todos || []} messages={messages} />
+
+      {/* Changes */}
+      <ChangesSection diffs={diffs || []} />
+
+      {/* VCS */}
+      <VCSSection sessionInfo={sessionInfo} />
+
+      {/* Session Health */}
+      <SessionActionsSection tokens={tokens} sessionCreatedAt={sessionInfo?.time?.created} />
+
+      {/* OpenCode link */}
+      {openCodeUrl && <OpenCodeLink url={openCodeUrl} />}
 
       {/* Empty state */}
       {!repo && !model && !tokens && !sessionInfo && !openCodeUrl && messages.length === 0 && (
-        <div className="px-4 py-8 text-muted-foreground/50 text-center text-[11px]">
+        <div className="px-3 py-8 text-muted-foreground/40 text-center text-[11px]">
           Waiting for session data...
         </div>
       )}

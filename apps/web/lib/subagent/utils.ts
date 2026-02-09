@@ -10,21 +10,28 @@ import type { ToolInvocation } from '@/lib/ai-elements-adapter'
  * Detects if a ToolInvocation represents a subagent task that should be viewable
  */
 export function isSubagentToolInvocation(tool: ToolInvocation): boolean {
+  const lowerName = tool.toolName.toLowerCase()
+
   // Primary check: toolName is 'task' and has subagent_type in args
-  if (tool.toolName === 'task' && tool.args?.subagent_type) {
+  if (lowerName === 'task' && tool.args?.subagent_type) {
+    return true
+  }
+
+  // Check for agent-like tool names
+  if (lowerName.includes('task') && (tool.args?.subagent_type || tool.args?.prompt)) {
     return true
   }
 
   // Alternative: Check if metadata contains a sessionId reference
   if (tool.args?.metadata && typeof tool.args.metadata === 'object') {
     const metadata = tool.args.metadata as Record<string, unknown>
-    if (metadata.sessionId || metadata.session_id) {
+    if (metadata.sessionId || metadata.session_id || metadata.sessionID) {
       return true
     }
   }
   if (tool.result && typeof tool.result === 'object') {
     const result = tool.result as Record<string, unknown>
-    if (result.sessionId || result.session_id) {
+    if (result.sessionId || result.session_id || result.sessionID) {
       return true
     }
   }
@@ -49,27 +56,31 @@ export function isSubagentToolInvocation(tool: ToolInvocation): boolean {
  * Extracts the subagent session ID from a tool invocation
  */
 export function extractSubagentSessionId(tool: ToolInvocation): string | null {
-  // Check args.metadata first (most common in OpenCode)
+  // Check tool-level metadata first (from ToolPart.state.metadata via SSE)
+  if (typeof tool.metadata === 'object' && tool.metadata !== null) {
+    if (typeof tool.metadata.sessionId === 'string') return tool.metadata.sessionId
+    if (typeof tool.metadata.session_id === 'string') return tool.metadata.session_id
+    if (typeof tool.metadata.sessionID === 'string') return tool.metadata.sessionID
+  }
+
+  // Check args.metadata (most common in OpenCode)
   if (typeof tool.args?.metadata === 'object' && tool.args.metadata !== null) {
     const metadata = tool.args.metadata as Record<string, unknown>
     if (typeof metadata.sessionId === 'string') return metadata.sessionId
     if (typeof metadata.session_id === 'string') return metadata.session_id
+    if (typeof metadata.sessionID === 'string') return metadata.sessionID
   }
 
   // Check result for session ID
   if (typeof tool.result === 'object' && tool.result !== null) {
     const result = tool.result as Record<string, unknown>
-    const sessionId = result.sessionId || result.session_id || result.subagent_session_id || result.child_session_id
+    const sessionId = result.sessionId || result.session_id || result.sessionID || result.subagent_session_id || result.child_session_id
     if (typeof sessionId === 'string') return sessionId
   }
 
   // Check args directly
-  if (typeof tool.args?.sessionId === 'string') {
-    return tool.args.sessionId
-  }
-  if (typeof tool.args?.session_id === 'string') {
-    return tool.args.session_id
-  }
+  if (typeof tool.args?.sessionId === 'string') return tool.args.sessionId
+  if (typeof tool.args?.session_id === 'string') return tool.args.session_id
 
   return null
 }
@@ -78,16 +89,13 @@ export function extractSubagentSessionId(tool: ToolInvocation): string | null {
  * Gets the display title for a subagent task
  */
 export function getSubagentTaskTitle(tool: ToolInvocation): string {
-  // Use explicit title if available
   if (tool.title) return tool.title
 
-  // Use subagent_type as title
   if (typeof tool.args?.subagent_type === 'string') {
     const subagentType = tool.args.subagent_type as string
     return `${subagentType.charAt(0).toUpperCase() + subagentType.slice(1)} Task`
   }
 
-  // Fallback to description or default
   if (typeof tool.args?.description === 'string') {
     return tool.args.description
   }
@@ -113,9 +121,64 @@ export function getSubagentDescription(tool: ToolInvocation): string | null {
     return tool.args.description
   }
   if (typeof tool.args?.prompt === 'string') {
-    // Truncate long prompts
     const prompt = tool.args.prompt as string
-    return prompt.length > 100 ? prompt.slice(0, 97) + '...' : prompt
+    return prompt.length > 200 ? prompt.slice(0, 197) + '...' : prompt
   }
   return null
+}
+
+/**
+ * Get the full prompt for a subagent (untruncated)
+ */
+export function getSubagentFullPrompt(tool: ToolInvocation): string | null {
+  if (typeof tool.args?.prompt === 'string') {
+    return tool.args.prompt as string
+  }
+  if (typeof tool.args?.description === 'string') {
+    return tool.args.description
+  }
+  return null
+}
+
+/**
+ * Extract child tool info from a subagent's result text (heuristic)
+ */
+export function extractChildToolsFromResult(tool: ToolInvocation): { name: string; status: string; title?: string }[] {
+  // The tool invocations on the same message that come after this sub-agent tool
+  // aren't stored here — they're in the child session.
+  // But we can check if the result is an object with tool info
+  if (typeof tool.result === 'object' && tool.result !== null) {
+    const result = tool.result as Record<string, unknown>
+    if (Array.isArray(result.tools)) {
+      return (result.tools as Array<{ name?: string; status?: string; title?: string }>)
+        .filter((t) => t.name)
+        .map((t) => ({ name: t.name!, status: t.status || 'completed', title: t.title }))
+    }
+  }
+  return []
+}
+
+/**
+ * Get the result text from a subagent tool invocation
+ */
+export function getSubagentResultText(tool: ToolInvocation): string | null {
+  if (!tool.result) return null
+
+  if (typeof tool.result === 'string') {
+    return tool.result
+  }
+
+  if (typeof tool.result === 'object') {
+    const result = tool.result as Record<string, unknown>
+    // Common patterns: { content, text, output, message, summary }
+    if (typeof result.content === 'string') return result.content
+    if (typeof result.text === 'string') return result.text
+    if (typeof result.output === 'string') return result.output
+    if (typeof result.message === 'string') return result.message
+    if (typeof result.summary === 'string') return result.summary
+    // Fallback: stringify
+    return JSON.stringify(tool.result, null, 2)
+  }
+
+  return String(tool.result)
 }

@@ -5,41 +5,70 @@ import Link from 'next/link'
 import { ModelSelector, ModelBadge } from '@/components/model/model-selector'
 import { ConnectorSettings } from '@/components/settings/connector-settings'
 import { Button, Card, CardHeader, CardTitle, CardDescription, CardContent } from '@ship/ui'
-import { useModels, useDefaultModel, useSetDefaultModel } from '@/lib/api'
+import { useModels, useDefaultModel, useSetDefaultModel, useGitHubRepos, useDefaultRepo, useSetDefaultRepo } from '@/lib/api'
 
 export function SettingsClient({ userId }: { userId: string }) {
   const [selectedModel, setSelectedModel] = useState<string>('')
-  const [error, setError] = useState<string | null>(null)
-  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [selectedRepo, setSelectedRepo] = useState<string>('')
+  const [modelError, setModelError] = useState<string | null>(null)
+  const [repoError, setRepoError] = useState<string | null>(null)
+  const [modelSaveSuccess, setModelSaveSuccess] = useState(false)
+  const [repoSaveSuccess, setRepoSaveSuccess] = useState(false)
 
-  // Use SWR hooks
+  // Model hooks
   const { models: availableModels, isLoading: modelsLoading } = useModels()
-  const { defaultModelId, isLoading: defaultLoading, mutate: mutateDefault } = useDefaultModel(userId)
-  const { setDefaultModel: saveDefaultModel, isSetting } = useSetDefaultModel()
+  const { defaultModelId, isLoading: defaultModelLoading, mutate: mutateDefaultModel } = useDefaultModel(userId)
+  const { setDefaultModel: saveDefaultModel, isSetting: isSettingModel } = useSetDefaultModel()
 
-  const loading = modelsLoading || defaultLoading
+  // Repo hooks
+  const { repos, isLoading: reposLoading } = useGitHubRepos(userId)
+  const { defaultRepoFullName, isLoading: defaultRepoLoading, mutate: mutateDefaultRepo } = useDefaultRepo(userId)
+  const { setDefaultRepo: saveDefaultRepo, isSetting: isSettingRepo } = useSetDefaultRepo()
 
-  // Sync selected model with default model when loaded
+  const loading = modelsLoading || defaultModelLoading || reposLoading || defaultRepoLoading
+
+  // Sync selected model with saved default
   useEffect(() => {
     if (defaultModelId && !selectedModel) {
       setSelectedModel(defaultModelId)
     }
   }, [defaultModelId, selectedModel])
 
-  const handleSave = async () => {
+  // Sync selected repo with saved default
+  useEffect(() => {
+    if (defaultRepoFullName && !selectedRepo) {
+      setSelectedRepo(defaultRepoFullName)
+    }
+  }, [defaultRepoFullName, selectedRepo])
+
+  const handleSaveModel = async () => {
     try {
-      setSaveSuccess(false)
-      setError(null)
+      setModelSaveSuccess(false)
+      setModelError(null)
       await saveDefaultModel({ userId, modelId: selectedModel })
-      mutateDefault() // Refresh default model
-      setSaveSuccess(true)
-      setTimeout(() => setSaveSuccess(false), 3000)
+      mutateDefaultModel()
+      setModelSaveSuccess(true)
+      setTimeout(() => setModelSaveSuccess(false), 3000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save')
+      setModelError(err instanceof Error ? err.message : 'Failed to save')
     }
   }
 
-  const hasChanges = selectedModel !== (defaultModelId || '')
+  const handleSaveRepo = async () => {
+    try {
+      setRepoSaveSuccess(false)
+      setRepoError(null)
+      await saveDefaultRepo({ userId, repoFullName: selectedRepo })
+      mutateDefaultRepo()
+      setRepoSaveSuccess(true)
+      setTimeout(() => setRepoSaveSuccess(false), 3000)
+    } catch (err) {
+      setRepoError(err instanceof Error ? err.message : 'Failed to save')
+    }
+  }
+
+  const modelHasChanges = selectedModel !== (defaultModelId || '')
+  const repoHasChanges = selectedRepo !== (defaultRepoFullName || '')
 
   if (loading) {
     return (
@@ -92,15 +121,16 @@ export function SettingsClient({ userId }: { userId: string }) {
         <h1 className="text-lg font-semibold text-foreground mb-1">Settings</h1>
         <p className="text-[12px] text-muted-foreground mb-5">Manage your preferences</p>
 
+        {/* Default Model */}
         <Card className="mb-4">
           <CardHeader className="pb-3">
-            <CardTitle className="text-[14px]">AI Model</CardTitle>
-            <CardDescription className="text-[11px]">Choose your default model</CardDescription>
+            <CardTitle className="text-[14px]">Default Model</CardTitle>
+            <CardDescription className="text-[11px]">Choose which model is selected by default for new sessions</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
-              <label className="block text-[11px] font-medium text-muted-foreground mb-1.5">Default Model</label>
-              <ModelSelector value={selectedModel} onChange={setSelectedModel} availableModels={availableModels} disabled={isSetting} />
+              <label className="block text-[11px] font-medium text-muted-foreground mb-1.5">Model</label>
+              <ModelSelector value={selectedModel} onChange={setSelectedModel} availableModels={availableModels} disabled={isSettingModel} />
             </div>
             {selectedModel && (
               <div>
@@ -108,16 +138,55 @@ export function SettingsClient({ userId }: { userId: string }) {
                 <ModelBadge modelId={selectedModel} modelName={availableModels.find((m) => m.id === selectedModel)?.name} />
               </div>
             )}
-            {error && <div className="rounded-md bg-destructive/10 px-3 py-2"><p className="text-[11px] text-destructive">{error}</p></div>}
-            {saveSuccess && <div className="rounded-md bg-emerald-500/10 px-3 py-2"><p className="text-[11px] text-emerald-600">Saved!</p></div>}
+            {modelError && <div className="rounded-md bg-destructive/10 px-3 py-2"><p className="text-[11px] text-destructive">{modelError}</p></div>}
+            {modelSaveSuccess && <div className="rounded-md bg-emerald-500/10 px-3 py-2"><p className="text-[11px] text-emerald-600">Saved!</p></div>}
             <div className="flex justify-end pt-1">
-              <Button size="sm" onClick={handleSave} disabled={!hasChanges || isSetting}>
-                {isSetting ? 'Saving...' : 'Save'}
+              <Button size="sm" onClick={handleSaveModel} disabled={!modelHasChanges || isSettingModel}>
+                {isSettingModel ? 'Saving...' : 'Save'}
               </Button>
             </div>
           </CardContent>
         </Card>
 
+        {/* Default Repo */}
+        <Card className="mb-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-[14px]">Default Repository</CardTitle>
+            <CardDescription className="text-[11px]">Choose which repo is pre-selected when starting new sessions</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <label className="block text-[11px] font-medium text-muted-foreground mb-1.5">Repository</label>
+              <select
+                value={selectedRepo}
+                onChange={(e) => setSelectedRepo(e.target.value)}
+                disabled={isSettingRepo}
+                className="w-full h-9 px-3 rounded-md border border-border bg-background text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="">None</option>
+                {repos.map((repo) => (
+                  <option key={repo.id} value={repo.fullName}>
+                    {repo.fullName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {selectedRepo && (
+              <div className="text-[11px] text-muted-foreground">
+                Selected: <span className="font-mono text-foreground/80">{selectedRepo}</span>
+              </div>
+            )}
+            {repoError && <div className="rounded-md bg-destructive/10 px-3 py-2"><p className="text-[11px] text-destructive">{repoError}</p></div>}
+            {repoSaveSuccess && <div className="rounded-md bg-emerald-500/10 px-3 py-2"><p className="text-[11px] text-emerald-600">Saved!</p></div>}
+            <div className="flex justify-end pt-1">
+              <Button size="sm" onClick={handleSaveRepo} disabled={!repoHasChanges || isSettingRepo}>
+                {isSettingRepo ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Integrations */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-[14px]">Integrations</CardTitle>

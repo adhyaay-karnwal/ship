@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Message, Tool, Response, Loader, Steps, Conversation, ConversationScrollButton } from '@ship/ui'
+import { Message, Tool, Response, Loader, Steps, Reasoning, Conversation, ConversationScrollButton } from '@ship/ui'
 import { Markdown } from '@/components/chat/markdown'
 import { mapToolState } from '@/lib/ai-elements-adapter'
 import { useSubagentStream } from '../hooks/use-subagent-stream'
@@ -10,7 +10,12 @@ interface SubagentViewState {
   toolCallId: string
   agentType: string
   description: string
+  prompt?: string
+  resultText?: string
   sessionId?: string
+  childTools?: { name: string; status: string; title?: string }[]
+  toolStatus?: 'pending' | 'in_progress' | 'completed' | 'failed'
+  duration?: number
 }
 
 interface SubagentViewProps {
@@ -18,12 +23,29 @@ interface SubagentViewProps {
   onBack: () => void
 }
 
+function formatDuration(ms: number): string {
+  if (ms >= 60000) {
+    const mins = Math.floor(ms / 60000)
+    const secs = ((ms % 60000) / 1000).toFixed(0)
+    return `${mins}m ${secs}s`
+  }
+  return `${(ms / 1000).toFixed(1)}s`
+}
+
 export function SubagentView({ subagent, onBack }: SubagentViewProps) {
+  // Only try WebSocket if we have a sessionId
   const { messages, isStreaming, status } = useSubagentStream({
     sessionId: subagent.sessionId || null,
   })
 
-  const hasStreamData = subagent.sessionId && messages.length > 0
+  const hasStreamData = subagent.sessionId && messages.some(
+    (m) => m.content || m.toolInvocations?.length || m.reasoning?.length,
+  )
+
+  // Determine what to show
+  const showStreamData = hasStreamData
+  const showResultFallback = !showStreamData && subagent.resultText
+  const showChildToolsFallback = !showStreamData && subagent.childTools && subagent.childTools.length > 0
 
   return (
     <div className="flex flex-col h-full">
@@ -40,7 +62,7 @@ export function SubagentView({ subagent, onBack }: SubagentViewProps) {
           Back
         </button>
         <div className="h-4 w-px bg-border/50" />
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           <svg
             className="w-4 h-4 shrink-0 text-muted-foreground/70"
             viewBox="0 0 24 24"
@@ -55,7 +77,10 @@ export function SubagentView({ subagent, onBack }: SubagentViewProps) {
             <rect x="3" y="14" width="7" height="7" rx="1" />
             <rect x="14" y="14" width="7" height="7" rx="1" />
           </svg>
-          <span className="text-sm font-medium text-foreground truncate">{subagent.agentType}</span>
+          <span className="text-sm font-medium text-foreground truncate">
+            {subagent.description || subagent.agentType}
+          </span>
+          <span className="text-xs text-muted-foreground/50 shrink-0">(@{subagent.agentType.toLowerCase().replace(/\s+/g, '-')} subagent)</span>
           {isStreaming && (
             <span className="relative flex h-2 w-2 shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/40 opacity-75" />
@@ -63,93 +88,133 @@ export function SubagentView({ subagent, onBack }: SubagentViewProps) {
             </span>
           )}
         </div>
+        {subagent.duration && (
+          <span className="text-xs text-muted-foreground/50 shrink-0">{formatDuration(subagent.duration)}</span>
+        )}
       </div>
 
       {/* Content */}
       <Conversation className="flex-1">
         <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-8 sm:py-8">
-          {/* Agent input / prompt */}
-          <div className="mb-6">
-            <div className="text-xs text-muted-foreground/50 uppercase tracking-wider mb-2 font-medium">Prompt</div>
-            <div className="text-sm text-foreground/80 bg-muted/30 rounded-lg px-4 py-3 border border-border/20">
-              {subagent.description}
-            </div>
-          </div>
-
-          {/* Status */}
-          {status && (
-            <div className="flex items-center gap-2 mb-4 text-xs text-muted-foreground/60">
-              {isStreaming && (
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/50 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary/60" />
-                </span>
-              )}
-              {status}
+          {/* Agent prompt */}
+          {subagent.prompt && (
+            <div className="mb-6">
+              <div className="text-sm text-foreground/80 bg-muted/30 rounded-lg px-4 py-3 border border-border/20">
+                {subagent.prompt}
+              </div>
             </div>
           )}
 
-          {/* Streaming content from child session */}
-          {hasStreamData ? (
-            messages.map((message) => {
-              if (!message.content && !message.toolInvocations?.length && !message.reasoning?.length) {
-                return isStreaming ? (
-                  <Message key={message.id} role="assistant">
-                    <Loader message={status || 'Working...'} />
-                  </Message>
-                ) : null
-              }
+          {/* Live streaming content from child session (priority 1) */}
+          {showStreamData && (
+            <div className="space-y-4">
+              {status && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground/60">
+                  {isStreaming && (
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/50 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary/60" />
+                    </span>
+                  )}
+                  {status}
+                </div>
+              )}
+              {messages.map((message) => {
+                if (!message.content && !message.toolInvocations?.length && !message.reasoning?.length) {
+                  return isStreaming ? (
+                    <Message key={message.id} role="assistant">
+                      <Loader message={status || 'Working...'} />
+                    </Message>
+                  ) : null
+                }
 
-              const hasSteps =
-                message.role === 'assistant' &&
-                ((message.reasoning && message.reasoning.length > 0) ||
-                  (message.toolInvocations && message.toolInvocations.length > 0))
+                const hasSteps =
+                  message.role === 'assistant' &&
+                  ((message.reasoning && message.reasoning.length > 0) ||
+                    (message.toolInvocations && message.toolInvocations.length > 0))
 
-              return (
-                <Message key={message.id} role={message.role}>
-                  {hasSteps && (
-                    <Steps isStreaming={isStreaming} toolCount={message.toolInvocations?.length}>
-                      {message.reasoning && message.reasoning.length > 0 && (
-                        <div className="text-sm text-muted-foreground/80 border-l-2 border-border/40 pl-3 py-1 my-1">
-                          <div className="whitespace-pre-wrap leading-relaxed">
-                            {message.reasoning.join('\n\n')}
+                return (
+                  <Message key={message.id} role={message.role}>
+                    {hasSteps && (
+                      <Steps isStreaming={isStreaming} toolCount={message.toolInvocations?.length}>
+                        {message.reasoning && message.reasoning.length > 0 && (
+                          <Reasoning isStreaming={isStreaming}>
+                            <div className="whitespace-pre-wrap">{message.reasoning.join('\n\n')}</div>
+                          </Reasoning>
+                        )}
+                        {message.toolInvocations && message.toolInvocations.length > 0 && (
+                          <div className="space-y-2 my-1">
+                            {message.toolInvocations.map((tool) => (
+                              <Tool
+                                key={tool.toolCallId}
+                                name={tool.toolName}
+                                status={mapToolState(tool.state)}
+                                input={tool.args}
+                                output={tool.result}
+                                duration={tool.duration}
+                              />
+                            ))}
                           </div>
-                        </div>
-                      )}
-                      {message.toolInvocations && message.toolInvocations.length > 0 && (
-                        <div className="space-y-2 my-1">
-                          {message.toolInvocations.map((tool) => (
-                            <Tool
-                              key={tool.toolCallId}
-                              name={tool.toolName}
-                              status={mapToolState(tool.state)}
-                              input={tool.args}
-                              output={tool.result}
-                              duration={tool.duration}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </Steps>
-                  )}
-                  {message.role === 'assistant' && message.content && (
-                    <div className={hasSteps ? 'mt-4' : undefined}>
-                      <Response>
-                        <Markdown content={message.content} />
-                      </Response>
-                    </div>
-                  )}
-                </Message>
-              )
-            })
-          ) : !subagent.sessionId ? (
-            // No child session — show fallback
-            <div className="text-sm text-muted-foreground/60 text-center py-12">
-              No streaming data available for this sub-agent.
+                        )}
+                      </Steps>
+                    )}
+                    {message.role === 'assistant' && message.content && (
+                      <div className={hasSteps ? 'mt-4' : undefined}>
+                        <Response>
+                          <Markdown content={message.content} />
+                        </Response>
+                      </div>
+                    )}
+                  </Message>
+                )
+              })}
             </div>
-          ) : (
+          )}
+
+          {/* Fallback: show child tools + result text (priority 2) */}
+          {!showStreamData && (showChildToolsFallback || showResultFallback) && (
+            <div className="space-y-4">
+              {/* Child tools list */}
+              {showChildToolsFallback && subagent.childTools && (
+                <Steps toolCount={subagent.childTools.length}>
+                  <div className="space-y-2 my-1">
+                    {subagent.childTools.map((tool, i) => (
+                      <Tool
+                        key={i}
+                        name={tool.name}
+                        status={tool.status === 'completed' ? 'completed' : tool.status === 'error' || tool.status === 'failed' ? 'failed' : 'completed'}
+                        input={tool.title ? { description: tool.title } : undefined}
+                      />
+                    ))}
+                  </div>
+                </Steps>
+              )}
+              {/* Result text */}
+              {showResultFallback && subagent.resultText && (
+                <Message role="assistant">
+                  <Response>
+                    <Markdown content={subagent.resultText} />
+                  </Response>
+                </Message>
+              )}
+            </div>
+          )}
+
+          {/* Loading state when WebSocket is connecting */}
+          {subagent.sessionId && !showStreamData && !showResultFallback && !showChildToolsFallback && (
             <Message role="assistant">
               <Loader message="Connecting to sub-agent session..." />
+            </Message>
+          )}
+
+          {/* No data at all — shouldn't happen but handle gracefully */}
+          {!subagent.sessionId && !showResultFallback && !showChildToolsFallback && (
+            <Message role="assistant">
+              <div className="text-sm text-muted-foreground/60">
+                {subagent.toolStatus === 'in_progress' || subagent.toolStatus === 'pending'
+                  ? <Loader message="Sub-agent is working..." />
+                  : 'Sub-agent completed without output.'}
+              </div>
             </Message>
           )}
         </div>

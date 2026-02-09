@@ -57,7 +57,7 @@ export function RightSidebar({
     <>
       {/* Desktop: inline panel */}
       {desktopOpen && !isMobile && (
-        <div className="w-64 border-l border-border/40 bg-background/60 backdrop-blur-sm hidden md:block overflow-y-auto no-scrollbar">
+        <div className="w-60 border-l border-border/30 bg-background/50 backdrop-blur-sm hidden md:block overflow-y-auto no-scrollbar">
           <SessionPanel {...panelProps} />
         </div>
       )}

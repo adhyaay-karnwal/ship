@@ -6,8 +6,16 @@ import { Markdown } from '@/components/chat/markdown'
 import { ErrorMessage } from '@/components/chat/error-message'
 import { PermissionPrompt } from './permission-prompt'
 import { QuestionPrompt } from './question-prompt'
-import { type UIMessage, getStreamingStatus, mapToolState } from '@/lib/ai-elements-adapter'
-import { isSubagentToolInvocation, extractSubagentSessionId, getSubagentType, getSubagentDescription } from '@/lib/subagent/utils'
+import { type UIMessage, type ToolInvocation, getStreamingStatus, mapToolState } from '@/lib/ai-elements-adapter'
+import {
+  isSubagentToolInvocation,
+  extractSubagentSessionId,
+  getSubagentType,
+  getSubagentDescription,
+  getSubagentFullPrompt,
+  getSubagentResultText,
+  extractChildToolsFromResult,
+} from '@/lib/subagent/utils'
 import { SubagentView, type SubagentViewState } from './subagent-view'
 import type { TodoItem } from '../types'
 
@@ -36,18 +44,27 @@ export function DashboardMessages({
   const hasContent = messages.some((m) => m.content || m.toolInvocations?.length)
 
   // Sub-agent navigation handlers
-  const handleSubagentNavigate = (toolCallId: string, tool: { toolName: string; args: Record<string, unknown>; result?: unknown }) => {
-    const agentType = getSubagentType({ ...tool, toolCallId, state: 'result' }) || String(tool.args?.subagent_type || tool.args?.description || 'Agent')
-    const description = getSubagentDescription({ ...tool, toolCallId, state: 'result' }) || String(tool.args?.prompt || tool.args?.description || '')
-    const sessionId = extractSubagentSessionId({ ...tool, toolCallId, state: 'result' }) || undefined
+  const handleSubagentNavigate = (tool: ToolInvocation) => {
+    const agentType = getSubagentType(tool) || String(tool.args?.subagent_type || 'Agent')
+    const description = getSubagentDescription(tool) || String(tool.args?.description || '')
+    const prompt = getSubagentFullPrompt(tool)
+    const sessionId = extractSubagentSessionId(tool) || undefined
+    const resultText = getSubagentResultText(tool) || undefined
+    const childTools = extractChildToolsFromResult(tool)
+    const toolStatus = mapToolState(tool.state)
 
     setSubagentStack((prev) => [
       ...prev,
       {
-        toolCallId,
+        toolCallId: tool.toolCallId,
         agentType: formatAgentType(agentType),
         description,
+        prompt: prompt || undefined,
+        resultText,
         sessionId,
+        childTools: childTools.length > 0 ? childTools : undefined,
+        toolStatus,
+        duration: tool.duration,
       },
     ])
   }
@@ -207,7 +224,6 @@ export function DashboardMessages({
                           // Check for todo tools — render inline TodoProgress
                           const isTodoTool = tool.toolName.toLowerCase().includes('todo')
                           if (isTodoTool && sessionTodos.length > 0 && !todoRendered) {
-                            // Skip todoread entirely
                             if (tool.toolName.toLowerCase().includes('todoread')) {
                               return null
                             }
@@ -217,7 +233,6 @@ export function DashboardMessages({
                             )
                           }
                           if (isTodoTool) {
-                            // If no todos data or already rendered, skip
                             return null
                           }
 
@@ -226,15 +241,20 @@ export function DashboardMessages({
                           if (isSubagent) {
                             const agentType = getSubagentType(tool) || String(tool.args?.subagent_type || tool.args?.description || 'Agent')
                             const description = getSubagentDescription(tool) || String(tool.args?.prompt || tool.args?.description || '')
+                            const childTools = extractChildToolsFromResult(tool)
+                            const resultText = getSubagentResultText(tool)
+                            const toolStatus = mapToolState(tool.state)
                             return (
                               <SubagentTool
                                 key={tool.toolCallId}
                                 toolCallId={tool.toolCallId}
                                 agentType={agentType}
                                 description={description}
-                                status={mapToolState(tool.state)}
+                                status={toolStatus}
                                 duration={tool.duration}
-                                onNavigate={() => handleSubagentNavigate(tool.toolCallId, tool)}
+                                childTools={childTools.length > 0 ? childTools : undefined}
+                                result={resultText ? <Markdown content={resultText} /> : undefined}
+                                onNavigate={() => handleSubagentNavigate(tool)}
                               />
                             )
                           }
@@ -268,8 +288,6 @@ export function DashboardMessages({
             )
           })}
         </div>
-
-        {/* Sidebar still shows todos — removed the separate todos block from chat */}
       </div>
 
       <ConversationScrollButton />

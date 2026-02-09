@@ -29,6 +29,7 @@ export interface ToolInvocation {
   result?: unknown
   duration?: number
   title?: string
+  metadata?: Record<string, unknown>
 }
 
 export interface UIMessage {
@@ -90,6 +91,7 @@ export function createToolInvocation(toolPart: ToolPart): ToolInvocation {
     result: toolPart.state?.output,
     duration,
     title: toolPart.state?.title,
+    metadata: toolPart.state?.metadata,
   }
 }
 
@@ -314,16 +316,25 @@ export function classifyError(errorMessage: string): {
   category: UIMessage['errorCategory']
   retryable: boolean
 } {
-  if (errorMessage.includes('credit balance') || errorMessage.includes('Anthropic API')) {
+  const lower = errorMessage.toLowerCase()
+
+  if (lower.includes('credit balance') || lower.includes('anthropic api')) {
     return { category: 'user-action', retryable: false }
   }
-  if (errorMessage.includes('rate limit') || errorMessage.includes('too many requests')) {
+  if (
+    lower.includes('rate limit') ||
+    lower.includes('too many requests') ||
+    lower.includes('too many api requests') ||
+    lower.includes('worker invocation')
+  ) {
     return { category: 'transient', retryable: true }
   }
   if (
-    errorMessage.includes('network') ||
-    errorMessage.includes('connection') ||
-    errorMessage.includes('timeout')
+    lower.includes('network') ||
+    lower.includes('connection') ||
+    lower.includes('timeout') ||
+    lower.includes('overloaded') ||
+    lower.includes('529')
   ) {
     return { category: 'transient', retryable: true }
   }

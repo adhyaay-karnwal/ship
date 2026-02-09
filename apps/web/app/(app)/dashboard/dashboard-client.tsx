@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { SidebarProvider, SidebarInset, cn } from '@ship/ui'
 import { AppSidebar } from '@/components/app-sidebar'
 import { useGitHubRepos } from '@/lib/api/hooks/use-repos'
-import { useModels } from '@/lib/api/hooks/use-models'
+import { useModels, useDefaultModel } from '@/lib/api/hooks/use-models'
+import { useDefaultRepo } from '@/lib/api/hooks/use-default-repo'
 import { useCreateSession } from '@/lib/api/hooks/use-sessions'
 import type { ChatSession } from '@/lib/api/server'
 import type { GitHubRepo, ModelInfo, User } from '@/lib/api/types'
@@ -59,6 +60,8 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
   // ---- Data fetching ----
   const { repos, isLoading: reposLoading } = useGitHubRepos(userId)
   const { models, groupedByProvider, isLoading: modelsLoading } = useModels()
+  const { defaultModelId } = useDefaultModel(userId)
+  const { defaultRepoFullName } = useDefaultRepo(userId)
   const { createSession, isCreating } = useCreateSession()
 
   // ---- Sync effects (URL param, default model, repo, message queue) ----
@@ -70,6 +73,7 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
     models,
     selectedModel,
     setSelectedModel,
+    defaultModelId,
     repos,
     localSessions: chat.localSessions,
     setSelectedRepo,
@@ -78,6 +82,14 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
     setMessageQueue: chat.setMessageQueue,
     handleSend,
   })
+
+  // ---- Default repo selection ----
+  useEffect(() => {
+    if (!selectedRepo && defaultRepoFullName && repos.length > 0) {
+      const match = repos.find((r) => r.fullName === defaultRepoFullName)
+      if (match) setSelectedRepo(match)
+    }
+  }, [defaultRepoFullName, repos, selectedRepo])
 
   // ---- Right sidebar ----
   const rightSidebar = useRightSidebar()
