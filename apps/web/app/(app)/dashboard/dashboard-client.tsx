@@ -4,13 +4,11 @@ import { useState, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { SidebarProvider, SidebarInset, cn } from '@ship/ui'
 import { AppSidebar } from '@/components/app-sidebar'
-import { TaskDetailSheet } from '@/components/chat/task-detail-sheet'
 import { CreateSessionDialog } from '@/components/session/create-session-dialog'
 import { useGitHubRepos, useModels, useCreateSession, type ChatSession, type GitHubRepo, type ModelInfo, type User } from '@/lib/api'
 import { useDashboardChat } from './hooks/use-dashboard-chat'
 import { useDashboardSSE } from './hooks/use-dashboard-sse'
 import { useRightSidebar } from './hooks/use-right-sidebar'
-import { useTaskDetailSheet } from './hooks/use-task-detail-sheet'
 import { useSessionSync } from './hooks/use-session-sync'
 import { DashboardHeader } from './components/dashboard-header'
 import { DashboardMessages } from './components/dashboard-messages'
@@ -80,9 +78,6 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
 
   // ---- Right sidebar ----
   const rightSidebar = useRightSidebar()
-
-  // ---- Task detail sheet (opened from sidebar todo clicks) ----
-  const taskSheet = useTaskDetailSheet()
 
   // ---- Session creation ----
   const handleCreate = useCallback(
@@ -256,23 +251,12 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
               mobileOpen={rightSidebar.mobileOpen}
               isMobile={rightSidebar.isMobile}
               onMobileOpenChange={rightSidebar.setMobileOpen}
-              onTodoClick={taskSheet.open}
             />
           )}
         </div>
       </SidebarInset>
 
       <CreateSessionDialog isOpen={false} onClose={() => {}} onCreate={handleCreate} userId={userId} />
-
-      {/* Task Detail Sheet — opened from sidebar todo clicks */}
-      {chat.activeSessionId && (
-        <TaskDetailSheet
-          isOpen={taskSheet.isOpen}
-          onClose={taskSheet.close}
-          todo={taskSheet.selectedTodo}
-          messages={chat.messages}
-        />
-      )}
     </SidebarProvider>
   )
 }

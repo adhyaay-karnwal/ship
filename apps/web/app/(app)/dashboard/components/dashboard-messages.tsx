@@ -1,10 +1,8 @@
 'use client'
 
-import { useState, useCallback } from 'react'
 import { Message, Tool, Response, Loader, Task, Steps, Conversation, ConversationScrollButton } from '@ship/ui'
 import { Markdown } from '@/components/chat/markdown'
 import { ErrorMessage } from '@/components/chat/error-message'
-import { TaskDetailSheet } from '@/components/chat/task-detail-sheet'
 import { PermissionPrompt } from './permission-prompt'
 import { QuestionPrompt } from './question-prompt'
 import type { UIMessage } from '@/lib/ai-elements-adapter'
@@ -34,19 +32,6 @@ export function DashboardMessages({
   streamStartTime,
   sessionTodos = [],
 }: DashboardMessagesProps) {
-  const [selectedTodo, setSelectedTodo] = useState<TodoItem | null>(null)
-  const [taskSheetOpen, setTaskSheetOpen] = useState(false)
-
-  const handleTodoClick = useCallback((todo: TodoItem) => {
-    setSelectedTodo(todo)
-    setTaskSheetOpen(true)
-  }, [])
-
-  const handleTaskSheetClose = useCallback(() => {
-    setTaskSheetOpen(false)
-    // Clear after animation
-    setTimeout(() => setSelectedTodo(null), 200)
-  }, [])
   if (!activeSessionId) return null
 
   const statusLabel = isStreaming ? getStreamingStatus(messages, streamingMessageId) : ''
@@ -223,7 +208,6 @@ export function DashboardMessages({
                     title={todo.content}
                     status={statusMap[todo.status] || 'pending'}
                     description={todo.priority !== 'medium' ? `Priority: ${todo.priority}` : undefined}
-                    onClick={() => handleTodoClick(todo)}
                   />
                 )
               })}
@@ -233,14 +217,6 @@ export function DashboardMessages({
       </div>
 
       <ConversationScrollButton />
-
-      {/* Task Detail Sheet */}
-      <TaskDetailSheet
-        isOpen={taskSheetOpen}
-        onClose={handleTaskSheetClose}
-        todo={selectedTodo}
-        messages={messages}
-      />
     </Conversation>
   )
 }

@@ -47,5 +47,4 @@ export interface SessionPanelProps {
   openCodeUrl?: string
   messages?: UIMessage[]
   className?: string
-  onTodoClick?: (todo: Todo) => void
 }

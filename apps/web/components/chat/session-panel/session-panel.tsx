@@ -1,12 +1,202 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { cn } from '@ship/ui/utils'
-import type { UIMessage } from '@/lib/ai-elements-adapter'
-import type { SessionPanelProps } from './types'
+import type { UIMessage, ToolInvocation } from '@/lib/ai-elements-adapter'
+import type { SessionPanelProps, Todo } from './types'
 import { StatRow, formatTokenCount, formatCost, formatDate, formatRelative } from './helpers'
 import { ContextBreakdownBar } from './context-breakdown'
 import { RawMessagesSection } from './raw-messages-section'
+
+// ---- Helpers for inline task detail ----
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`
+  return `${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`
+}
+
+function findRelatedTools(todo: Todo, messages: UIMessage[]): ToolInvocation[] {
+  const todoLower = todo.content.toLowerCase()
+  const related: ToolInvocation[] = []
+  for (const msg of messages) {
+    if (!msg.toolInvocations) continue
+    for (const tool of msg.toolInvocations) {
+      const name = tool.toolName.toLowerCase()
+      if (name.includes('task') || name.includes('agent')) {
+        const argsStr = JSON.stringify(tool.args || {}).toLowerCase()
+        if (argsStr.includes(todoLower.slice(0, 30)) || todoLower.includes(name)) {
+          related.push(tool)
+          continue
+        }
+        related.push(tool)
+      }
+    }
+  }
+  return related
+}
+
+// ---- Inline tool row ----
+
+function ToolStatusDot({ state }: { state: string }) {
+  return (
+    <span
+      className={cn(
+        'w-1.5 h-1.5 rounded-full shrink-0',
+        state === 'result' && 'bg-green-500',
+        state === 'error' && 'bg-red-500',
+        state === 'call' && 'bg-primary animate-pulse',
+        state === 'partial-call' && 'bg-muted-foreground/40',
+      )}
+    />
+  )
+}
+
+function MiniToolRow({ tool }: { tool: ToolInvocation }) {
+  const summary = useMemo(() => {
+    const a = tool.args
+    if (a?.file_path || a?.path || a?.filePath) {
+      const p = String(a.file_path || a.path || a.filePath || '')
+      const segs = p.split('/')
+      return segs.length > 2 ? '.../' + segs.slice(-2).join('/') : p
+    }
+    if (a?.command) return String(a.command).slice(0, 40)
+    if (a?.pattern || a?.query) return String(a.pattern || a.query).slice(0, 40)
+    if (a?.description) return String(a.description).slice(0, 40)
+    return null
+  }, [tool.args])
+
+  return (
+    <div className="flex items-center gap-1.5 py-0.5 text-[10px]">
+      <ToolStatusDot state={tool.state} />
+      <span className="font-medium text-foreground/70">{tool.toolName}</span>
+      {summary && <span className="text-muted-foreground/50 truncate font-mono">{summary}</span>}
+      {tool.duration !== undefined && (
+        <span className="text-muted-foreground/30 ml-auto shrink-0">{formatDuration(tool.duration)}</span>
+      )}
+    </div>
+  )
+}
+
+// ---- Inline expandable task item ----
+
+function TaskItem({ todo, messages }: { todo: Todo; messages: UIMessage[] }) {
+  const [expanded, setExpanded] = useState(false)
+  const isInProgress = todo.status === 'in_progress'
+  const isCompleted = todo.status === 'completed'
+  const isCancelled = todo.status === 'cancelled'
+
+  const relatedTools = useMemo(
+    () => (expanded ? findRelatedTools(todo, messages) : []),
+    [expanded, todo, messages],
+  )
+
+  return (
+    <div className="rounded-md transition-colors">
+      {/* Clickable row */}
+      <div
+        className={cn(
+          'flex items-start gap-2 py-1 px-1.5 rounded-md cursor-pointer transition-colors hover:bg-muted/30',
+          expanded && 'bg-muted/20',
+        )}
+        onClick={() => setExpanded(!expanded)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === 'Enter' && setExpanded(!expanded)}
+      >
+        {/* Status indicator */}
+        {isInProgress ? (
+          <span className="relative flex h-3 w-3 shrink-0 mt-0.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/30 opacity-75" />
+            <span className="relative inline-flex rounded-full h-3 w-3 border-[1.5px] border-primary/30 border-t-primary animate-spin" />
+          </span>
+        ) : isCompleted ? (
+          <span className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/40 shrink-0 mt-0.5 flex items-center justify-center">
+            <svg className="w-2 h-2 text-green-500" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </span>
+        ) : isCancelled ? (
+          <span className="w-3 h-3 rounded-full bg-red-500/10 border border-red-500/30 shrink-0 mt-0.5" />
+        ) : (
+          <span className="w-3 h-3 rounded-full border border-muted-foreground/30 shrink-0 mt-0.5" />
+        )}
+
+        <div className="min-w-0 flex-1">
+          <p className={cn(
+            'text-[11px] leading-tight',
+            isInProgress ? 'text-foreground/90 font-medium' : isCompleted ? 'text-muted-foreground/50 line-through' : 'text-muted-foreground/70',
+          )}>
+            {todo.content}
+          </p>
+          {todo.priority === 'high' && !isCompleted && (
+            <span className="text-[9px] text-orange-500/70">high priority</span>
+          )}
+        </div>
+
+        {/* Chevron */}
+        <svg
+          className={cn(
+            'w-3 h-3 text-muted-foreground/30 shrink-0 mt-0.5 transition-transform',
+            expanded && 'rotate-90',
+          )}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+      </div>
+
+      {/* Expanded detail (inline collapsible) */}
+      {expanded && (
+        <div className="ml-5 mr-1 mt-1 mb-2 pl-2 border-l border-border/30 space-y-2">
+          {/* Status badge */}
+          <div className="flex items-center gap-1.5">
+            <span className={cn(
+              'text-[9px] font-medium px-1.5 py-0.5 rounded-full',
+              todo.status === 'pending' && 'text-muted-foreground bg-muted/50',
+              todo.status === 'in_progress' && 'text-primary bg-primary/10',
+              todo.status === 'completed' && 'text-green-600 bg-green-500/10',
+              todo.status === 'cancelled' && 'text-red-600 bg-red-500/10',
+            )}>
+              {todo.status === 'in_progress' ? 'In Progress' : todo.status.charAt(0).toUpperCase() + todo.status.slice(1)}
+            </span>
+            {todo.priority !== 'medium' && (
+              <span className="text-[9px] text-muted-foreground/50 px-1.5 py-0.5 rounded-full bg-muted/30">
+                {todo.priority}
+              </span>
+            )}
+          </div>
+
+          {/* Related tools */}
+          {relatedTools.length > 0 && (
+            <div>
+              <p className="text-[9px] uppercase tracking-wider text-muted-foreground/40 font-medium mb-1">
+                Tools ({relatedTools.length})
+              </p>
+              <div className="space-y-0.5">
+                {relatedTools.slice(0, 6).map((tool) => (
+                  <MiniToolRow key={tool.toolCallId} tool={tool} />
+                ))}
+                {relatedTools.length > 6 && (
+                  <p className="text-[9px] text-muted-foreground/30">+{relatedTools.length - 6} more</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {relatedTools.length === 0 && (
+            <p className="text-[9px] text-muted-foreground/30">No related tool activity yet.</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---- Main component ----
 
 export function SessionPanel({
   sessionId,
@@ -20,7 +210,6 @@ export function SessionPanel({
   openCodeUrl,
   messages = [],
   className,
-  onTodoClick,
 }: SessionPanelProps) {
   const totalTokens = tokens ? tokens.input + tokens.output + tokens.reasoning : 0
   const contextLimit = tokens?.contextLimit || 200000
@@ -48,6 +237,7 @@ export function SessionPanel({
     () => (todos || []).filter((t) => t.status === 'completed' || t.status === 'cancelled'),
     [todos],
   )
+  const allTodos = useMemo(() => [...activeTodos, ...completedTodos], [activeTodos, completedTodos])
 
   const activeTools = useMemo(() => {
     const tools: Array<{ toolCallId: string; toolName: string; title?: string }> = []
@@ -97,57 +287,18 @@ export function SessionPanel({
         </>
       )}
 
-      {/* Active Tasks / Todos */}
-      {activeTodos.length > 0 && (
+      {/* Tasks (all — active first, then completed) */}
+      {allTodos.length > 0 && (
         <>
           <div className="px-4 py-3">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium mb-2">
-              Tasks ({activeTodos.length})
+              Tasks ({activeTodos.length}/{allTodos.length})
             </div>
-            <div className="space-y-1">
-              {activeTodos.map((todo) => {
-                const isInProgress = todo.status === 'in_progress'
-                const isClickable = Boolean(onTodoClick)
-                return (
-                  <div
-                    key={todo.id}
-                    className={cn(
-                      'flex items-start gap-2 py-1 rounded-md transition-colors',
-                      isClickable && 'cursor-pointer hover:bg-muted/30 px-1.5 -mx-1.5',
-                    )}
-                    onClick={onTodoClick ? () => onTodoClick(todo) : undefined}
-                    role={isClickable ? 'button' : undefined}
-                    tabIndex={isClickable ? 0 : undefined}
-                  >
-                    {isInProgress ? (
-                      <span className="relative flex h-3 w-3 shrink-0 mt-0.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/30 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-3 w-3 border-[1.5px] border-primary/30 border-t-primary animate-spin" />
-                      </span>
-                    ) : (
-                      <span className="w-3 h-3 rounded-full border border-muted-foreground/30 shrink-0 mt-0.5" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className={cn(
-                        'text-[11px] leading-tight',
-                        isInProgress ? 'text-foreground/90 font-medium' : 'text-muted-foreground/70',
-                      )}>
-                        {todo.content}
-                      </p>
-                      {todo.priority === 'high' && <span className="text-[9px] text-orange-500/70">high priority</span>}
-                    </div>
-                    {isClickable && (
-                      <svg className="w-3 h-3 text-muted-foreground/30 shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
-                    )}
-                  </div>
-                )
-              })}
+            <div className="space-y-0.5">
+              {allTodos.map((todo) => (
+                <TaskItem key={todo.id} todo={todo} messages={messages} />
+              ))}
             </div>
-            {completedTodos.length > 0 && (
-              <div className="text-[10px] text-muted-foreground/40 mt-1.5">{completedTodos.length} completed</div>
-            )}
           </div>
           <div className="mx-4 border-t border-border/20" />
         </>

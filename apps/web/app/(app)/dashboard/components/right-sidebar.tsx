@@ -11,8 +11,6 @@ import { SessionPanel } from '@/components/chat/session-panel'
 import type { SessionInfo } from '@/lib/sse-types'
 import type { UIMessage } from '@/lib/ai-elements-adapter'
 import type { GitHubRepo, ModelInfo } from '@/lib/api'
-import type { TodoItem } from '../hooks/use-task-detail-sheet'
-
 interface SessionPanelData {
   sessionId: string
   selectedRepo: GitHubRepo | null
@@ -20,7 +18,7 @@ interface SessionPanelData {
   mode: 'build' | 'plan'
   lastStepCost: { cost: number; tokens: { input: number; output: number; reasoning: number; cache: { read: number; write: number } } } | null
   totalCost: number
-  sessionTodos: TodoItem[]
+  sessionTodos: Array<{ id: string; content: string; status: 'pending' | 'in_progress' | 'completed' | 'cancelled'; priority: 'high' | 'medium' | 'low' }>
   fileDiffs: Array<{ filename: string; additions: number; deletions: number }>
   openCodeUrl: string
   sessionInfo: SessionInfo | null
@@ -28,24 +26,14 @@ interface SessionPanelData {
 }
 
 interface RightSidebarProps {
-  /** Panel data to render */
   data: SessionPanelData
-  /** Desktop sidebar open state */
   desktopOpen: boolean
-  /** Mobile sidebar open state */
   mobileOpen: boolean
-  /** Whether this is a mobile viewport */
   isMobile: boolean
-  /** Callback to set mobile open state */
   onMobileOpenChange: (open: boolean) => void
-  /** Callback when a todo is clicked */
-  onTodoClick: (todo: TodoItem) => void
 }
 
-/**
- * Builds the common SessionPanel props from the data object to avoid repetition.
- */
-function useSessionPanelProps(data: SessionPanelData, onTodoClick: (todo: TodoItem) => void) {
+function useSessionPanelProps(data: SessionPanelData) {
   return {
     sessionId: data.sessionId,
     repo: data.selectedRepo
@@ -68,7 +56,6 @@ function useSessionPanelProps(data: SessionPanelData, onTodoClick: (todo: TodoIt
     openCodeUrl: data.openCodeUrl || undefined,
     sessionInfo: data.sessionInfo || undefined,
     messages: data.messages,
-    onTodoClick,
   }
 }
 
@@ -78,9 +65,8 @@ export function RightSidebar({
   mobileOpen,
   isMobile,
   onMobileOpenChange,
-  onTodoClick,
 }: RightSidebarProps) {
-  const panelProps = useSessionPanelProps(data, onTodoClick)
+  const panelProps = useSessionPanelProps(data)
 
   return (
     <>
