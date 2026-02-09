@@ -2,7 +2,17 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { SidebarProvider, SidebarInset, cn } from '@ship/ui'
+import {
+  SidebarProvider,
+  SidebarInset,
+  cn,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  useIsMobile,
+} from '@ship/ui'
 import { AppSidebar } from '@/components/app-sidebar'
 import { SessionPanel } from '@/components/chat/session-panel'
 import { CreateSessionDialog } from '@/components/session/create-session-dialog'
@@ -21,6 +31,7 @@ interface DashboardClientProps {
 
 export function DashboardClient({ sessions: initialSessions, userId, user }: DashboardClientProps) {
   const searchParams = useSearchParams()
+  const isMobile = useIsMobile()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedRepo, setSelectedRepo] = useState<GitHubRepo | null>(null)
   const [selectedModel, setSelectedModel] = useState<ModelInfo | null>(null)
@@ -203,8 +214,9 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
     activeRepos: new Set(localSessions.map((s) => `${s.repoOwner}/${s.repoName}`)).size,
   }
 
-  // Right sidebar state — persisted in localStorage
+  // Right sidebar state — persisted in localStorage (desktop), sheet state (mobile)
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true)
+  const [rightSidebarMobileOpen, setRightSidebarMobileOpen] = useState(false)
   useEffect(() => {
     try {
       const saved = localStorage.getItem('ship-right-sidebar')
@@ -212,12 +224,16 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
     } catch {}
   }, [])
   const toggleRightSidebar = useCallback(() => {
-    setRightSidebarOpen((prev) => {
-      const next = !prev
-      try { localStorage.setItem('ship-right-sidebar', String(next)) } catch {}
-      return next
-    })
-  }, [])
+    if (isMobile) {
+      setRightSidebarMobileOpen((prev) => !prev)
+    } else {
+      setRightSidebarOpen((prev) => {
+        const next = !prev
+        try { localStorage.setItem('ship-right-sidebar', String(next)) } catch {}
+        return next
+      })
+    }
+  }, [isMobile])
 
   // Derive the display title from sessionInfo or sessionTitle state
   const displayTitle = useMemo(() => {
@@ -298,8 +314,8 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
             </div>
           </div>
 
-          {/* Right sidebar — spans full page height */}
-          {activeSessionId && rightSidebarOpen && (
+          {/* Right sidebar — desktop: inline panel, mobile: sheet drawer */}
+          {activeSessionId && rightSidebarOpen && !isMobile && (
             <div className="w-64 border-l border-border/40 bg-background/60 backdrop-blur-sm hidden md:block overflow-y-auto no-scrollbar">
               <SessionPanel
                 sessionId={activeSessionId}
@@ -330,6 +346,46 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
                 messages={messages}
               />
             </div>
+          )}
+
+          {/* Right sidebar — mobile sheet */}
+          {activeSessionId && isMobile && (
+            <Sheet open={rightSidebarMobileOpen} onOpenChange={setRightSidebarMobileOpen}>
+              <SheetContent side="right" className="w-[85vw] max-w-sm p-0 overflow-y-auto">
+                <SheetHeader className="sr-only">
+                  <SheetTitle>Session Context</SheetTitle>
+                  <SheetDescription>Session details and context panel.</SheetDescription>
+                </SheetHeader>
+                <SessionPanel
+                  sessionId={activeSessionId}
+                  repo={selectedRepo ? { owner: selectedRepo.owner, name: selectedRepo.name } : undefined}
+                  model={
+                    selectedModel
+                      ? {
+                          id: selectedModel.id,
+                          name: selectedModel.name,
+                          provider: selectedModel.provider,
+                          mode: mode,
+                        }
+                      : undefined
+                  }
+                  tokens={
+                    lastStepCost?.tokens
+                      ? {
+                          ...lastStepCost.tokens,
+                          contextLimit: 200000,
+                        }
+                      : undefined
+                  }
+                  cost={totalCost > 0 ? totalCost : undefined}
+                  todos={sessionTodos}
+                  diffs={fileDiffs}
+                  openCodeUrl={openCodeUrl || undefined}
+                  sessionInfo={sessionInfo || undefined}
+                  messages={messages}
+                />
+              </SheetContent>
+            </Sheet>
           )}
         </div>
       </SidebarInset>
