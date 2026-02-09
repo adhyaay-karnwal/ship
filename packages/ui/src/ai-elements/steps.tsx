@@ -26,14 +26,10 @@ function formatElapsed(ms: number): string {
 export function Steps({ children, isStreaming = false, elapsed, toolCount, className }: StepsProps) {
   const [isOpen, setIsOpen] = React.useState(isStreaming)
 
-  // Auto-open when streaming starts, auto-close when it ends
+  // Auto-open when streaming starts, never auto-close
   React.useEffect(() => {
     if (isStreaming) {
       setIsOpen(true)
-    } else {
-      // Collapse after streaming ends with a brief delay
-      const timer = setTimeout(() => setIsOpen(false), 300)
-      return () => clearTimeout(timer)
     }
   }, [isStreaming])
 
@@ -50,14 +46,14 @@ export function Steps({ children, isStreaming = false, elapsed, toolCount, class
     <CollapsiblePrimitive.Root open={isOpen} onOpenChange={setIsOpen}>
       <CollapsiblePrimitive.Trigger
         className={cn(
-          'flex items-center gap-1.5 text-[13px] text-muted-foreground/70 hover:text-muted-foreground transition-colors py-1 group',
+          'flex items-center gap-1.5 text-sm text-muted-foreground/70 hover:text-muted-foreground transition-colors py-1.5 group',
           className,
         )}
       >
         {/* Triangle caret icon */}
         <svg
           className={cn(
-            'w-3 h-3 transition-transform duration-150 text-muted-foreground/50',
+            'w-3.5 h-3.5 transition-transform duration-150 text-muted-foreground/50',
             isOpen && 'rotate-90',
           )}
           fill="currentColor"
@@ -67,9 +63,9 @@ export function Steps({ children, isStreaming = false, elapsed, toolCount, class
         </svg>
         {isStreaming ? (
           <span className="flex items-center gap-2">
-            <span className="relative flex h-1.5 w-1.5">
+            <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/50 opacity-75" />
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary/60" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary/60" />
             </span>
             Working...
             {summaryText && <span className="text-muted-foreground/40">{summaryText}</span>}
@@ -84,7 +80,7 @@ export function Steps({ children, isStreaming = false, elapsed, toolCount, class
         )}
       </CollapsiblePrimitive.Trigger>
       <CollapsiblePrimitive.Panel>
-        <div className="pl-5 pb-1 pt-1">
+        <div className="pl-4 pb-1.5 pt-1.5 border-l border-border/20 ml-1.5">
           {children}
         </div>
       </CollapsiblePrimitive.Panel>

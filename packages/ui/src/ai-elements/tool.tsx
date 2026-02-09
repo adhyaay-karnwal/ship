@@ -11,13 +11,15 @@ interface ToolProps {
   output?: unknown
   duration?: number
   className?: string
+  onClick?: () => void
+  isSubagent?: boolean
 }
 
 // ============ Tool Icons ============
 
 function ToolIcon({ name }: { name: string }) {
   const lowerName = name.toLowerCase()
-  const iconClass = 'w-3.5 h-3.5 shrink-0 text-muted-foreground/60'
+  const iconClass = 'w-3.5 h-3.5 shrink-0 text-muted-foreground/70'
 
   if (lowerName.includes('read')) {
     return (
@@ -109,7 +111,6 @@ function getInputSummary(name: string, input: Record<string, unknown>): string |
     const c = String(input.content)
     return c.length > 60 ? c.slice(0, 57) + '...' : c
   }
-  // Task/agent tools: show description or prompt
   if (input.description) {
     const d = String(input.description)
     return d.length > 60 ? d.slice(0, 57) + '...' : d
@@ -136,6 +137,24 @@ function formatOutput(output: unknown): [string, boolean] {
   return [text, false]
 }
 
+function StatusIndicator({ status }: { status: ToolProps['status'] }) {
+  if (status === 'in_progress') {
+    return (
+      <span className="relative flex h-2 w-2 shrink-0">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/40 opacity-75" />
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+      </span>
+    )
+  }
+  if (status === 'completed') {
+    return <span className="flex h-2 w-2 shrink-0 rounded-full bg-green-500" />
+  }
+  if (status === 'failed') {
+    return <span className="flex h-2 w-2 shrink-0 rounded-full bg-red-500" />
+  }
+  return null
+}
+
 export function Tool({
   name,
   status,
@@ -143,6 +162,8 @@ export function Tool({
   output,
   duration,
   className,
+  onClick,
+  isSubagent,
 }: ToolProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const [showFullOutput, setShowFullOutput] = React.useState(false)
@@ -159,40 +180,54 @@ export function Tool({
     : null
 
   return (
-    <CollapsiblePrimitive.Root open={isOpen} onOpenChange={setIsOpen}>
-      <div className={cn('rounded-lg border border-border/40 overflow-hidden', className)}>
-        <CollapsiblePrimitive.Trigger className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/30 transition-colors">
+    <CollapsiblePrimitive.Root open={isOpen} onOpenChange={isSubagent ? undefined : setIsOpen}>
+      <div
+        className={cn(
+          'rounded-lg border border-border/30 bg-muted/40 overflow-hidden',
+          isSubagent && 'cursor-pointer',
+          className,
+        )}
+        onClick={isSubagent ? onClick : undefined}
+      >
+        <CollapsiblePrimitive.Trigger
+          className={cn(
+            'w-full flex items-center gap-2.5 px-3.5 py-2 hover:bg-muted/60 transition-colors min-h-[36px]',
+            isSubagent && 'pointer-events-none',
+          )}
+        >
           <ToolIcon name={name} />
-          <span className="text-[13px] font-semibold text-foreground/90 shrink-0">{name}</span>
+          <span className="text-sm font-medium text-foreground/90 shrink-0">{name}</span>
           {inputSummary && (
-            <span className="text-[11px] text-muted-foreground/50 truncate font-mono">{inputSummary}</span>
+            <span className="text-xs text-muted-foreground/50 truncate font-mono">{inputSummary}</span>
           )}
-          {status === 'in_progress' && (
-            <span className="relative flex h-1.5 w-1.5 shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/40 opacity-75" />
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary" />
-            </span>
-          )}
-          <div className="flex items-center gap-1.5 ml-auto shrink-0">
+          <div className="flex items-center gap-2 ml-auto shrink-0">
             {durationLabel && (
-              <span className="text-[11px] text-muted-foreground/40">{durationLabel}</span>
+              <span className="text-xs text-muted-foreground/60">{durationLabel}</span>
             )}
-            {hasDetails && (
+            <StatusIndicator status={status} />
+            {isSubagent ? (
               <svg
-                className={cn('w-3.5 h-3.5 text-muted-foreground/30 transition-transform', isOpen && 'rotate-180')}
+                className="w-4 h-4 text-muted-foreground/40"
+                fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            ) : hasDetails ? (
+              <svg
+                className={cn('w-3.5 h-3.5 text-muted-foreground/40 transition-transform', isOpen && 'rotate-180')}
                 fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </svg>
-            )}
+            ) : null}
           </div>
         </CollapsiblePrimitive.Trigger>
-        {hasDetails && (
+        {hasDetails && !isSubagent && (
           <CollapsiblePrimitive.Panel>
-            <div className="border-t border-border/30 px-3 pb-3 pt-2 space-y-2.5 text-[11px]">
+            <div className="border-t border-border/30 px-4 py-3 space-y-3 text-[11px]">
               {input && Object.keys(input).length > 0 && (
                 <div>
-                  <p className="font-medium mb-1 text-muted-foreground/40 text-[10px] uppercase tracking-wider">
+                  <p className="font-medium mb-1.5 text-muted-foreground/40 text-[10px] uppercase tracking-wider">
                     Input
                   </p>
                   <pre className="bg-muted/30 rounded-md px-3 py-2 overflow-x-auto text-foreground/70 leading-relaxed font-mono text-[11px]">
@@ -202,7 +237,7 @@ export function Tool({
               )}
               {output !== undefined && (
                 <div>
-                  <p className="font-medium mb-1 text-muted-foreground/40 text-[10px] uppercase tracking-wider">
+                  <p className="font-medium mb-1.5 text-muted-foreground/40 text-[10px] uppercase tracking-wider">
                     Output
                   </p>
                   <pre className="bg-muted/30 rounded-md px-3 py-2 overflow-x-auto text-foreground/70 leading-relaxed font-mono text-[11px] max-h-[400px] overflow-y-auto">
@@ -214,7 +249,7 @@ export function Tool({
                         e.stopPropagation()
                         setShowFullOutput(!showFullOutput)
                       }}
-                      className="text-[10px] text-primary/70 hover:text-primary mt-1 transition-colors"
+                      className="text-[10px] text-primary/70 hover:text-primary mt-1.5 transition-colors"
                     >
                       {showFullOutput ? 'Show less' : 'Show more'}
                     </button>
