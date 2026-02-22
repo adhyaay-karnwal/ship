@@ -33,15 +33,15 @@ export function StatsSection({
         <div className="space-y-1">
           {model && (
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-muted-foreground/50">Model</span>
-              <span className="text-[10px] text-foreground/70 font-mono truncate ml-2 max-w-[60%] text-right">
+              <span className="text-[11px] text-muted-foreground/60">Model</span>
+              <span className="text-[11px] text-foreground/70 font-mono truncate ml-2 max-w-[60%] text-right">
                 {model.name || model.id}
               </span>
             </div>
           )}
           {model?.mode && (
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-muted-foreground/50">Mode</span>
+              <span className="text-[11px] text-muted-foreground/60">Mode</span>
               <span className={cn(
                 'text-[9px] font-medium px-1.5 py-0.5 rounded-full',
                 model.mode === 'build' ? 'bg-green-500/10 text-green-500' : 'bg-blue-500/10 text-blue-500',
@@ -52,8 +52,8 @@ export function StatsSection({
           )}
           {repo && (
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-muted-foreground/50">Repo</span>
-              <span className="text-[10px] text-foreground/70 font-mono truncate ml-2 max-w-[60%] text-right">
+              <span className="text-[11px] text-muted-foreground/60">Repo</span>
+              <span className="text-[11px] text-foreground/70 font-mono truncate ml-2 max-w-[60%] text-right">
                 {repo.owner}/{repo.name}
               </span>
             </div>
@@ -65,8 +65,8 @@ export function StatsSection({
       {tokens && totalTokens > 0 && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] text-muted-foreground/50">Tokens</span>
-            <span className="text-[10px] text-foreground/70 font-mono">
+            <span className="text-[11px] text-muted-foreground/60">Tokens</span>
+            <span className="text-[11px] text-foreground/70 font-mono">
               {formatTokenCount(totalTokens)} / {formatTokenCount(contextLimit)}
             </span>
           </div>
@@ -90,7 +90,7 @@ export function StatsSection({
       )}
 
       {/* Cost + Messages — inline row */}
-      <div className="flex items-center gap-3 text-[10px] text-muted-foreground/50">
+      <div className="flex items-center gap-3 text-[11px] text-muted-foreground/60">
         {messageCounts.total > 0 && (
           <span>{messageCounts.total} msgs</span>
         )}

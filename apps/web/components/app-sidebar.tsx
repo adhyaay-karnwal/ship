@@ -2,29 +2,26 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Search01Icon, Settings01Icon, Logout01Icon, Cancel01Icon } from '@hugeicons/core-free-icons'
+import { Search01Icon, Settings01Icon, Logout01Icon, Cancel01Icon, Add01Icon } from '@hugeicons/core-free-icons'
 import { useDeleteSession, type ChatSession } from '@/lib/api'
+import { cn } from '@ship/ui/utils'
 import {
   Sidebar,
-  SidebarContent,
   SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
-  SidebarInput,
   SidebarMenu,
   SidebarMenuButton,
-  SidebarMenuAction,
   SidebarMenuItem,
-  Button,
+  SidebarTrigger,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@ship/ui'
+import { ChatSearchCommand } from './chat-search-command'
 
 interface User {
   id: string
@@ -42,6 +39,7 @@ interface AppSidebarProps {
   currentSessionId?: string
   currentSessionTitle?: string
   onSessionDeleted?: (sessionId: string) => void
+  onNewChat?: () => void
   isStreaming?: boolean
 }
 
@@ -50,27 +48,86 @@ function formatRelativeTime(timestamp: number): string {
   if (seconds < 60) return 'now'
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m`
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`
-  return `${Math.floor(seconds / 86400)}d`
+  const days = Math.floor(seconds / 86400)
+  if (days < 14) return `${days}d`
+  if (days < 60) return `${Math.floor(days / 7)}w`
+  return `${Math.floor(days / 30)}mo`
 }
 
-export function AppSidebar({ sessions, user, searchQuery, onSearchChange, currentSessionId, currentSessionTitle, onSessionDeleted, isStreaming = false }: AppSidebarProps) {
+// Folder SVG icon
+function FolderIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 7a2 2 0 0 1 2-2h3.586a1 1 0 0 1 .707.293L10.707 6.7A1 1 0 0 0 11.414 7H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+    </svg>
+  )
+}
+
+// Chevron SVG
+function ChevronIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  )
+}
+
+
+export function AppSidebar({ sessions, user, searchQuery, onSearchChange, currentSessionId, currentSessionTitle, onSessionDeleted, onNewChat, isStreaming = false }: AppSidebarProps) {
   const router = useRouter()
   const { deleteSession } = useDeleteSession()
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
 
-  const oneWeekAgo = Math.floor(Date.now() / 1000) - 7 * 24 * 60 * 60
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setSearchOpen((v) => !v)
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [])
+
+  // collapsedRepos: keys of repos that are manually collapsed (default = all expanded)
+  const [collapsedRepos, setCollapsedRepos] = useState<Set<string>>(new Set())
+  const [archiveExpanded, setArchiveExpanded] = useState(false)
+
+  const toggleRepo = (key: string) => {
+    setCollapsedRepos(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  // Filter by search query
   const filtered = sessions.filter(s =>
     searchQuery === '' ||
     s.repoName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.repoOwner.toLowerCase().includes(searchQuery.toLowerCase())
   )
-  const activeSessions = filtered.filter(s => s.lastActivity > oneWeekAgo)
-  const inactiveSessions = filtered.filter(s => s.lastActivity <= oneWeekAgo)
+
+  // Split into non-archived and archived
+  const nonArchived = filtered.filter(s => !s.archivedAt)
+  const archived = filtered.filter(s => !!s.archivedAt)
+
+  // Group non-archived by repo, sorted by most recent activity
+  const byRepo: Record<string, ChatSession[]> = {}
+  for (const session of nonArchived) {
+    const key = `${session.repoOwner}/${session.repoName}`
+    if (!byRepo[key]) byRepo[key] = []
+    byRepo[key].push(session)
+  }
+  const repoEntries = Object.entries(byRepo).sort(([, a], [, b]) =>
+    Math.max(...b.map(s => s.lastActivity)) - Math.max(...a.map(s => s.lastActivity))
+  )
 
   const handleDeleteSession = async (session: ChatSession) => {
-    const confirmed = window.confirm(`Delete session ${session.repoOwner}/${session.repoName}?`)
+    const confirmed = window.confirm(`Delete session for ${session.repoOwner}/${session.repoName}?`)
     if (!confirmed) return
-
     try {
       setDeletingSessionId(session.id)
       await deleteSession({ sessionId: session.id })
@@ -90,168 +147,237 @@ export function AppSidebar({ sessions, user, searchQuery, onSearchChange, curren
   }
 
   return (
-    <Sidebar collapsible="offcanvas">
-      <SidebarHeader className="border-b border-sidebar-border">
-        <div className="flex items-center justify-between px-2 py-1">
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 bg-foreground rounded flex items-center justify-center">
-              <svg className="w-3 h-3 text-background" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-              </svg>
-            </div>
-            <span className="text-sm font-semibold text-foreground group-data-[collapsible=icon]:hidden">Ship</span>
-          </div>
-          <div className="flex items-center gap-1 group-data-[collapsible=icon]:hidden">
-            {/* New chat button */}
-            <Button variant="ghost" size="icon" className="size-7" onClick={() => router.push('/')} title="New chat">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m-7-7h14" />
-              </svg>
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <button
-                    className="w-6 h-6 rounded-full overflow-hidden bg-muted flex items-center justify-center text-[10px] font-medium text-muted-foreground cursor-pointer"
-                    aria-label="Open user menu"
-                  >
-                    {user.avatarUrl ? (
-                      <img src={user.avatarUrl} alt={user.username} width={24} height={24} className="w-6 h-6 object-cover" />
-                    ) : (
-                      <span>{user.username[0].toUpperCase()}</span>
-                    )}
-                  </button>
-                }
-              />
-              <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuItem
-                  onClick={() => router.push('/settings')}
-                  className="cursor-pointer"
-                >
-                  <HugeiconsIcon icon={Settings01Icon} strokeWidth={2} />
-                  Settings
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    window.location.href = '/api/auth/logout'
-                  }}
-                  className="cursor-pointer"
-                >
-                  <HugeiconsIcon icon={Logout01Icon} strokeWidth={2} />
-                  Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+    <Sidebar collapsible="icon">
+      {/* Header: logo + sidebar trigger */}
+      <SidebarHeader>
+        <div className="flex items-center justify-between px-2 py-1 group-data-[collapsible=icon]:justify-center">
+          <Link href="/" className="text-sm font-semibold text-foreground group-data-[collapsible=icon]:hidden hover:opacity-80 transition-opacity">Ship</Link>
+          <SidebarTrigger className="size-7 text-muted-foreground hover:text-foreground" />
         </div>
       </SidebarHeader>
 
-      <div className="px-3 py-2 group-data-[collapsible=icon]:hidden">
-        <div className="relative">
-          <HugeiconsIcon icon={Search01Icon} strokeWidth={2} className="absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-          <SidebarInput
-            type="text"
-            placeholder="Search sessions..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-7 h-7 text-xs"
-          />
-        </div>
+      {/* Top nav: New Chat + Search */}
+      <div className="px-2 pt-3 pb-1 space-y-0.5">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              render={<button type="button" onClick={() => onNewChat ? onNewChat() : router.push('/')} />}
+            >
+              <span className="shrink-0 w-4 h-4 rounded-full border border-foreground/25 flex items-center justify-center">
+                <HugeiconsIcon icon={Add01Icon} strokeWidth={2} className="size-2.5 text-foreground/60" />
+              </span>
+              <span className="text-sm font-normal text-foreground/75 group-data-[collapsible=icon]:hidden">New chat</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={() => setSearchOpen(true)}
+            >
+              <HugeiconsIcon icon={Search01Icon} strokeWidth={2} className="size-4 text-muted-foreground/50" />
+              <span className="text-sm font-normal text-foreground/75 group-data-[collapsible=icon]:hidden">Search</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </div>
 
-      <SidebarContent>
-        {activeSessions.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-[9px] uppercase tracking-wide text-muted-foreground/70">Active</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {activeSessions.map((session) => {
-                  const isCurrentAndStreaming = isStreaming && currentSessionId === session.id
-                  const isCurrent = currentSessionId === session.id
-                  const title = isCurrent && currentSessionTitle ? currentSessionTitle : null
-                  return (
-                    <SidebarMenuItem key={session.id}>
-                      <SidebarMenuButton render={<Link href={`/session/${session.id}`} />} tooltip={`${session.repoOwner}/${session.repoName}`}>
-                        <div className="flex items-center gap-2 min-w-0 w-full group-data-[collapsible=icon]:hidden">
-                          {isCurrentAndStreaming && (
-                            <span className="shrink-0 w-3 h-3 border-[1.5px] border-primary/30 border-t-primary rounded-full animate-spin" />
-                          )}
-                          <div className="flex flex-col min-w-0 flex-1">
-                            <div className="flex items-baseline justify-between gap-2">
-                              <span className="text-xs font-medium truncate">
-                                {title || `${session.repoOwner}/${session.repoName}`}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground/50 shrink-0">
-                                {formatRelativeTime(session.lastActivity)}
-                              </span>
-                            </div>
-                            {title && (
-                              <span className="text-[10px] text-muted-foreground/60 truncate">
-                                {session.repoOwner}/{session.repoName}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </SidebarMenuButton>
-                      <SidebarMenuAction
-                        showOnHover
-                        title="Delete session"
-                        aria-label="Delete session"
-                        disabled={deletingSessionId === session.id}
-                        className="cursor-pointer disabled:opacity-50"
-                        onClick={(event) => {
-                          event.preventDefault()
-                          event.stopPropagation()
-                          if (deletingSessionId) return
-                          handleDeleteSession(session)
-                        }}
-                      >
-                        <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
-                      </SidebarMenuAction>
-                    </SidebarMenuItem>
-                  )
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+      <div className="flex-1 overflow-y-auto">
+        {/* Repo-grouped sessions */}
+        <div className="px-2 py-1 group-data-[collapsible=icon]:hidden">
 
-        {inactiveSessions.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-[9px] uppercase tracking-wide text-muted-foreground/70">Inactive</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {inactiveSessions.map((session) => (
-                  <SidebarMenuItem key={session.id}>
-                    <SidebarMenuButton render={<Link href={`/session/${session.id}`} />} tooltip={`${session.repoOwner}/${session.repoName}`}>
-                      <div className="flex items-center min-w-0 w-full group-data-[collapsible=icon]:hidden">
-                        <div className="flex flex-col min-w-0 flex-1">
-                          <div className="flex items-baseline justify-between gap-2">
-                            <span className="text-xs font-medium truncate opacity-70">{session.repoOwner}/{session.repoName}</span>
-                            <span className="text-[10px] text-muted-foreground/50 shrink-0">{formatRelativeTime(session.lastActivity)}</span>
+          {repoEntries.map(([repoKey, repoSessions]) => {
+            const isExpanded = !collapsedRepos.has(repoKey)
+            const repoName = repoKey.split('/')[1] ?? repoKey
+
+            return (
+              <div key={repoKey} className="mb-1">
+                {/* Repo header */}
+                <button
+                  type="button"
+                  onClick={() => toggleRepo(repoKey)}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-sidebar-accent transition-colors group/repo"
+                >
+                  <FolderIcon className="size-4 shrink-0 text-muted-foreground/60 group-hover/repo:text-muted-foreground transition-colors" />
+                  <span className="text-xs font-medium text-muted-foreground flex-1 truncate">{repoName}</span>
+                  <ChevronIcon className={cn(
+                    'size-3.5 shrink-0 text-muted-foreground/40 transition-transform duration-150',
+                    isExpanded ? 'rotate-0' : '-rotate-90'
+                  )} />
+                </button>
+
+                {/* Sessions under this repo */}
+                {isExpanded && (
+                  <div className="mt-0.5 ml-3 pl-3 border-l border-sidebar-border/60">
+                    {repoSessions
+                      .sort((a, b) => b.lastActivity - a.lastActivity)
+                      .map((session) => {
+                        const isCurrent = currentSessionId === session.id
+                        const isCurrentAndStreaming = isStreaming && isCurrent
+                        const sessionTitle = isCurrent && currentSessionTitle
+                          ? currentSessionTitle
+                          : (session.title || null)
+                        const displayTitle = sessionTitle || session.repoName
+                        const tooltipText = sessionTitle || `${session.repoOwner}/${session.repoName}`
+
+                        return (
+                          <div key={session.id} className="relative group/item">
+                            <Link
+                              href={`/session/${session.id}`}
+                              className={cn(
+                                'flex items-center gap-2 py-1.5 pr-6 pl-2 rounded-md text-left w-full transition-colors',
+                                isCurrent
+                                  ? 'bg-sidebar-accent text-foreground'
+                                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground',
+                              )}
+                            >
+                              {isCurrentAndStreaming && (
+                                <span className="shrink-0 w-2.5 h-2.5 border-[1.5px] border-primary/30 border-t-primary rounded-full animate-spin" />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-baseline justify-between gap-2">
+                                  <span className={cn(
+                                    'text-xs truncate',
+                                    isCurrent ? 'font-medium' : 'font-normal'
+                                  )}>
+                                    {displayTitle}
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground/40 shrink-0">
+                                    {formatRelativeTime(session.lastActivity)}
+                                  </span>
+                                </div>
+                              </div>
+                            </Link>
+                            {/* Delete action */}
+                            <button
+                              type="button"
+                              title="Delete session"
+                              disabled={deletingSessionId === session.id}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                if (!deletingSessionId) handleDeleteSession(session)
+                              }}
+                              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded opacity-0 group-hover/item:opacity-100 hover:bg-muted transition-opacity disabled:opacity-30 text-muted-foreground/60 hover:text-foreground"
+                            >
+                              <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-3" />
+                            </button>
                           </div>
-                        </div>
-                      </div>
+                        )
+                      })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Collapsed icon mode: flat session list */}
+        <div className="hidden group-data-[collapsible=icon]:block px-1 py-1">
+          <SidebarMenu>
+            {nonArchived
+              .sort((a, b) => b.lastActivity - a.lastActivity)
+              .map((session) => {
+                const isCurrent = currentSessionId === session.id
+                const sessionTitle = isCurrent && currentSessionTitle ? currentSessionTitle : null
+                const tooltip = sessionTitle || `${session.repoOwner}/${session.repoName}`
+                return (
+                  <SidebarMenuItem key={session.id}>
+                    <SidebarMenuButton render={<Link href={`/session/${session.id}`} />} tooltip={tooltip} isActive={isCurrent}>
+                      <span className={cn(
+                        'size-1.5 rounded-full shrink-0',
+                        isCurrent ? 'bg-foreground' : 'bg-foreground/30'
+                      )} />
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+                )
+              })}
+          </SidebarMenu>
+        </div>
 
-        {sessions.length === 0 && (
-          <div className="py-6 text-center group-data-[collapsible=icon]:hidden">
-            <p className="text-xs text-muted-foreground">No sessions yet</p>
+        {/* Archive section */}
+        {archived.length > 0 && (
+          <div className="px-2 py-1 group-data-[collapsible=icon]:hidden">
+            <div className="mt-2 pt-2 border-t border-sidebar-border/40">
+              <button
+                type="button"
+                onClick={() => setArchiveExpanded(v => !v)}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-sidebar-accent transition-colors"
+              >
+                <span className="text-[10px] uppercase tracking-widest font-medium text-muted-foreground/50 flex-1">Archived</span>
+                <ChevronIcon className={cn(
+                  'size-3 text-muted-foreground/30 transition-transform duration-150',
+                  archiveExpanded ? 'rotate-0' : '-rotate-90'
+                )} />
+              </button>
+
+              {archiveExpanded && (
+                <div className="mt-1 space-y-0.5">
+                  {archived
+                    .sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0))
+                    .map((session) => (
+                      <Link
+                        key={session.id}
+                        href={`/session/${session.id}`}
+                        className="flex items-baseline justify-between gap-2 px-2 py-1.5 rounded-md text-muted-foreground/50 hover:bg-sidebar-accent hover:text-muted-foreground transition-colors"
+                      >
+                        <span className="text-xs truncate">{session.repoOwner}/{session.repoName}</span>
+                        <span className="text-[10px] text-muted-foreground/30 shrink-0">
+                          {formatRelativeTime(session.archivedAt ?? session.lastActivity)}
+                        </span>
+                      </Link>
+                    ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
-      </SidebarContent>
+      </div>
 
-      <SidebarFooter className="border-t border-sidebar-border group-data-[collapsible=icon]:hidden">
-        <div className="px-2 py-1 text-[10px] text-muted-foreground">
-          {sessions.length} session{sessions.length !== 1 ? 's' : ''}
-        </div>
+      <SidebarFooter className="group-data-[collapsible=icon]:border-0 border-t border-sidebar-border">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <button
+                className="w-full flex items-center gap-2.5 px-1 py-1 rounded-md hover:bg-sidebar-accent transition-colors cursor-pointer outline-none group-data-[collapsible=icon]:justify-center"
+                aria-label="Open user menu"
+              >
+                <span className="w-6 h-6 rounded-full overflow-hidden bg-muted flex items-center justify-center text-[10px] font-medium text-muted-foreground shrink-0">
+                  {user.avatarUrl ? (
+                    <img src={user.avatarUrl} alt={user.username} width={24} height={24} className="w-6 h-6 object-cover" />
+                  ) : (
+                    <span>{user.username[0].toUpperCase()}</span>
+                  )}
+                </span>
+                <span className="text-sm font-normal text-foreground/80 truncate group-data-[collapsible=icon]:hidden">
+                  {user.name || user.username}
+                </span>
+              </button>
+            }
+          />
+          <DropdownMenuContent align="end" className="w-48">
+            <div className="px-3 py-2">
+              <p className="text-xs font-medium text-foreground truncate">{user.name || user.username}</p>
+              {user.email && <p className="text-[11px] text-muted-foreground/70 truncate">{user.email}</p>}
+            </div>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer">
+              <HugeiconsIcon icon={Settings01Icon} strokeWidth={2} />
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => { window.location.href = '/api/auth/logout' }} className="cursor-pointer">
+              <HugeiconsIcon icon={Logout01Icon} strokeWidth={2} />
+              Logout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarFooter>
+
+      <ChatSearchCommand
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        sessions={sessions}
+        currentSessionId={currentSessionId}
+      />
     </Sidebar>
   )
 }

@@ -9,5 +9,9 @@ interface ResponseProps {
 }
 
 export function Response({ children, className }: ResponseProps) {
-  return <div className={cn('max-w-none', className)}>{children}</div>
+  return (
+    <div className={cn('prose-sm text-[14.5px] leading-relaxed break-words max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0', className)}>
+      {children}
+    </div>
+  )
 }

@@ -58,9 +58,16 @@ export function useModels() {
  * Hook to fetch user's default model
  */
 export function useDefaultModel(userId: string | undefined) {
-  const { data, error, isLoading, mutate } = useSWR<DefaultModelResponse>(
+  const { data, error, isLoading, mutate } = useSWR<DefaultModelResponse | null>(
     userId ? apiUrl('/models/default', { userId }) : null,
-    fetcher,
+    async (url: string) => {
+      try {
+        return await fetcher<DefaultModelResponse>(url)
+      } catch (err: unknown) {
+        if ((err as { status?: number })?.status === 404) return null
+        throw err
+      }
+    },
   )
 
   return {

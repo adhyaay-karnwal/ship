@@ -3,11 +3,14 @@
 import { useMemo } from 'react'
 import { Card } from '@ship/ui'
 
-function AreaChart({ color = 'var(--chart-1)' }: { color?: string }) {
+function AreaChart({ data, color = 'var(--chart-1)' }: { data: number[]; color?: string }) {
   const points = useMemo(() => {
-    const data = [30, 35, 32, 40, 38, 45, 42, 50, 48, 55, 60, 65]
-    return data.map((y, i) => `${(i / 11) * 100},${100 - y}`).join(' ')
-  }, [])
+    if (data.length === 0) return '0,100 100,100'
+    const max = Math.max(...data, 1)
+    return data
+      .map((y, i) => `${(i / (data.length - 1 || 1)) * 100},${100 - (y / max) * 100}`)
+      .join(' ')
+  }, [data])
 
   return (
     <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full">
@@ -31,16 +34,26 @@ function AreaChart({ color = 'var(--chart-1)' }: { color?: string }) {
   )
 }
 
-function StatsCard({ label, value }: { label: string; value: number }) {
+function StatsCard({
+  label,
+  value,
+  chartData,
+}: {
+  label: string
+  value: number
+  chartData: number[]
+}) {
   return (
     <Card className="p-4 relative overflow-hidden">
       <p className="text-xs text-muted-foreground font-medium mb-1">{label}</p>
       <p className="text-2xl font-semibold text-foreground tabular-nums">
         {value.toLocaleString()}
       </p>
-      <div className="absolute bottom-0 left-0 right-0 h-12 opacity-80">
-        <AreaChart />
-      </div>
+      {value > 0 && (
+        <div className="absolute bottom-0 left-0 right-0 h-12 opacity-80">
+          <AreaChart data={chartData} />
+        </div>
+      )}
     </Card>
   )
 }
@@ -49,14 +62,29 @@ export type DashboardStatsValue = {
   sessionsPastWeek: number
   messagesPastWeek: number
   activeRepos: number
+  sessionsChartData: number[]
+  messagesChartData: number[]
+  activeReposChartData: number[]
 }
 
 export function DashboardStats({ stats }: { stats: DashboardStatsValue }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-      <StatsCard label="Sessions past week" value={stats.sessionsPastWeek} />
-      <StatsCard label="Messages past week" value={stats.messagesPastWeek} />
-      <StatsCard label="Active repos" value={stats.activeRepos} />
+      <StatsCard
+        label="Sessions past week"
+        value={stats.sessionsPastWeek}
+        chartData={stats.sessionsChartData}
+      />
+      <StatsCard
+        label="Messages past week"
+        value={stats.messagesPastWeek}
+        chartData={stats.messagesChartData}
+      />
+      <StatsCard
+        label="Active repos"
+        value={stats.activeRepos}
+        chartData={stats.activeReposChartData}
+      />
     </div>
   )
 }

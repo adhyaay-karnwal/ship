@@ -23,5 +23,9 @@
   },
   "engines": {
     "node": "22.x"
-  }
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
 }

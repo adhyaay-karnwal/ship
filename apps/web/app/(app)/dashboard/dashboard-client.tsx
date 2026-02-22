@@ -51,6 +51,7 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
     setOpenCodeUrl: chat.setOpenCodeUrl,
     setSessionTitle: chat.setSessionTitle,
     setSessionInfo: chat.setSessionInfo,
+    updateSessionTitle: chat.updateSessionTitle,
     streamingMessageRef: chat.streamingMessageRef,
     assistantTextRef: chat.assistantTextRef,
     reasoningRef: chat.reasoningRef,
@@ -169,12 +170,36 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
   )
 
   const stats = useMemo(() => {
-    const oneWeekAgo = Math.floor(Date.now() / 1000) - 7 * 24 * 60 * 60
+    const now = Math.floor(Date.now() / 1000)
+    const oneDay = 24 * 60 * 60
+    const oneWeekAgo = now - 7 * oneDay
     const recent = chat.localSessions.filter((s) => s.lastActivity > oneWeekAgo)
+
+    // Build 7 daily buckets (oldest to newest) for chart data
+    const sessionsChartData: number[] = []
+    const messagesChartData: number[] = []
+    const activeReposChartData: number[] = []
+
+    for (let i = 6; i >= 0; i--) {
+      const bucketStart = now - (i + 1) * oneDay
+      const bucketEnd = now - i * oneDay
+      const inBucket = chat.localSessions.filter(
+        (s) => s.lastActivity >= bucketStart && s.lastActivity < bucketEnd
+      )
+      sessionsChartData.push(inBucket.length)
+      messagesChartData.push(inBucket.reduce((acc, s) => acc + (s.messageCount || 0), 0))
+      activeReposChartData.push(
+        new Set(inBucket.map((s) => `${s.repoOwner}/${s.repoName}`)).size
+      )
+    }
+
     return {
       sessionsPastWeek: recent.length,
       messagesPastWeek: recent.reduce((acc, s) => acc + (s.messageCount || 0), 0),
       activeRepos: new Set(chat.localSessions.map((s) => `${s.repoOwner}/${s.repoName}`)).size,
+      sessionsChartData,
+      messagesChartData,
+      activeReposChartData,
     }
   }, [chat.localSessions])
 
@@ -193,6 +218,7 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
         currentSessionId={chat.activeSessionId || undefined}
         currentSessionTitle={displayTitle}
         onSessionDeleted={(id) => chat.setLocalSessions((prev) => prev.filter((s) => s.id !== id))}
+        onNewChat={() => { chat.setActiveSessionId(null); chat.setMessages([]) }}
         isStreaming={chat.isStreaming}
       />
 

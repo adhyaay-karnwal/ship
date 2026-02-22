@@ -1,6 +1,8 @@
 'use client'
 
-import { useSidebar, cn } from '@ship/ui'
+import { cn, SidebarTrigger } from '@ship/ui'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { PanelRightIcon } from '@hugeicons/core-free-icons'
 import type { WebSocketStatus } from '@/lib/websocket'
 
 interface DashboardHeaderProps {
@@ -28,23 +30,12 @@ export function DashboardHeader({
   rightSidebarOpen,
   onToggleRightSidebar,
 }: DashboardHeaderProps) {
-  const { toggleSidebar } = useSidebar()
-
   const sbConfig = sandboxStatus ? sandboxStatusConfig[sandboxStatus] : null
 
   return (
     <header className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 relative z-10">
-      {/* Left sidebar trigger */}
-      <button
-        onClick={toggleSidebar}
-        className="p-1.5 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
-        title="Toggle sidebar"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <path d="M9 3v18" />
-        </svg>
-      </button>
+      {/* Mobile-only sidebar trigger (sidebar is hidden on mobile when closed) */}
+      <SidebarTrigger className="sm:hidden size-7 text-muted-foreground hover:text-foreground shrink-0" />
 
       {/* Session title */}
       {activeSessionId && (
@@ -85,10 +76,7 @@ export function DashboardHeader({
             className="p-1.5 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors"
             title={rightSidebarOpen ? 'Hide context panel' : 'Show context panel'}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <path d="M15 3v18" />
-            </svg>
+            <HugeiconsIcon icon={PanelRightIcon} className="size-4" strokeWidth={2} />
           </button>
         )}
       </div>

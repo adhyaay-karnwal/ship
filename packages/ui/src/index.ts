@@ -1,5 +1,6 @@
 // UI Components
 export * from './button'
+export * from './command'
 export * from './badge'
 export * from './card'
 export * from './collapsible'

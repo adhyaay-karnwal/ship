@@ -7,7 +7,7 @@ import { AgentStatus } from '@/components/session/status-indicator'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { AppSidebar } from '@/components/app-sidebar'
-import { SidebarInset, SidebarProvider, SidebarTrigger } from '@ship/ui'
+import { SidebarInset, SidebarProvider } from '@ship/ui'
 import type { ChatSession, User } from '@/lib/api'
 import { API_URL } from '@/lib/config'
 
@@ -343,7 +343,6 @@ export function SessionPageClient({ sessionId, userId, user, sessions: initialSe
           {/* Header */}
           <header className="flex items-center justify-between border-b bg-white dark:bg-background/95 px-4 py-3 relative z-10">
             <div className="flex items-center gap-3">
-              <SidebarTrigger className="cursor-pointer" />
               <div>
                 <h1 className="font-semibold text-foreground">
                   {sessionTitle

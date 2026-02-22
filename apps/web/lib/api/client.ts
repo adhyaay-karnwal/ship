@@ -17,10 +17,13 @@ export async function fetcher<T>(url: string, init?: RequestInit): Promise<T> {
   })
 
   if (!res.ok) {
-    const error = new Error('An error occurred while fetching the data.')
-    // Attach extra info to the error object
-    ;(error as any).info = await res.json().catch(() => null)
-    ;(error as any).status = res.status
+    const info = await res.json().catch(() => null)
+    const message =
+      info?.message ?? info?.error ?? `Request failed (${res.status} ${res.statusText})`
+    const error = new Error(message)
+    ;(error as Error & { info?: unknown; status?: number; url?: string }).info = info
+    ;(error as Error & { info?: unknown; status?: number; url?: string }).status = res.status
+    ;(error as Error & { info?: unknown; status?: number; url?: string }).url = url
     throw error
   }
 
@@ -45,9 +48,13 @@ export async function post<TBody, TResponse>(
   })
 
   if (!res.ok) {
-    const error = new Error('POST request failed')
-    ;(error as any).info = await res.json().catch(() => null)
-    ;(error as any).status = res.status
+    const info = await res.json().catch(() => null)
+    const message =
+      info?.message ?? info?.error ?? `POST request failed (${res.status} ${res.statusText})`
+    const error = new Error(message)
+    ;(error as Error & { info?: unknown; status?: number; url?: string }).info = info
+    ;(error as Error & { info?: unknown; status?: number; url?: string }).status = res.status
+    ;(error as Error & { info?: unknown; status?: number; url?: string }).url = url
     throw error
   }
 
@@ -62,9 +69,13 @@ export async function del<TResponse = void>(url: string): Promise<TResponse> {
   })
 
   if (!res.ok) {
-    const error = new Error('DELETE request failed')
-    ;(error as any).info = await res.json().catch(() => null)
-    ;(error as any).status = res.status
+    const info = await res.json().catch(() => null)
+    const message =
+      info?.message ?? info?.error ?? `DELETE request failed (${res.status} ${res.statusText})`
+    const error = new Error(message)
+    ;(error as Error & { info?: unknown; status?: number; url?: string }).info = info
+    ;(error as Error & { info?: unknown; status?: number; url?: string }).status = res.status
+    ;(error as Error & { info?: unknown; status?: number; url?: string }).url = url
     throw error
   }
 

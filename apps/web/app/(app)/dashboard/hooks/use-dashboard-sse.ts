@@ -40,6 +40,7 @@ interface UseDashboardSSEParams {
   setOpenCodeUrl: React.Dispatch<React.SetStateAction<string>>
   setSessionTitle: React.Dispatch<React.SetStateAction<string>>
   setSessionInfo: React.Dispatch<React.SetStateAction<SessionInfo | null>>
+  updateSessionTitle: (sessionId: string, title: string) => void
   streamingMessageRef: React.MutableRefObject<string | null>
   assistantTextRef: React.MutableRefObject<string>
   reasoningRef: React.MutableRefObject<string>
@@ -60,6 +61,7 @@ export function useDashboardSSE({
   setOpenCodeUrl,
   setSessionTitle,
   setSessionInfo,
+  updateSessionTitle,
   streamingMessageRef,
   assistantTextRef,
   reasoningRef,
@@ -207,7 +209,10 @@ export function useDashboardSSE({
                   case 'session.updated': {
                     const info = (event as any).properties.info
                     if (info) {
-                      if (info.title) setSessionTitle(info.title)
+                      if (info.title) {
+                        setSessionTitle(info.title)
+                        if (activeSessionId) updateSessionTitle(activeSessionId, info.title)
+                      }
                       setSessionInfo(info)
                     }
                     break

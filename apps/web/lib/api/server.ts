@@ -18,6 +18,7 @@ export interface ChatSession {
   createdAt: number
   archivedAt: number | null
   messageCount?: number
+  title?: string
 }
 
 export interface CreateSessionData {

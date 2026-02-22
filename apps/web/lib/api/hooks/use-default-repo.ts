@@ -12,16 +12,15 @@ interface DefaultRepoResponse {
  * Hook to fetch user's default repo
  */
 export function useDefaultRepo(userId: string | undefined) {
-  const { data, error, isLoading, mutate } = useSWR<DefaultRepoResponse>(
+  const { data, error, isLoading, mutate } = useSWR<DefaultRepoResponse | null>(
     userId ? apiUrl('/accounts/github/default-repo', { userId }) : null,
-    fetcher,
-    {
-      // Silently handle 404 (endpoint may not exist yet)
-      onErrorRetry: (error, _key, _config, revalidate, { retryCount }) => {
-        if ((error as any).status === 404) return
-        if (retryCount >= 2) return
-        setTimeout(() => revalidate({ retryCount }), 3000)
-      },
+    async (url: string) => {
+      try {
+        return await fetcher<DefaultRepoResponse>(url)
+      } catch (err: unknown) {
+        if ((err as { status?: number })?.status === 404) return null
+        throw err
+      }
     },
   )
 

@@ -36,6 +36,9 @@ interface DashboardComposerProps {
     sessionsPastWeek: number
     messagesPastWeek: number
     activeRepos: number
+    sessionsChartData: number[]
+    messagesChartData: number[]
+    activeReposChartData: number[]
   }
   canSubmit: boolean
 }
@@ -91,14 +94,14 @@ export function DashboardComposer(props: DashboardComposerProps) {
             )}
           >
             {/* Textarea area */}
-            <div className={cn('p-4', activeSessionId ? 'pb-2' : 'pb-3')}>
+            <div className={cn('px-3 pt-4', activeSessionId ? 'pb-2' : 'pb-3')}>
               <ComposerTextarea />
 
               {/* Non-active session: action buttons inline with textarea */}
               {!activeSessionId && (
                 <div className="mt-3 flex items-center justify-between">
                   <div className="flex items-center gap-1">
-                    <DropdownMenu>
+                    {/* <DropdownMenu>
                       <DropdownMenuTrigger
                         render={
                           <Button variant="ghost" size="icon-sm" className="rounded-full">
@@ -112,7 +115,7 @@ export function DashboardComposer(props: DashboardComposerProps) {
                           Add files
                         </DropdownMenuItem>
                       </DropdownMenuContent>
-                    </DropdownMenu>
+                    </DropdownMenu> */}
                     <RepoSelector />
                   </div>
                   <SubmitButton />
@@ -124,14 +127,8 @@ export function DashboardComposer(props: DashboardComposerProps) {
           </div>
 
           {!activeSessionId && (
-            <div className="mt-6 space-y-6">
+            <div className="mt-6">
               <DashboardStats stats={stats} />
-              <div className="text-center">
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 text-sm text-muted-foreground">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span>1 human prompting</span>
-                </div>
-              </div>
             </div>
           )}
         </div>

@@ -104,7 +104,7 @@ export function DashboardMessages({
         )}
 
         {/* Messages */}
-        <div className="space-y-4">
+        <div className="space-y-6">
           {messages.map((message) => {
             // Permission prompts
             if (message.type === 'permission' && message.promptData) {
@@ -182,10 +182,14 @@ export function DashboardMessages({
               return null
             }
 
+            const hasOnlyReasoning =
+              message.role === 'assistant' &&
+              (message.reasoning && message.reasoning.length > 0) &&
+              (!message.toolInvocations || message.toolInvocations.length === 0)
+
             const hasSteps =
               message.role === 'assistant' &&
-              ((message.reasoning && message.reasoning.length > 0) ||
-                (message.toolInvocations && message.toolInvocations.length > 0))
+              (message.toolInvocations && message.toolInvocations.length > 0)
 
             // Wall-clock elapsed
             const stepsElapsed = isCurrentlyStreaming
@@ -201,6 +205,13 @@ export function DashboardMessages({
                 {/* User messages */}
                 {message.role === 'user' && message.content && (
                   <div className="text-foreground whitespace-pre-wrap">{message.content}</div>
+                )}
+
+                {/* Reasoning-only: no Steps wrapper needed */}
+                {hasOnlyReasoning && (
+                  <Reasoning isStreaming={isCurrentlyStreaming && isStreaming}>
+                    <div className="whitespace-pre-wrap">{message.reasoning!.join('\n\n')}</div>
+                  </Reasoning>
                 )}
 
                 {/* Steps collapsible — groups reasoning + tools */}

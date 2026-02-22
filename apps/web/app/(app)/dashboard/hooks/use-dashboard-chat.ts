@@ -137,12 +137,17 @@ export function useDashboardChat(initialSessions: ChatSession[]) {
     streamingMessageRef.current = null
   }, [activeSessionId])
 
+  const updateSessionTitle = useCallback((sessionId: string, title: string) => {
+    setLocalSessions((prev) => prev.map((s) => s.id === sessionId ? { ...s, title } : s))
+  }, [setLocalSessions])
+
   return {
     // Session management
     localSessions,
     setLocalSessions,
     activeSessionId,
     setActiveSessionId,
+    updateSessionTitle,
     // Messages
     messages,
     setMessages,
