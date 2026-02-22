@@ -1,8 +1,15 @@
 'use client'
 
-import { cn, SidebarTrigger } from '@ship/ui'
+import {
+  cn,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@ship/ui'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { PanelRightIcon } from '@hugeicons/core-free-icons'
+import { PanelRightIcon, Settings01Icon, Logout01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons'
 import type { WebSocketStatus } from '@/lib/websocket'
 
 interface DashboardHeaderProps {
@@ -12,6 +19,11 @@ interface DashboardHeaderProps {
   sandboxStatus?: string
   rightSidebarOpen?: boolean
   onToggleRightSidebar?: () => void
+  showBackButton?: boolean
+  user?: {
+    username: string
+    avatarUrl: string | null
+  }
 }
 
 const sandboxStatusConfig: Record<string, { label: string; color: string; pulse?: boolean }> = {
@@ -29,20 +41,27 @@ export function DashboardHeader({
   sandboxStatus,
   rightSidebarOpen,
   onToggleRightSidebar,
+  showBackButton,
+  user,
 }: DashboardHeaderProps) {
   const sbConfig = sandboxStatus ? sandboxStatusConfig[sandboxStatus] : null
 
   return (
     <header className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 relative z-10">
-      {/* Mobile-only sidebar trigger (sidebar is hidden on mobile when closed) */}
-      <SidebarTrigger className="sm:hidden size-7 text-muted-foreground hover:text-foreground shrink-0" />
+      {/* Back button - mobile only */}
+      {activeSessionId && showBackButton && (
+        <button
+          onClick={() => (window.location.href = '/')}
+          className="sm:hidden p-1 -ml-1 text-muted-foreground hover:text-foreground"
+        >
+          <HugeiconsIcon icon={ArrowLeft01Icon} className="size-5" />
+        </button>
+      )}
 
       {/* Session title */}
       {activeSessionId && (
         <div className="flex items-center gap-2 text-xs sm:text-sm min-w-0 flex-1">
-          <span className="font-medium truncate">
-            {sessionTitle || 'Untitled session'}
-          </span>
+          <span className="font-medium truncate">{sessionTitle || 'Untitled session'}</span>
         </div>
       )}
 
@@ -50,13 +69,15 @@ export function DashboardHeader({
         {/* Sandbox status pill */}
         {activeSessionId && sbConfig && sandboxStatus !== 'unknown' && (
           <div className={cn('text-[10px] flex items-center gap-1.5 mr-2', sbConfig.color)}>
-            <span className={cn(
-              'w-1.5 h-1.5 rounded-full',
-              sandboxStatus === 'active' && 'bg-green-500',
-              sandboxStatus === 'paused' && 'bg-muted-foreground/40',
-              sandboxStatus === 'error' && 'bg-red-500',
-              (sandboxStatus === 'provisioning' || sandboxStatus === 'resuming') && 'bg-amber-500 animate-pulse',
-            )} />
+            <span
+              className={cn(
+                'w-1.5 h-1.5 rounded-full',
+                sandboxStatus === 'active' && 'bg-green-500',
+                sandboxStatus === 'paused' && 'bg-muted-foreground/40',
+                sandboxStatus === 'error' && 'bg-red-500',
+                (sandboxStatus === 'provisioning' || sandboxStatus === 'resuming') && 'bg-amber-500 animate-pulse',
+              )}
+            />
             {sbConfig.label}
           </div>
         )}
@@ -78,6 +99,46 @@ export function DashboardHeader({
           >
             <HugeiconsIcon icon={PanelRightIcon} className="size-4" strokeWidth={2} />
           </button>
+        )}
+
+        {/* User avatar with dropdown - mobile only, homepage only */}
+        {!activeSessionId && (
+          <div className="shrink-0 ml-2 md:hidden">
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <button className="focus:outline-none rounded-full cursor-pointer">
+                    {user?.avatarUrl ? (
+                      <img
+                        src={user.avatarUrl}
+                        alt={user.username}
+                        width={28}
+                        height={28}
+                        className="w-7 h-7 rounded-full object-cover hover:opacity-80 transition-opacity"
+                      />
+                    ) : (
+                      <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium hover:opacity-80 transition-opacity">
+                        {user?.username?.[0]?.toUpperCase() || '?'}
+                      </div>
+                    )}
+                  </button>
+                }
+              />
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => (window.location.href = '/settings')} className="cursor-pointer">
+                  <HugeiconsIcon icon={Settings01Icon} className="mr-2 h-4 w-4" />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => (window.location.href = '/api/auth/signout')}
+                  className="cursor-pointer text-red-600 dark:text-red-400"
+                >
+                  <HugeiconsIcon icon={Logout01Icon} className="mr-2 h-4 w-4" />
+                  Log out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         )}
       </div>
     </header>

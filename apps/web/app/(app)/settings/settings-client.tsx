@@ -4,8 +4,27 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ModelSelector, ModelBadge } from '@/components/model/model-selector'
 import { ConnectorSettings } from '@/components/settings/connector-settings'
-import { Button, Card, CardHeader, CardTitle, CardDescription, CardContent } from '@ship/ui'
-import { useModels, useDefaultModel, useSetDefaultModel, useGitHubRepos, useDefaultRepo, useSetDefaultRepo } from '@/lib/api'
+import {
+  Button,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@ship/ui'
+import {
+  useModels,
+  useDefaultModel,
+  useSetDefaultModel,
+  useGitHubRepos,
+  useDefaultRepo,
+  useSetDefaultRepo,
+} from '@/lib/api'
 
 export function SettingsClient({ userId }: { userId: string }) {
   const [selectedModel, setSelectedModel] = useState<string>('')
@@ -104,14 +123,20 @@ export function SettingsClient({ userId }: { userId: string }) {
             </div>
             <span className="text-[13px] font-semibold text-foreground">Ship</span>
           </Link>
-          <a href="/api/auth/logout" className="text-[12px] text-muted-foreground hover:text-foreground transition-colors">
+          <a
+            href="/api/auth/logout"
+            className="text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+          >
             Logout
           </a>
         </div>
       </header>
 
       <div className="mx-auto max-w-xl px-4 py-6">
-        <Link href="/" className="inline-flex items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground transition-colors mb-4">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground transition-colors mb-4"
+        >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
           </svg>
@@ -125,21 +150,39 @@ export function SettingsClient({ userId }: { userId: string }) {
         <Card className="mb-4">
           <CardHeader className="pb-3">
             <CardTitle className="text-[14px]">Default Model</CardTitle>
-            <CardDescription className="text-[11px]">Choose which model is selected by default for new sessions</CardDescription>
+            <CardDescription className="text-[11px]">
+              Choose which model is selected by default for new sessions
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
               <label className="block text-[11px] font-medium text-muted-foreground mb-1.5">Model</label>
-              <ModelSelector value={selectedModel} onChange={setSelectedModel} availableModels={availableModels} disabled={isSettingModel} />
+              <ModelSelector
+                value={selectedModel}
+                onChange={setSelectedModel}
+                availableModels={availableModels}
+                disabled={isSettingModel}
+              />
             </div>
             {selectedModel && (
               <div>
                 <p className="text-[11px] text-muted-foreground mb-1">Current:</p>
-                <ModelBadge modelId={selectedModel} modelName={availableModels.find((m) => m.id === selectedModel)?.name} />
+                <ModelBadge
+                  modelId={selectedModel}
+                  modelName={availableModels.find((m) => m.id === selectedModel)?.name}
+                />
               </div>
             )}
-            {modelError && <div className="rounded-md bg-destructive/10 px-3 py-2"><p className="text-[11px] text-destructive">{modelError}</p></div>}
-            {modelSaveSuccess && <div className="rounded-md bg-emerald-500/10 px-3 py-2"><p className="text-[11px] text-emerald-600">Saved!</p></div>}
+            {modelError && (
+              <div className="rounded-md bg-destructive/10 px-3 py-2">
+                <p className="text-[11px] text-destructive">{modelError}</p>
+              </div>
+            )}
+            {modelSaveSuccess && (
+              <div className="rounded-md bg-emerald-500/10 px-3 py-2">
+                <p className="text-[11px] text-emerald-600">Saved!</p>
+              </div>
+            )}
             <div className="flex justify-end pt-1">
               <Button size="sm" onClick={handleSaveModel} disabled={!modelHasChanges || isSettingModel}>
                 {isSettingModel ? 'Saving...' : 'Save'}
@@ -152,32 +195,46 @@ export function SettingsClient({ userId }: { userId: string }) {
         <Card className="mb-4">
           <CardHeader className="pb-3">
             <CardTitle className="text-[14px]">Default Repository</CardTitle>
-            <CardDescription className="text-[11px]">Choose which repo is pre-selected when starting new sessions</CardDescription>
+            <CardDescription className="text-[11px]">
+              Choose which repo is pre-selected when starting new sessions
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
               <label className="block text-[11px] font-medium text-muted-foreground mb-1.5">Repository</label>
-              <select
+              <Select
                 value={selectedRepo}
-                onChange={(e) => setSelectedRepo(e.target.value)}
+                onValueChange={(value) => setSelectedRepo(value || '')}
                 disabled={isSettingRepo}
-                className="w-full h-9 px-3 rounded-md border border-border bg-background text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               >
-                <option value="">None</option>
-                {repos.map((repo) => (
-                  <option key={repo.id} value={repo.fullName}>
-                    {repo.fullName}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a repository" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {repos.map((repo) => (
+                    <SelectItem key={repo.id} value={repo.fullName}>
+                      {repo.fullName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             {selectedRepo && (
               <div className="text-[11px] text-muted-foreground">
                 Selected: <span className="font-mono text-foreground/80">{selectedRepo}</span>
               </div>
             )}
-            {repoError && <div className="rounded-md bg-destructive/10 px-3 py-2"><p className="text-[11px] text-destructive">{repoError}</p></div>}
-            {repoSaveSuccess && <div className="rounded-md bg-emerald-500/10 px-3 py-2"><p className="text-[11px] text-emerald-600">Saved!</p></div>}
+            {repoError && (
+              <div className="rounded-md bg-destructive/10 px-3 py-2">
+                <p className="text-[11px] text-destructive">{repoError}</p>
+              </div>
+            )}
+            {repoSaveSuccess && (
+              <div className="rounded-md bg-emerald-500/10 px-3 py-2">
+                <p className="text-[11px] text-emerald-600">Saved!</p>
+              </div>
+            )}
             <div className="flex justify-end pt-1">
               <Button size="sm" onClick={handleSaveRepo} disabled={!repoHasChanges || isSettingRepo}>
                 {isSettingRepo ? 'Saving...' : 'Save'}
