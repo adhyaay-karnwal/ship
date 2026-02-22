@@ -76,7 +76,7 @@ export function DashboardComposer(props: DashboardComposerProps) {
           'w-full transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]',
           activeSessionId
             ? 'mt-auto pb-3 px-3 sm:pb-4 sm:px-6'
-            : 'absolute inset-0 flex items-center justify-center px-3 sm:px-6',
+            : 'absolute inset-0 flex items-start sm:items-center justify-center px-3 sm:px-6 pt-[10vh] sm:pt-0',
         )}
       >
         <div
@@ -127,7 +127,7 @@ export function DashboardComposer(props: DashboardComposerProps) {
           </div>
 
           {!activeSessionId && (
-            <div className="mt-6">
+            <div className="mt-6 hidden sm:block">
               <DashboardStats stats={stats} />
             </div>
           )}

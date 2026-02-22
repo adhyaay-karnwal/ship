@@ -163,9 +163,7 @@ export function AppSidebar({ sessions, user, searchQuery, onSearchChange, curren
             <SidebarMenuButton
               render={<button type="button" onClick={() => onNewChat ? onNewChat() : router.push('/')} />}
             >
-              <span className="shrink-0 w-4 h-4 rounded-full border border-foreground/25 flex items-center justify-center">
-                <HugeiconsIcon icon={Add01Icon} strokeWidth={2} className="size-2.5 text-foreground/60" />
-              </span>
+              <HugeiconsIcon icon={Add01Icon} strokeWidth={2} className="size-4 text-muted-foreground/50 shrink-0" />
               <span className="text-sm font-normal text-foreground/75 group-data-[collapsible=icon]:hidden">New chat</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -338,7 +336,7 @@ export function AppSidebar({ sessions, user, searchQuery, onSearchChange, curren
           <DropdownMenuTrigger
             render={
               <button
-                className="w-full flex items-center gap-2.5 px-1 py-1 rounded-md hover:bg-sidebar-accent transition-colors cursor-pointer outline-none group-data-[collapsible=icon]:justify-center"
+                className="w-full flex items-center gap-2.5 px-1 py-1 rounded-md cursor-pointer outline-none group-data-[collapsible=icon]:justify-center"
                 aria-label="Open user menu"
               >
                 <span className="w-6 h-6 rounded-full overflow-hidden bg-muted flex items-center justify-center text-[10px] font-medium text-muted-foreground shrink-0">
