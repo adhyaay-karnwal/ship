@@ -1,6 +1,6 @@
 'use client'
 
-import { Message, Tool, Shimmer, Response, Loader, Conversation, ConversationScrollButton } from '@ship/ui'
+import { Message, Tool, Response, Loader, Conversation, ConversationScrollButton } from '@ship/ui'
 import { ErrorMessage } from './error-message'
 import { Markdown } from './markdown'
 import { cn } from '@ship/ui'
@@ -108,13 +108,7 @@ function MessageListContent({
                 {/* Assistant response content */}
                 {msg.role === 'assistant' && msg.content && (
                   <Response>
-                    {isCurrentlyStreaming ? (
-                      <Shimmer>
-                        <Markdown content={msg.content} />
-                      </Shimmer>
-                    ) : (
-                      <Markdown content={msg.content} />
-                    )}
+                    <Markdown content={msg.content} isAnimating={isCurrentlyStreaming} />
                   </Response>
                 )}
 

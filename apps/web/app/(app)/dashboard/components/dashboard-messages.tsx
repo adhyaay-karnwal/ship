@@ -287,7 +287,7 @@ export function DashboardMessages({
                 {message.role === 'assistant' && message.content && (
                   <div className={hasSteps ? 'mt-4' : undefined}>
                     <Response>
-                      <Markdown content={message.content} />
+                      <Markdown content={message.content} isAnimating={isCurrentlyStreaming} />
                     </Response>
                   </div>
                 )}

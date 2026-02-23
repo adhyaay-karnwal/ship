@@ -87,7 +87,7 @@
 - zod 4.3.6 - Runtime schema validation library
 - nanoid 5.1.6 - URL-friendly unique ID generator
 - ms 2.1.3 - Time conversion utility
-- streamdown 1.6.11 - Markdown stream parser
+- streamdown 2.3.0 - Markdown stream parser for AI streaming (with @streamdown/code, @streamdown/mermaid, animated per-word reveal)
 - next-themes 0.4.6 - Theme management for dark/light modes
 - @git-diff-view/file 0.0.32 - Git diff file visualization
 - @git-diff-view/react 0.0.32 - Git diff React component

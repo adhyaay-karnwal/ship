@@ -160,7 +160,7 @@ export function SubagentView({ subagent, onBack, parentSessionId }: SubagentView
                     {message.role === 'assistant' && message.content && (
                       <div className={hasSteps ? 'mt-4' : undefined}>
                         <Response>
-                          <Markdown content={message.content} />
+                          <Markdown content={message.content} isAnimating={isStreaming} />
                         </Response>
                       </div>
                     )}
@@ -190,7 +190,7 @@ export function SubagentView({ subagent, onBack, parentSessionId }: SubagentView
               {showResultFallback && subagent.resultText && (
                 <Message role="assistant">
                   <Response>
-                    <Markdown content={subagent.resultText} />
+                    <Markdown content={subagent.resultText} isAnimating={false} />
                   </Response>
                 </Message>
               )}
