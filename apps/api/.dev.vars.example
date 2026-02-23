@@ -17,3 +17,10 @@ API_SECRET=your-api-secret-here
 # Allowed CORS Origins (comma-separated)
 # In production, set via: wrangler secret put ALLOWED_ORIGINS --env production
 ALLOWED_ORIGINS=http://localhost:3000
+
+# Login restriction (optional) - when true, only ALLOWED_USER_ID can log in
+# Default: off. Set to "true" to enable.
+LOGIN_RESTRICTED_TO_SINGLE_USER=false
+# Your app user ID from the users table (required when restricted)
+# Find yours: wrangler d1 execute ship-db --local --command "SELECT id FROM users LIMIT 1"
+ALLOWED_USER_ID=

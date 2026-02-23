@@ -1,10 +1,6 @@
 import { Hono } from 'hono'
 import type { CreateUserInput, UserDTO } from '@ship/types'
-
-// Define the environment bindings
-interface Env {
-  DB: D1Database
-}
+import type { Env } from '../env.d'
 
 const users = new Hono<{ Bindings: Env }>()
 
@@ -30,6 +26,22 @@ users.post('/upsert', async (c) => {
     )
       .bind(input.githubId)
       .first<{ id: string }>()
+
+    // Login restriction: only allow ALLOWED_USER_ID when enabled
+    if (c.env.LOGIN_RESTRICTED_TO_SINGLE_USER && c.env.ALLOWED_USER_ID) {
+      if (!existing) {
+        return c.json(
+          { error: 'access_restricted', message: 'Access is restricted.' },
+          403
+        )
+      }
+      if (existing.id !== c.env.ALLOWED_USER_ID) {
+        return c.json(
+          { error: 'access_restricted', message: 'Access is restricted.' },
+          403
+        )
+      }
+    }
 
     const now = Math.floor(Date.now() / 1000)
 

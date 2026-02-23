@@ -1,6 +1,13 @@
 import { Button } from '@ship/ui'
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>
+}) {
+  const params = await searchParams
+  const error = params.error
+
   return (
     <div className="flex flex-col items-center space-y-6 px-4">
       {/* Ship Logo */}
@@ -12,6 +19,18 @@ export default function LoginPage() {
           Agent that works autonomously in the background
         </p>
       </div>
+
+      {/* Error message */}
+      {error === 'access_restricted' && (
+        <p className="text-center text-sm text-muted-foreground">
+          Access is restricted. Only authorized users can sign in.
+        </p>
+      )}
+      {error === 'auth_failed' && (
+        <p className="text-center text-sm text-destructive">
+          Authentication failed. Please try again.
+        </p>
+      )}
 
       {/* Sign in Button */}
       <div className="w-full">

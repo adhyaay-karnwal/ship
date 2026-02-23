@@ -72,6 +72,17 @@ export async function GET(request: Request): Promise<Response> {
     })
 
     if (!apiResponse.ok) {
+      if (apiResponse.status === 403) {
+        const body = await apiResponse.json()
+        if (body?.error === 'access_restricted') {
+          return new Response(null, {
+            status: 302,
+            headers: {
+              Location: '/login?error=access_restricted',
+            },
+          })
+        }
+      }
       return new Response(null, {
         status: 302,
         headers: {

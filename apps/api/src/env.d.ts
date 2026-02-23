@@ -22,4 +22,8 @@ export interface Env {
   API_SECRET: string;
   E2B_API_KEY: string;
   ALLOWED_ORIGINS?: string;
+
+  // Login restriction (optional)
+  LOGIN_RESTRICTED_TO_SINGLE_USER?: string;
+  ALLOWED_USER_ID?: string;
 }
