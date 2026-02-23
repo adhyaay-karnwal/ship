@@ -3,29 +3,29 @@ import type { Env } from '../env.d'
 
 const models = new Hono<{ Bindings: Env }>()
 
-// Default model if no preference set - Kimi K2.5 Free (via OpenCode Zen)
+// Default model if no preference set - Big Pickle (via OpenCode Zen)
 // Format: opencode/<model-id> per OpenCode docs
-const DEFAULT_MODEL = 'opencode/kimi-k2.5-free'
+const DEFAULT_MODEL = 'opencode/big-pickle'
 
 // Fallback static model list when OpenCode is unavailable
 // Ordered by recommendation - default model first
 // OpenCode Zen models use format "opencode/<model-id>" per OpenCode docs
 const FALLBACK_MODELS = [
   {
-    id: 'opencode/kimi-k2.5-free',
-    name: 'Kimi K2.5 Free',
-    provider: 'OpenCode Zen',
-    description: 'Free high-performance model from Moonshot AI (256K context)',
-    contextWindow: 256000,
-    maxTokens: 128000,
-    isDefault: true,
-  },
-  {
     id: 'opencode/big-pickle',
     name: 'Big Pickle',
     provider: 'OpenCode Zen',
     description: 'Free stealth model optimized for coding agents (200K context)',
     contextWindow: 200000,
+    maxTokens: 128000,
+    isDefault: true,
+  },
+  {
+    id: 'opencode/kimi-k2.5-free',
+    name: 'Kimi K2.5 Free',
+    provider: 'OpenCode Zen',
+    description: 'Free high-performance model from Moonshot AI (256K context)',
+    contextWindow: 256000,
     maxTokens: 128000,
   },
   {

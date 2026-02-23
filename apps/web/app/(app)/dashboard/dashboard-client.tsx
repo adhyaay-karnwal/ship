@@ -183,7 +183,7 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
           userId,
           repoOwner: data.repoOwner,
           repoName: data.repoName,
-          model: data.model || selectedModel?.id || 'opencode/kimi-k2.5-free',
+          model: data.model || selectedModel?.id || 'opencode/big-pickle',
         })
 
         if (newSession) {

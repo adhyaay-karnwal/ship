@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Message, Tool, Response, Loader, Conversation, ConversationScrollButton } from '@ship/ui'
+import { Message, Tool, Response, Loader, ReasoningCollapsible, Conversation, ConversationScrollButton } from '@ship/ui'
 import { Markdown } from '@/components/chat/markdown'
 import { mapToolState } from '@/lib/ai-elements-adapter'
 import { useSubagentStream } from '../hooks/use-subagent-stream'
@@ -142,7 +142,11 @@ export function SubagentView({ subagent, onBack, parentSessionId }: SubagentView
 
                 return (
                   <Message key={message.id} role={message.role}>
-                    {hasOnlyReasoning && <Loader message={status || 'Thinking...'} />}
+                    {hasOnlyReasoning && (
+                      <ReasoningCollapsible isStreaming={isStreaming}>
+                        {message.reasoning?.join('\n\n') ?? ''}
+                      </ReasoningCollapsible>
+                    )}
                     {hasSteps && message.toolInvocations && message.toolInvocations.length > 0 && (
                       <div className="space-y-2 my-1">
                         {message.toolInvocations.map((tool) => (

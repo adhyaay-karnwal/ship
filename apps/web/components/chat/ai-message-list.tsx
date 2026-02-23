@@ -1,6 +1,6 @@
 'use client'
 
-import { Message, Tool, Response, Loader, Conversation, ConversationScrollButton } from '@ship/ui'
+import { Message, Tool, Response, Loader, ReasoningCollapsible, Conversation, ConversationScrollButton } from '@ship/ui'
 import { ErrorMessage } from './error-message'
 import { Markdown } from './markdown'
 import { cn } from '@ship/ui'
@@ -80,13 +80,17 @@ function MessageListContent({
                   <div className="text-foreground whitespace-pre-wrap">{msg.content}</div>
                 )}
 
-                {/* Assistant reasoning only = still thinking, show Loader (hide when content exists) */}
+                {/* Assistant reasoning only = show collapsible reasoning content */}
                 {msg.role === 'assistant' &&
                   msg.reasoning &&
                   msg.reasoning.length > 0 &&
                   !msg.toolInvocations?.length &&
                   !msg.content && (
-                    <Loader message={streamingLabel || 'Thinking...'} />
+                    <ReasoningCollapsible
+                      isStreaming={isCurrentlyStreaming}
+                    >
+                      {msg.reasoning.join('\n\n')}
+                    </ReasoningCollapsible>
                   )}
 
                 {/* Assistant tools - only show tool calls */}

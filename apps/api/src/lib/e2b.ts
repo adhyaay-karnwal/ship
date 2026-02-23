@@ -407,9 +407,11 @@ export async function startOpenCodeServer(
     throw new Error('Could not find opencode binary after installation')
   }
 
-  // Write opencode.json with MCP servers (grep, deepwiki, context7, exa) so they load in the sandbox session
+  // Write opencode.json with MCP servers and default model so they load in the sandbox session
+  // Placed in homeDir so OpenCode finds it when it starts with cd homeDir (project root)
   const opencodeConfig = {
     $schema: 'https://opencode.ai/config.json',
+    model: 'opencode/big-pickle',
     mcp: {
       grep: { type: 'remote', url: 'https://mcp.grep.app', enabled: true },
       deepwiki: { type: 'remote', url: 'https://mcp.deepwiki.com/mcp', enabled: true },

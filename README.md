@@ -67,6 +67,10 @@ Edit `.dev.vars`:
 | `E2B_API_KEY` | [e2b.dev/dashboard](https://e2b.dev/dashboard) → Settings → API Keys |
 | `API_SECRET` | `openssl rand -hex 32` (must match web app expectations) |
 | `ALLOWED_ORIGINS` | `http://localhost:3000` |
+| `LOGIN_RESTRICTED_TO_SINGLE_USER` | *(optional)* `true` to restrict login to one user |
+| `ALLOWED_USER_ID` | *(optional)* Your user ID from `users` table (required when restricted) |
+
+> **Tip:** For private instances, set `LOGIN_RESTRICTED_TO_SINGLE_USER=true` and `ALLOWED_USER_ID` to your user ID (from `SELECT id FROM users`) so only you can sign in.
 
 ### 3. Database (D1)
 

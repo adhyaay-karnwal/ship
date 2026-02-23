@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Message, Tool, Response, Loader, SubagentTool, TodoProgress, Conversation, ConversationScrollButton } from '@ship/ui'
+import { Message, Tool, Response, Loader, ReasoningCollapsible, SubagentTool, TodoProgress, Conversation, ConversationScrollButton } from '@ship/ui'
 import { Markdown } from '@/components/chat/markdown'
 import { ErrorMessage } from '@/components/chat/error-message'
 import { PermissionPrompt } from './permission-prompt'
@@ -221,9 +221,18 @@ export function DashboardMessages({
                   <div className="text-foreground whitespace-pre-wrap">{message.content}</div>
                 )}
 
-                {/* Reasoning-only: still "thinking", show Loader until tools/content arrive */}
+                {/* Reasoning-only: show collapsible reasoning content (like ai-elements Reasoning) */}
                 {hasOnlyReasoning && (
-                  <Loader message={statusLabel || 'Thinking...'} />
+                  <ReasoningCollapsible
+                    isStreaming={isCurrentlyStreaming}
+                    duration={
+                      streamStartTime
+                        ? Math.floor((Date.now() - streamStartTime) / 1000)
+                        : undefined
+                    }
+                  >
+                    {message.reasoning?.join('\n\n') ?? ''}
+                  </ReasoningCollapsible>
                 )}
 
                 {/* Tool calls — each Tool has its own collapsible with arrow */}

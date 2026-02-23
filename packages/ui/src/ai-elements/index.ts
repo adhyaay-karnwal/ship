@@ -1,5 +1,5 @@
 export { Message } from './message'
-export { Reasoning } from './reasoning'
+export { Reasoning, ReasoningCollapsible } from './reasoning'
 export { ChainOfThought } from './chain-of-thought'
 export { Tool } from './tool'
 export { PromptInput } from './prompt-input'
