@@ -25,7 +25,7 @@ export interface SSEHandlerContext {
   setLastStepCost: React.Dispatch<React.SetStateAction<StepCostInfo | null>>
   setSessionTodos: React.Dispatch<React.SetStateAction<TodoItem[]>>
   setFileDiffs: React.Dispatch<React.SetStateAction<FileDiff[]>>
-  setOpenCodeUrl: React.Dispatch<React.SetStateAction<string>>
+  setAgentUrl: React.Dispatch<React.SetStateAction<string>>
   setSessionTitle: React.Dispatch<React.SetStateAction<string>>
   setSessionInfo: React.Dispatch<React.SetStateAction<SessionInfo | null>>
   setStreamStartTime: (value: number | null) => void
@@ -160,7 +160,7 @@ export function handleQuestionResolved(
 }
 
 export function handleAgentUrl(url: string, ctx: SSEHandlerContext) {
-  ctx.setOpenCodeUrl(url)
+  ctx.setAgentUrl(url)
   try { localStorage.setItem(`agent-url-${ctx.targetSessionId}`, url) } catch {}
 }
 

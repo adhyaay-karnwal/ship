@@ -37,7 +37,7 @@ interface UseDashboardSSEParams {
   setSessionTodos: React.Dispatch<React.SetStateAction<TodoItem[]>>
   setFileDiffs: React.Dispatch<React.SetStateAction<FileDiff[]>>
   setMessageQueue: React.Dispatch<React.SetStateAction<string[]>>
-  setOpenCodeUrl: React.Dispatch<React.SetStateAction<string>>
+  setAgentUrl: React.Dispatch<React.SetStateAction<string>>
   setSessionTitle: React.Dispatch<React.SetStateAction<string>>
   setSessionInfo: React.Dispatch<React.SetStateAction<SessionInfo | null>>
   updateSessionTitle: (sessionId: string, title: string) => void
@@ -58,7 +58,7 @@ export function useDashboardSSE({
   setSessionTodos,
   setFileDiffs,
   setMessageQueue,
-  setOpenCodeUrl,
+  setAgentUrl,
   setSessionTitle,
   setSessionInfo,
   updateSessionTitle,
@@ -122,7 +122,7 @@ export function useDashboardSSE({
         setLastStepCost,
         setSessionTodos,
         setFileDiffs,
-        setOpenCodeUrl,
+        setAgentUrl,
         setSessionTitle,
         setSessionInfo,
         setStreamStartTime,

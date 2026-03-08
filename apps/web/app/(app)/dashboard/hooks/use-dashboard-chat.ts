@@ -84,7 +84,7 @@ export function useDashboardChat(initialSessions: ChatSession[]) {
         if (event.type === 'agent-url' || event.type === 'opencode-url') {
           const url = (event as { url?: string }).url
           if (url) {
-            persistence.setOpenCodeUrl(url)
+            persistence.setAgentUrl(url)
             try { localStorage.setItem(`agent-url-${sessionId}`, url) } catch {}
           }
         }
