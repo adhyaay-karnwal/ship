@@ -201,6 +201,10 @@ export function processPartUpdated(
       return messages
     }
 
+    case 'plan':
+      // Plan parts handled at the UI level
+      return messages
+
     case 'step-finish':
     case 'step-start':
       // These are handled separately for cost tracking
