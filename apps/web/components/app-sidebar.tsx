@@ -184,7 +184,7 @@ export function AppSidebar({
           >
             Ship
           </Link>
-          <SidebarTrigger className="size-7 text-muted-foreground hover:text-foreground" />
+          <SidebarTrigger className="size-5 cursor-pointer text-muted-foreground hover:text-foreground" />
         </div>
       </SidebarHeader>
 
