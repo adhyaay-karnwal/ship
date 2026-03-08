@@ -47,11 +47,11 @@ export function AgentLink({ url, agentSessionId }: { url: string; agentSessionId
       </a>
       {agentSessionId && (
         <a
-          href={`${baseUrl}/v1/acp/${encodeURIComponent(agentSessionId)}`}
+          href={`${baseUrl}/ui/sessions/${encodeURIComponent(agentSessionId)}`}
           target="_blank"
           rel="noopener noreferrer"
           className={linkClass}
-          title="Session events stream (SSE)"
+          title="View session events in Inspector"
         >
           {iconSvg}
           <span className="truncate">Logs</span>

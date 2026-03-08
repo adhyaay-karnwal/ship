@@ -166,10 +166,11 @@ function SessionRow({
         </button>
       )}
       {!isMobile && (
-        <DropdownMenu>
+        <DropdownMenu id={`session-menu-${session.id}`}>
           <DropdownMenuTrigger
             render={
               <button
+                id={`session-menu-trigger-${session.id}`}
                 type="button"
                 title="Delete chat"
                 disabled={isDeleting}
