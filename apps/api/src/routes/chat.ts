@@ -187,6 +187,7 @@ app.post('/:sessionId', async (c) => {
             const envVars: Record<string, string> = {}
             if (c.env.ANTHROPIC_API_KEY) envVars.ANTHROPIC_API_KEY = c.env.ANTHROPIC_API_KEY
             if (c.env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = c.env.OPENAI_API_KEY
+            if (c.env.CURSOR_API_KEY) envVars.CURSOR_API_KEY = c.env.CURSOR_API_KEY
 
             const { Sandbox } = await import('../lib/e2b')
             const sandbox = await Sandbox.connect(currentSandboxId, { apiKey: c.env.E2B_API_KEY })
@@ -363,6 +364,7 @@ app.post('/:sessionId', async (c) => {
               const envVars: Record<string, string> = {}
               if (c.env.ANTHROPIC_API_KEY) envVars.ANTHROPIC_API_KEY = c.env.ANTHROPIC_API_KEY
               if (c.env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = c.env.OPENAI_API_KEY
+              if (c.env.CURSOR_API_KEY) envVars.CURSOR_API_KEY = c.env.CURSOR_API_KEY
 
               const { url } = await startSandboxAgentServer(newSandbox, currentSandboxId, agentType, envVars)
               currentSandboxAgentUrl = url
@@ -561,11 +563,7 @@ app.post('/:sessionId', async (c) => {
           lastEventTime = Date.now()
           eventCount++
 
-          if (eventCount <= 20 || eventCount % 10 === 0) {
-            console.log(`[chat:${sessionId}] Event #${eventCount}`)
-          }
-
-          // Translate universal event to Ship SSE events
+          // Translate ACP/UniversalEvent to Ship SSE events
           const sseEvents = translator.translateEvent(event)
 
           for (const sseEvent of sseEvents) {
