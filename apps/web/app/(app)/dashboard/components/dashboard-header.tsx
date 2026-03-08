@@ -6,6 +6,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  SidebarTrigger,
+  useSidebar,
+  useIsMobile,
 } from '@ship/ui'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { PanelRightIcon, Settings01Icon, Logout01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons'
@@ -45,9 +48,16 @@ export function DashboardHeader({
   user,
 }: DashboardHeaderProps) {
   const sbConfig = sandboxStatus ? sandboxStatusConfig[sandboxStatus] : null
+  const { state } = useSidebar()
+  const isMobile = useIsMobile()
+  const showSidebarTrigger = state === 'collapsed' && !isMobile
 
   return (
     <header className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 relative z-10">
+      {/* Sidebar trigger when collapsed (desktop only) */}
+      {showSidebarTrigger && (
+        <SidebarTrigger className="size-7 text-muted-foreground hover:text-foreground shrink-0" />
+      )}
       {/* Back button + Session title */}
       {activeSessionId && (
         <div className="flex items-center gap-2 min-w-0 flex-1">

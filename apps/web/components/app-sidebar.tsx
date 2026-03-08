@@ -174,7 +174,7 @@ export function AppSidebar({
   }
 
   return (
-    <Sidebar collapsible="icon" className={className}>
+    <Sidebar collapsible="offcanvas" className={className}>
       {/* Header: logo + sidebar trigger */}
       <SidebarHeader>
         <div className="flex items-center justify-between px-2 py-1 group-data-[collapsible=icon]:justify-center">
