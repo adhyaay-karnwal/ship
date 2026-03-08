@@ -41,10 +41,18 @@ export async function startSandboxAgentServer(
       `curl -sf http://localhost:${SANDBOX_AGENT_PORT}/v1/health --connect-timeout 2 --max-time 3`,
     )
     if (healthResult.exitCode === 0) {
-      const host = sandbox.getHost(SANDBOX_AGENT_PORT)
-      const url = `https://${host}`
-      console.log(`[sandbox-agent:${sandboxId}] Server already running at ${url}`)
-      return { url }
+      // When using Cursor, we must ensure the server was started with CURSOR_API_KEY.
+      // If we reuse an already-running server, it may have been started without it.
+      // So for Cursor, kill the server and restart with envVars.
+      if (agentType !== 'cursor') {
+        const host = sandbox.getHost(SANDBOX_AGENT_PORT)
+        const url = `https://${host}`
+        console.log(`[sandbox-agent:${sandboxId}] Server already running at ${url}`)
+        return { url }
+      }
+      console.log(`[sandbox-agent:${sandboxId}] Cursor agent: restarting server to ensure CURSOR_API_KEY in env`)
+      await sandbox.commands.run(`pkill -f "sandbox-agent server" || true`, { timeoutMs: 5000 })
+      await new Promise((r) => setTimeout(r, 2000))
     }
   } catch {
     // Server not running, continue with setup
