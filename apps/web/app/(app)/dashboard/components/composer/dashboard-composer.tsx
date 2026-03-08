@@ -4,10 +4,11 @@ import { cn } from '@ship/ui'
 import { ClientOnly } from '@/components/client-only'
 import { ComposerProvider, type ComposerContextValue } from './composer-context'
 import { ComposerTextarea } from './composer-textarea'
-import { ComposerFooter } from './composer-footer'
 import { ComposerRepoSelector } from './repo-selector'
 import { BranchSelector } from './branch-selector'
 import { SubmitButton } from './submit-button'
+import { AgentModelSelector } from './agent-model-selector'
+import { ModeToggle } from './mode-toggle'
 
 /** Same minimal trigger style as Cursor: text + chevron above input */
 const aboveInputTriggerClass =
@@ -63,23 +64,25 @@ export function DashboardComposer({ context, compactLayout = false }: DashboardC
             {/* Textarea area */}
             <div className={cn('px-3', activeSessionId ? 'pt-4 pb-2' : 'pt-2 pb-2')}>
               <ComposerTextarea />
-              {!activeSessionId ? (
-                <div className="flex justify-end pt-2">
-                  <SubmitButton />
-                </div>
-              ) : (
-                <div className="mt-3 flex items-center justify-between">
-                  <div className="flex items-center gap-1">
+
+              {/* Bottom row inside the card: selectors on left, submit on right */}
+              <div className="mt-2 flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  {activeSessionId && (
                     <ClientOnly>
                       <ComposerRepoSelector />
                     </ClientOnly>
-                  </div>
-                  <SubmitButton />
+                  )}
+                  <ClientOnly>
+                    <AgentModelSelector />
+                  </ClientOnly>
+                  <ClientOnly>
+                    <ModeToggle />
+                  </ClientOnly>
                 </div>
-              )}
+                <SubmitButton />
+              </div>
             </div>
-
-            <ComposerFooter />
           </div>
         </div>
       </div>
