@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Message, Tool, Response, Loader, ReasoningCollapsible, SubagentTool, TodoProgress, SessionSetup, Conversation, ConversationScrollButton } from '@ship/ui'
+import { Message, Tool, Response, Loader, ReasoningCollapsible, SubagentTool, TodoProgress, SessionSetup, Conversation, ConversationScrollButton, PhaseBlock } from '@ship/ui'
 import { Markdown } from '@/components/chat/markdown'
 import { ErrorMessage } from '@/components/chat/error-message'
 import { PermissionPrompt } from './permission-prompt'
@@ -220,6 +220,16 @@ export function DashboardMessages({
               message.role === 'assistant' &&
               (message.toolInvocations && message.toolInvocations.length > 0)
 
+            const hasPhaseBlock = message.role === 'assistant' && (hasReasoning || hasSteps)
+            const phaseLabel = getPhaseLabel(message, !!hasReasoning, !!hasSteps)
+            const phaseDuration =
+              isCurrentlyStreaming && streamStartTime
+                ? `${Math.floor((Date.now() - streamStartTime) / 1000)}s`
+                : message.elapsed != null
+                  ? `${Math.floor(message.elapsed / 1000)}s`
+                  : undefined
+            const isPhaseComplete = hasPhaseBlock && !isCurrentlyStreaming
+
             return (
               <Message
                 key={message.id}
@@ -236,25 +246,32 @@ export function DashboardMessages({
                   <SessionSetup steps={message.startupSteps} defaultOpen={false} className="my-1" />
                 )}
 
-                {/* Reasoning/thinking: always show when present, collapsed by default when done */}
-                {hasReasoning && (
-                  <ReasoningCollapsible
-                    reasoning={message.reasoning}
-                    isStreaming={isCurrentlyStreaming}
-                    duration={
-                      isCurrentlyStreaming && streamStartTime
-                        ? Math.floor((Date.now() - streamStartTime) / 1000)
-                        : message.elapsed != null
-                          ? Math.floor(message.elapsed / 1000)
-                          : undefined
-                    }
-                  />
-                )}
+                {/* Phase block: reasoning + tools with Exploring/Working label */}
+                {hasPhaseBlock ? (
+                  <PhaseBlock
+                    label={phaseLabel}
+                    duration={phaseDuration}
+                    isComplete={!!isPhaseComplete}
+                  >
+                    {/* Reasoning/thinking: always show when present, collapsed by default when done */}
+                    {hasReasoning && (
+                      <ReasoningCollapsible
+                        reasoning={message.reasoning}
+                        isStreaming={isCurrentlyStreaming}
+                        duration={
+                          isCurrentlyStreaming && streamStartTime
+                            ? Math.floor((Date.now() - streamStartTime) / 1000)
+                            : message.elapsed != null
+                              ? Math.floor(message.elapsed / 1000)
+                              : undefined
+                        }
+                      />
+                    )}
 
-                {/* Tool calls — each Tool has its own collapsible with arrow */}
-                {hasSteps && message.toolInvocations && message.toolInvocations.length > 0 && (
-                  <div className="space-y-2 my-1">
-                    {message.toolInvocations.map((tool) => {
+                    {/* Tool calls — each Tool has its own collapsible with arrow */}
+                    {hasSteps && message.toolInvocations && message.toolInvocations.length > 0 && (
+                      <div className="space-y-2 my-1">
+                        {message.toolInvocations.map((tool) => {
                           // Check for todo tools — render inline TodoProgress
                           const isTodoTool = tool.toolName.toLowerCase().includes('todo')
                           if (isTodoTool && sessionTodos.length > 0 && !todoRendered) {
@@ -305,8 +322,10 @@ export function DashboardMessages({
                             />
                           )
                         })}
-                  </div>
-                )}
+                      </div>
+                    )}
+                  </PhaseBlock>
+                ) : null}
 
                 {/* Plan items */}
                 {message.planItems && message.planItems.length > 0 && (
@@ -358,4 +377,15 @@ function formatAgentType(raw: string): string {
     .split(/[-_]/)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ')
+}
+
+function getPhaseLabel(message: UIMessage, hasReasoning: boolean, hasSteps: boolean): string {
+  if (hasSteps && message.toolInvocations?.length) {
+    const first = message.toolInvocations[0]
+    const name = (first?.toolName ?? '').toLowerCase()
+    if (/grep|search|glob|read_file|read/.test(name)) return 'Exploring'
+    return 'Working'
+  }
+  if (hasReasoning) return 'Thinking'
+  return 'Working'
 }
