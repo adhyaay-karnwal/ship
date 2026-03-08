@@ -12,6 +12,7 @@ export interface CreateSessionParams {
   repoOwner: string
   repoName: string
   model: string
+  agentType?: string
   initialPrompt?: string
 }
 
@@ -66,6 +67,31 @@ export interface ModelInfo {
 export interface DefaultModelResponse {
   model?: string | null
   modelId?: string | null
+}
+
+// ============ Agents ============
+
+/** All known agent mode IDs across all agents */
+export type AgentModeId =
+  | 'agent' | 'plan' | 'ask'           // Cursor
+  | 'default' | 'acceptEdits'          // Claude Code
+  | 'build'                            // OpenCode
+  | 'auto' | 'read-only' | 'full-access' // Codex
+
+export interface AgentMode {
+  id: AgentModeId
+  label: string
+}
+
+export interface AgentInfo {
+  id: string
+  name: string
+  modes: AgentMode[]
+  models: ModelInfo[]
+}
+
+export interface DefaultAgentResponse {
+  agentId: string
 }
 
 // ============ GitHub ============

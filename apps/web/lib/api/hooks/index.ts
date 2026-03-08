@@ -51,5 +51,12 @@ export {
   replyPermission,
 } from './use-chat'
 
+// Agents
+export {
+  useAgents,
+  useDefaultAgent,
+  useSetDefaultAgent,
+} from './use-agents'
+
 // User
 export { useUser } from './use-user'

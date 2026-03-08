@@ -33,6 +33,7 @@ interface CreateSessionInput {
   repoOwner: string
   repoName: string
   model?: string
+  agentType?: string
 }
 
 const sessions = new Hono<{ Bindings: Env }>()
@@ -110,6 +111,11 @@ sessions.post('/', async (c) => {
     // Store model override if provided
     if (input.model) {
       await doStub.setSessionMeta('model', input.model)
+    }
+
+    // Store agent type if provided
+    if (input.agentType) {
+      await doStub.setSessionMeta('agent_type', input.agentType)
     }
 
     // Set initial sandbox status to provisioning
