@@ -1,11 +1,19 @@
 'use client'
 
+import { useState, useEffect } from 'react'
+import { useTheme } from 'next-themes'
 import {
   cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   SidebarTrigger,
   useSidebar,
   useIsMobile,
@@ -47,10 +55,16 @@ export function DashboardHeader({
   showBackButton,
   user,
 }: DashboardHeaderProps) {
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
   const sbConfig = sandboxStatus ? sandboxStatusConfig[sandboxStatus] : null
   const { state } = useSidebar()
   const isMobile = useIsMobile()
   const showSidebarTrigger = state === 'collapsed' && !isMobile
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   return (
     <header className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 relative z-10">
@@ -155,6 +169,31 @@ export function DashboardHeader({
                   }
                 />
                 <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="cursor-pointer">
+                      <span>Appearance</span>
+                      <span className="ml-auto text-muted-foreground capitalize">
+                        {mounted && typeof theme === 'string' ? theme : 'System'}
+                      </span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                      <DropdownMenuRadioGroup
+                        value={mounted && theme ? theme : 'system'}
+                        onValueChange={(v) => setTheme(v)}
+                      >
+                        <DropdownMenuRadioItem value="system" className="cursor-pointer">
+                          System
+                        </DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="light" className="cursor-pointer">
+                          Light
+                        </DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="dark" className="cursor-pointer">
+                          Dark
+                        </DropdownMenuRadioItem>
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => (window.location.href = '/settings')} className="cursor-pointer">
                     <HugeiconsIcon icon={Settings01Icon} className="mr-2 h-4 w-4" />
                     Settings

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
+import { useTheme } from 'next-themes'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Search01Icon, Settings01Icon, Logout01Icon, Cancel01Icon, Add01Icon } from '@hugeicons/core-free-icons'
 import { useDeleteSession, type ChatSession } from '@/lib/api'
@@ -20,6 +21,11 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
 } from '@ship/ui'
 import { ChatSearchCommand } from './chat-search-command'
 import { ClientOnly } from './client-only'
@@ -103,9 +109,15 @@ export function AppSidebar({
   className,
 }: AppSidebarProps) {
   const router = useRouter()
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
   const { deleteSession } = useDeleteSession()
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -401,6 +413,31 @@ export function AppSidebar({
               }
             />
             <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="cursor-pointer">
+                  <span>Appearance</span>
+                  <span className="ml-auto text-muted-foreground capitalize">
+                    {mounted && typeof theme === 'string' ? theme : 'System'}
+                  </span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuRadioGroup
+                    value={mounted && theme ? theme : 'system'}
+                    onValueChange={(v) => setTheme(v)}
+                  >
+                    <DropdownMenuRadioItem value="system" className="cursor-pointer">
+                      System
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="light" className="cursor-pointer">
+                      Light
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="dark" className="cursor-pointer">
+                      Dark
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => (window.location.href = '/settings')} className="cursor-pointer">
                 <HugeiconsIcon icon={Settings01Icon} className="mr-2 h-4 w-4" />
                 Settings
