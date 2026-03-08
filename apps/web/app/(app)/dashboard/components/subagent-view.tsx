@@ -141,13 +141,12 @@ export function SubagentView({ subagent, onBack, parentSessionId }: SubagentView
                   <Message key={message.id} role={message.role}>
                     {hasReasoning && (
                       <ReasoningCollapsible
+                        reasoning={message.reasoning}
                         isStreaming={isStreaming}
                         duration={
                           message.elapsed != null ? Math.floor(message.elapsed / 1000) : undefined
                         }
-                      >
-                        {message.reasoning?.join('\n\n') ?? ''}
-                      </ReasoningCollapsible>
+                      />
                     )}
                     {hasSteps && message.toolInvocations && message.toolInvocations.length > 0 && (
                       <div className="space-y-2 my-1">

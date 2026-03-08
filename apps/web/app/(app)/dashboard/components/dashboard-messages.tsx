@@ -239,6 +239,7 @@ export function DashboardMessages({
                 {/* Reasoning/thinking: always show when present, collapsed by default when done */}
                 {hasReasoning && (
                   <ReasoningCollapsible
+                    reasoning={message.reasoning}
                     isStreaming={isCurrentlyStreaming}
                     duration={
                       isCurrentlyStreaming && streamStartTime
@@ -247,9 +248,7 @@ export function DashboardMessages({
                           ? Math.floor(message.elapsed / 1000)
                           : undefined
                     }
-                  >
-                    {message.reasoning?.join('\n\n') ?? ''}
-                  </ReasoningCollapsible>
+                  />
                 )}
 
                 {/* Tool calls — each Tool has its own collapsible with arrow */}

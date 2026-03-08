@@ -83,13 +83,12 @@ function MessageListContent({
                 {/* Assistant reasoning = show collapsible, collapsed by default when done */}
                 {msg.role === 'assistant' && msg.reasoning && msg.reasoning.length > 0 && (
                   <ReasoningCollapsible
+                    reasoning={msg.reasoning}
                     isStreaming={isCurrentlyStreaming}
                     duration={
                       msg.elapsed != null ? Math.floor(msg.elapsed / 1000) : undefined
                     }
-                  >
-                    {msg.reasoning.join('\n\n')}
-                  </ReasoningCollapsible>
+                  />
                 )}
 
                 {/* Assistant tools - only show tool calls */}
