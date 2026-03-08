@@ -99,6 +99,7 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
     assistantTextRef: chat.assistantTextRef,
     reasoningRef: chat.reasoningRef,
     setStreamStartTime: chat.setStreamStartTime,
+    setStreamingStatus: chat.setStreamingStatus,
   })
 
   // ---- Data fetching ----
@@ -439,6 +440,7 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
                         isStreaming={chat.isStreaming}
                         streamingMessageId={chat.streamingMessageRef.current}
                         streamStartTime={chat.streamStartTime}
+                        streamingStatus={chat.streamingStatus}
                         sessionTodos={chat.sessionTodos}
                         onPermissionReply={handlePermissionReply}
                       />
@@ -457,6 +459,7 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
                     isStreaming={chat.isStreaming}
                     streamingMessageId={chat.streamingMessageRef.current}
                     streamStartTime={chat.streamStartTime}
+                    streamingStatus={chat.streamingStatus}
                     sessionTodos={chat.sessionTodos}
                     onPermissionReply={handlePermissionReply}
                   />

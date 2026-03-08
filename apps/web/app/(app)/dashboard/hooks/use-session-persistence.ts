@@ -14,6 +14,7 @@ export function useSessionPersistence(activeSessionId: string | null) {
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null)
   const [streamStartTime, setStreamStartTime] = useState<number | null>(null)
   const [sandboxStatus, setSandboxStatus] = useState<string>('unknown')
+  const [streamingStatus, setStreamingStatus] = useState<string>('')
 
   // Restore persisted sidebar data from localStorage when session changes
   useEffect(() => {
@@ -70,5 +71,7 @@ export function useSessionPersistence(activeSessionId: string | null) {
     setStreamStartTime,
     sandboxStatus,
     setSandboxStatus,
+    streamingStatus,
+    setStreamingStatus,
   }
 }

@@ -25,6 +25,7 @@ interface DashboardMessagesProps {
   isStreaming: boolean
   streamingMessageId: string | null
   streamStartTime: number | null
+  streamingStatus?: string
   sessionTodos?: TodoItem[]
   onPermissionReply?: (permissionId: string, approved: boolean) => Promise<void>
 }
@@ -35,6 +36,7 @@ export function DashboardMessages({
   isStreaming,
   streamingMessageId,
   streamStartTime,
+  streamingStatus = '',
   sessionTodos = [],
   onPermissionReply,
 }: DashboardMessagesProps) {
@@ -42,7 +44,9 @@ export function DashboardMessages({
 
   if (!activeSessionId) return null
 
-  const statusLabel = isStreaming ? getStreamingStatus(messages, streamingMessageId) : ''
+  const statusLabel = isStreaming
+    ? getStreamingStatus(messages, streamingMessageId) || streamingStatus
+    : ''
   const hasContent = messages.some((m) => m.content || m.toolInvocations?.length)
 
   // Sub-agent navigation handlers

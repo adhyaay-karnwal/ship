@@ -29,6 +29,7 @@ export interface SSEHandlerContext {
   setSessionTitle: React.Dispatch<React.SetStateAction<string>>
   setSessionInfo: React.Dispatch<React.SetStateAction<SessionInfo | null>>
   setStreamStartTime: (value: number | null) => void
+  setStreamingStatus: (value: string) => void
   streamingMessageRef: React.MutableRefObject<string | null>
   assistantTextRef: React.MutableRefObject<string>
   reasoningRef: React.MutableRefObject<string>
@@ -98,6 +99,7 @@ export function handleDoneOrIdle(
   }
   ctx.setIsStreaming(false)
   ctx.setStreamStartTime(null)
+  ctx.setStreamingStatus('')
   ctx.streamingMessageRef.current = null
 }
 
@@ -115,6 +117,7 @@ export function handleSessionError(
   const { category, retryable } = classifyError(errorMessage)
   ctx.setMessages((prev) => [...prev, createErrorMessage(errorMessage, category, retryable)])
   ctx.setIsStreaming(false)
+  ctx.setStreamingStatus('')
   ctx.streamingMessageRef.current = null
 }
 
@@ -123,6 +126,7 @@ export function handleGenericError(error: unknown, ctx: SSEHandlerContext) {
   const { category, retryable } = classifyError(errorMessage)
   ctx.setMessages((prev) => [...prev, createErrorMessage(errorMessage, category, retryable)])
   ctx.setIsStreaming(false)
+  ctx.setStreamingStatus('')
   ctx.streamingMessageRef.current = null
 }
 

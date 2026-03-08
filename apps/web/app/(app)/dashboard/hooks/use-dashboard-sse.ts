@@ -45,6 +45,7 @@ interface UseDashboardSSEParams {
   assistantTextRef: React.MutableRefObject<string>
   reasoningRef: React.MutableRefObject<string>
   setStreamStartTime: (value: number | null) => void
+  setStreamingStatus: (value: string) => void
 }
 
 export function useDashboardSSE({
@@ -66,6 +67,7 @@ export function useDashboardSSE({
   assistantTextRef,
   reasoningRef,
   setStreamStartTime,
+  setStreamingStatus,
 }: UseDashboardSSEParams) {
   const streamStartTimeRef = useRef<number | null>(null)
 
@@ -101,6 +103,7 @@ export function useDashboardSSE({
       }
 
       setIsStreaming(true)
+      setStreamingStatus('Preparing...')
       assistantTextRef.current = ''
       reasoningRef.current = ''
       setLastStepCost(null)
@@ -126,6 +129,7 @@ export function useDashboardSSE({
         setSessionTitle,
         setSessionInfo,
         setStreamStartTime,
+        setStreamingStatus,
         streamingMessageRef,
         assistantTextRef,
         reasoningRef,
@@ -146,6 +150,7 @@ export function useDashboardSSE({
           })
 
           setIsStreaming(false)
+          setStreamingStatus('')
           streamingMessageRef.current = null
           return
         }
@@ -258,7 +263,12 @@ export function useDashboardSSE({
                     break
 
                   case 'status':
-                  case 'session.status':
+                  case 'session.status': {
+                    const ev = event as { message?: string; status?: string }
+                    const msg = ev.message ?? ev.status
+                    if (typeof msg === 'string') ctx.setStreamingStatus(msg)
+                    break
+                  }
                   case 'heartbeat':
                   case 'file-watcher.updated':
                   case 'session.created':
@@ -300,6 +310,7 @@ export function useDashboardSSE({
         })
 
         setIsStreaming(false)
+        setStreamingStatus('')
         streamingMessageRef.current = null
       }
     },
