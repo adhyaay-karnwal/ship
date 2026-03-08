@@ -10,10 +10,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  cn,
 } from '@ship/ui'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { ArrowDown01Icon } from '@hugeicons/core-free-icons'
 import { useComposer } from './composer-context'
 
 export function AgentModelSelector() {
@@ -26,7 +23,6 @@ export function AgentModelSelector() {
     agentsLoading,
     modelsLoading,
     isStreaming,
-    activeSessionId,
   } = useComposer()
 
   const loading = agentsLoading || modelsLoading
@@ -51,19 +47,17 @@ export function AgentModelSelector() {
           <Button
             variant="ghost"
             disabled={isStreaming}
-            className={cn(
-              'h-auto gap-1 px-1.5 py-0.5 text-[11px] disabled:opacity-60 disabled:pointer-events-none',
-              activeSessionId
-                ? 'text-muted-foreground hover:text-foreground'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800',
-            )}
+            className="group h-auto gap-1 px-0 py-0 rounded-full text-muted-foreground hover:text-foreground hover:bg-transparent disabled:opacity-60 disabled:pointer-events-none max-w-full overflow-hidden"
           >
-            {triggerLabel}
-            <HugeiconsIcon
-              icon={ArrowDown01Icon}
-              strokeWidth={2}
-              className="size-3 shrink-0 opacity-60"
-            />
+            <span className="truncate text-base">{triggerLabel}</span>
+            <svg
+              className="h-3 w-3 shrink-0 opacity-40 transition-opacity duration-150 group-hover:opacity-100"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m6 9 6 6 6-6" />
+            </svg>
           </Button>
         }
       />

@@ -38,9 +38,9 @@ export function DashboardComposer({ context, compactLayout = false }: DashboardC
             activeSessionId ? 'max-w-3xl mx-auto' : compactLayout ? 'w-full' : 'max-w-[540px]',
           )}
         >
-          {/* Repo + branch outside the card, on top (Cursor-style) */}
+          {/* Repo + branch above the card (Cursor-style) */}
           {!activeSessionId && (
-            <div className="flex items-center gap-1 pb-2 flex-wrap">
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 min-h-[32px] px-1.5 pb-1.5">
               <ClientOnly>
                 <ComposerRepoSelector />
               </ClientOnly>
@@ -57,25 +57,32 @@ export function DashboardComposer({ context, compactLayout = false }: DashboardC
                 : 'rounded-3xl bg-zinc-900 border-zinc-700/50 shadow-lg focus-within:shadow-xl focus-within:ring-2 focus-within:ring-white/10',
             )}
           >
-            {/* Textarea area */}
-            <div className={cn('px-3', activeSessionId ? 'pt-4 pb-2' : 'pt-2 pb-2')}>
+            {/* Textarea */}
+            <div className="px-3 pt-3">
               <ComposerTextarea />
+            </div>
 
-              {/* Bottom row inside the card: selectors on left, submit on right */}
-              <div className="mt-2 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-0.5 min-w-0">
-                  {activeSessionId && (
-                    <ClientOnly>
-                      <ComposerRepoSelector />
-                    </ClientOnly>
-                  )}
+            {/* Bottom bar inside the card: selectors left, actions right */}
+            <div className="flex items-center gap-1 px-3 h-[42px]">
+              <div className="flex-shrink min-w-0 overflow-hidden">
+                <ClientOnly>
+                  <AgentModelSelector />
+                </ClientOnly>
+              </div>
+              {activeSessionId && (
+                <div className="ml-2">
                   <ClientOnly>
-                    <AgentModelSelector />
-                  </ClientOnly>
-                  <ClientOnly>
-                    <ModeToggle />
+                    <ComposerRepoSelector />
                   </ClientOnly>
                 </div>
+              )}
+              <div className="ml-2">
+                <ClientOnly>
+                  <ModeToggle />
+                </ClientOnly>
+              </div>
+              <div className="flex-1" />
+              <div className="flex items-center gap-2 flex-shrink-0">
                 <SubmitButton />
               </div>
             </div>
