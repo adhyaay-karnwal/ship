@@ -12,7 +12,7 @@ import {
 } from '@ship/ui'
 import { cn } from '@ship/ui/utils'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { ArrowDown01Icon, GithubIcon } from '@hugeicons/core-free-icons'
+import { ArrowDown01Icon } from '@hugeicons/core-free-icons'
 import type { GitHubRepo } from '@/lib/api/types'
 
 export interface RepoSelectorProps {
@@ -80,7 +80,6 @@ export function RepoSelector({
               triggerClassName,
             )}
           >
-            <HugeiconsIcon icon={GithubIcon} strokeWidth={2} />
             <span
               className={
                 fullWidth
@@ -122,7 +121,6 @@ export function RepoSelector({
               )}
               {filteredRepos.map((repo) => (
                 <DropdownMenuItem key={repo.id} onClick={() => onRepoSelect(repo)}>
-                  <HugeiconsIcon icon={GithubIcon} strokeWidth={2} />
                   <span className="truncate flex-1">{repo.fullName}</span>
                   {repo.private && <span className="text-[10px] text-muted-foreground">private</span>}
                 </DropdownMenuItem>

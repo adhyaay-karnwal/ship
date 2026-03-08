@@ -6,7 +6,6 @@ import { ComposerProvider, type ComposerContextValue } from './composer-context'
 import { ComposerTextarea } from './composer-textarea'
 import { ComposerFooter } from './composer-footer'
 import { ComposerRepoSelector } from './repo-selector'
-import { ModelSelector } from './model-selector'
 import { BranchSelector } from './branch-selector'
 import { SubmitButton } from './submit-button'
 
@@ -33,7 +32,7 @@ export function DashboardComposer({ context, compactLayout = false }: DashboardC
             ? 'mt-auto pb-3 px-3 sm:pb-4 sm:px-6'
             : compactLayout
               ? 'flex flex-col px-3 pt-4 pb-2'
-              : 'absolute inset-0 flex items-start sm:items-center justify-center px-3 sm:px-6 pt-[10vh] sm:pt-0',
+              : 'absolute inset-0 flex items-start justify-center px-3 sm:px-6 pt-[6vh] sm:pt-[8vh]',
         )}
       >
         <div
@@ -42,6 +41,17 @@ export function DashboardComposer({ context, compactLayout = false }: DashboardC
             activeSessionId ? 'max-w-3xl mx-auto' : compactLayout ? 'w-full' : 'max-w-[540px]',
           )}
         >
+          {/* Repo + branch outside the card, on top (Cursor-style) */}
+          {!activeSessionId && (
+            <div className="flex items-center gap-2 pb-2 flex-wrap">
+              <ClientOnly>
+                <ComposerRepoSelector />
+              </ClientOnly>
+              <ClientOnly>
+                <BranchSelector triggerClassName={aboveInputTriggerClass} />
+              </ClientOnly>
+            </div>
+          )}
           <div
             className={cn(
               'rounded-2xl border overflow-hidden transition-all',
@@ -50,23 +60,6 @@ export function DashboardComposer({ context, compactLayout = false }: DashboardC
                 : 'rounded-3xl bg-zinc-900 border-zinc-700/50 shadow-lg focus-within:shadow-xl focus-within:ring-2 focus-within:ring-white/10',
             )}
           >
-            {/* When homepage: repo + model + branch row above textarea (Cursor-style) */}
-            {!activeSessionId && (
-              <div className="flex items-center gap-2 px-3 pt-3 pb-1 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <ClientOnly>
-                    <ComposerRepoSelector />
-                  </ClientOnly>
-                  <ClientOnly>
-                    <ModelSelector triggerClassName={aboveInputTriggerClass} />
-                  </ClientOnly>
-                  <span className="text-zinc-500 text-sm">/</span>
-                  <ClientOnly>
-                    <BranchSelector triggerClassName={aboveInputTriggerClass} />
-                  </ClientOnly>
-                </div>
-              </div>
-            )}
             {/* Textarea area */}
             <div className={cn('px-3', activeSessionId ? 'pt-4 pb-2' : 'pt-2 pb-2')}>
               <ComposerTextarea />

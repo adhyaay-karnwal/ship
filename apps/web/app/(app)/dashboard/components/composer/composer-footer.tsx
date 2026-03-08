@@ -12,12 +12,7 @@ function ModelSelectorWithSeparator() {
   const { groupedByProvider } = useComposer()
   const totalModels = Object.values(groupedByProvider).reduce((sum, models) => sum + models.length, 0)
   if (totalModels <= 1) return null
-  return (
-    <>
-      <span className="text-[10px] text-muted-foreground/30">/</span>
-      <ModelSelector />
-    </>
-  )
+  return <ModelSelector />
 }
 
 export function ComposerFooter() {
