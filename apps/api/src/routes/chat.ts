@@ -183,12 +183,24 @@ app.post('/:sessionId', async (c) => {
           })
 
           try {
-            // Build env vars for the agent
+            // Build env vars for the agent (per https://cursor.com/docs/cli/acp — CURSOR_API_KEY for non-interactive auth)
             const envVars: Record<string, string> = {}
             if (c.env.ANTHROPIC_API_KEY) envVars.ANTHROPIC_API_KEY = c.env.ANTHROPIC_API_KEY
             if (c.env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = c.env.OPENAI_API_KEY
-            if (c.env.CURSOR_API_KEY) envVars.CURSOR_API_KEY = c.env.CURSOR_API_KEY
-            if (agentType === 'cursor' && c.env.CURSOR_API_KEY) {
+            if (c.env.CURSOR_API_KEY?.trim()) envVars.CURSOR_API_KEY = c.env.CURSOR_API_KEY.trim()
+            if (agentType === 'cursor') {
+              if (!c.env.CURSOR_API_KEY?.trim()) {
+                await stream.writeSSE({
+                  event: 'error',
+                  data: JSON.stringify({
+                    error: 'Cursor agent requires CURSOR_API_KEY',
+                    details: 'Set CURSOR_API_KEY in .dev.vars (local) or Wrangler secrets (production). Get the key from Cursor Dashboard → Integrations → Cloud Agents API.',
+                    category: 'user-action',
+                    retryable: false,
+                  }),
+                })
+                return
+              }
               console.log(`[chat:${sessionId}] Cursor auth: CURSOR_API_KEY set`)
             }
 
@@ -367,7 +379,19 @@ app.post('/:sessionId', async (c) => {
               const envVars: Record<string, string> = {}
               if (c.env.ANTHROPIC_API_KEY) envVars.ANTHROPIC_API_KEY = c.env.ANTHROPIC_API_KEY
               if (c.env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = c.env.OPENAI_API_KEY
-              if (c.env.CURSOR_API_KEY) envVars.CURSOR_API_KEY = c.env.CURSOR_API_KEY
+              if (c.env.CURSOR_API_KEY?.trim()) envVars.CURSOR_API_KEY = c.env.CURSOR_API_KEY.trim()
+              if (agentType === 'cursor' && !c.env.CURSOR_API_KEY?.trim()) {
+                await stream.writeSSE({
+                  event: 'error',
+                  data: JSON.stringify({
+                    error: 'Cursor agent requires CURSOR_API_KEY',
+                    details: 'Set CURSOR_API_KEY in .dev.vars (local) or Wrangler secrets (production). Get the key from Cursor Dashboard → Integrations → Cloud Agents API.',
+                    category: 'user-action',
+                    retryable: false,
+                  }),
+                })
+                return
+              }
 
               const { url } = await startSandboxAgentServer(newSandbox, currentSandboxId, agentType, envVars)
               currentSandboxAgentUrl = url
