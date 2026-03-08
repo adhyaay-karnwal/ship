@@ -14,11 +14,13 @@ import {
 import { AppSidebar } from '@/components/app-sidebar'
 import { useGitHubRepos } from '@/lib/api/hooks/use-repos'
 import { useModels, useDefaultModel } from '@/lib/api/hooks/use-models'
+import { useAgents, useDefaultAgent } from '@/lib/api/hooks/use-agents'
 import { useDefaultRepo } from '@/lib/api/hooks/use-default-repo'
 import { useCreateSession, useDeleteSession } from '@/lib/api/hooks/use-sessions'
 import { replyPermission } from '@/lib/api/hooks/use-chat'
 import type { ChatSession } from '@/lib/api/server'
-import type { GitHubRepo, ModelInfo, User } from '@/lib/api/types'
+import type { GitHubRepo, ModelInfo, AgentInfo, AgentMode, AgentModeId, User } from '@/lib/api/types'
+import type { ComposerContextValue } from './components/composer/composer-context'
 import { useDashboardChat } from './hooks/use-dashboard-chat'
 import { useDashboardSSE } from './hooks/use-dashboard-sse'
 import { useRightSidebar } from './hooks/use-right-sidebar'
@@ -27,6 +29,7 @@ import { DashboardHeader } from './components/dashboard-header'
 import { DashboardMessages } from './components/dashboard-messages'
 import { DashboardComposer } from './components/composer'
 import { RightSidebar } from './components/right-sidebar'
+import { MobileSessionList } from './components/mobile-session-list'
 
 function formatRelativeTime(timestamp: number): string {
   const seconds = Math.floor(Date.now() / 1000 - timestamp)
@@ -39,55 +42,28 @@ function formatRelativeTime(timestamp: number): string {
   return `${Math.floor(days / 30)}mo`
 }
 
-function groupSessionsByTime(sessions: ChatSession[]): { label: string; sessions: ChatSession[] }[] {
-  const now = Math.floor(Date.now() / 1000)
-  const oneDay = 24 * 60 * 60
-  const todayStart = now - oneDay
-  const yesterdayStart = now - 2 * oneDay
-  const weekStart = now - 7 * oneDay
-  const monthStart = now - 30 * oneDay
-
-  const today: ChatSession[] = []
-  const yesterday: ChatSession[] = []
-  const thisWeek: ChatSession[] = []
-  const thisMonth: ChatSession[] = []
-  const older: ChatSession[] = []
-
-  for (const s of sessions) {
-    const t = s.lastActivity
-    if (t >= todayStart) today.push(s)
-    else if (t >= yesterdayStart) yesterday.push(s)
-    else if (t >= weekStart) thisWeek.push(s)
-    else if (t >= monthStart) thisMonth.push(s)
-    else older.push(s)
-  }
-
-  const sortByActivity = (a: ChatSession, b: ChatSession) => b.lastActivity - a.lastActivity
-  const groups: { label: string; sessions: ChatSession[] }[] = []
-  if (today.length) groups.push({ label: 'Today', sessions: today.sort(sortByActivity) })
-  if (yesterday.length) groups.push({ label: 'Yesterday', sessions: yesterday.sort(sortByActivity) })
-  if (thisWeek.length) groups.push({ label: 'This Week', sessions: thisWeek.sort(sortByActivity) })
-  if (thisMonth.length) groups.push({ label: 'This Month', sessions: thisMonth.sort(sortByActivity) })
-  if (older.length) groups.push({ label: 'Older', sessions: older.sort(sortByActivity) })
-  return groups
-}
-
 interface DashboardClientProps {
   sessions: ChatSession[]
   userId: string
   user: User
 }
 
+const DEFAULT_MODES: AgentMode[] = [
+  { id: 'agent', label: 'agent' },
+  { id: 'plan', label: 'plan' },
+  { id: 'ask', label: 'ask' },
+]
+
 export function DashboardClient({ sessions: initialSessions, userId, user }: DashboardClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState<string>('')
   const [selectedRepo, setSelectedRepo] = useState<GitHubRepo | null>(null)
+  const [selectedAgent, setSelectedAgent] = useState<AgentInfo | null>(null)
   const [selectedModel, setSelectedModel] = useState<ModelInfo | null>(null)
-  const [mode, setMode] = useState<'build' | 'plan'>('build')
-  const [prompt, setPrompt] = useState('')
-  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null)
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [mode, setMode] = useState<AgentModeId>('agent')
+  const [availableModes, setAvailableModes] = useState<AgentMode[]>(DEFAULT_MODES)
+  const [prompt, setPrompt] = useState<string>('')
 
   const { deleteSession } = useDeleteSession()
   const isMobile = useIsMobile()
@@ -133,10 +109,47 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
     hasMore: reposHasMore,
     isLoadingMore: reposLoadingMore,
   } = useGitHubRepos(userId)
-  const { models, groupedByProvider, isLoading: modelsLoading } = useModels()
+  const { models, isLoading: modelsLoading } = useModels()
+  const { agents, isLoading: agentsLoading } = useAgents()
+  const { defaultAgentId, isLoading: defaultAgentLoading } = useDefaultAgent(userId)
   const { defaultModelId, isLoading: defaultModelLoading } = useDefaultModel(userId)
   const { defaultRepoFullName, isLoading: defaultRepoLoading } = useDefaultRepo(userId)
   const { createSession, isCreating } = useCreateSession()
+
+  // ---- Agent initialization (runs once when agents load) ----
+  useEffect(() => {
+    if (agentsLoading || defaultAgentLoading || agents.length === 0 || selectedAgent) return
+    const agentId = defaultAgentId || 'cursor'
+    const agent = agents.find((a) => a.id === agentId) || agents[0]
+    if (agent) {
+      setSelectedAgent(agent)
+      setAvailableModes(agent.modes)
+      setMode(agent.modes[0]?.id || 'agent')
+      if (agent.models.length > 0 && !selectedModel) {
+        setSelectedModel(agent.models[0])
+      }
+    }
+  }, [agents, agentsLoading, defaultAgentId, defaultAgentLoading, selectedAgent, selectedModel])
+
+  const handleAgentSelect = useCallback((agent: AgentInfo) => {
+    setSelectedAgent(agent)
+    setAvailableModes(agent.modes)
+    setMode(agent.modes[0]?.id || 'agent')
+    if (agent.models.length > 0) {
+      setSelectedModel(agent.models[0])
+    }
+  }, [])
+
+  // Group agent's models by provider
+  const groupedByProvider = useMemo(() => {
+    const agentModels = selectedAgent?.models || []
+    return agentModels.reduce<Record<string, ModelInfo[]>>((acc, model) => {
+      const provider = model.provider || 'Other'
+      if (!acc[provider]) acc[provider] = []
+      acc[provider].push(model)
+      return acc
+    }, {})
+  }, [selectedAgent])
 
   // ---- Sync effects (URL param, default model, repo, message queue) ----
   useSessionSync({
@@ -167,7 +180,6 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
     if (repos.length === 0) return
     if (defaultRepoFullName) return // useSessionSync handles saved default
 
-    // No saved default: use first repo owned by user
     const userOwnedRepo = repos.find((r) => r.owner === user.username)
     if (userOwnedRepo) setSelectedRepo(userOwnedRepo)
   }, [chat.activeSessionId, defaultRepoLoading, defaultRepoFullName, repos, selectedRepo, user.username, setSelectedRepo])
@@ -183,7 +195,8 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
           userId,
           repoOwner: data.repoOwner,
           repoName: data.repoName,
-          model: data.model || selectedModel?.id || 'opencode/big-pickle',
+          model: data.model || selectedModel?.id || 'cursor/default',
+          agentType: selectedAgent?.id || 'cursor',
         })
 
         if (newSession) {
@@ -213,37 +226,7 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
         console.error('Failed to create session:', error)
       }
     },
-    [createSession, userId, selectedModel, prompt, mode, chat, handleSend],
-  )
-
-  const handleDeleteSession = useCallback(
-    async (session: ChatSession, confirmed = false) => {
-      if (!confirmed) {
-        setConfirmDeleteId(session.id)
-        return
-      }
-
-      try {
-        setDeletingSessionId(session.id)
-        await deleteSession({ sessionId: session.id })
-        chat.setLocalSessions((prev) => prev.filter((s) => s.id !== session.id))
-        if (chat.activeSessionId === session.id) {
-          chat.setActiveSessionId(null)
-          chat.setMessages([])
-          router.push('/')
-          window.location.href = '/'
-        } else {
-          router.refresh()
-        }
-      } catch (error) {
-        console.error('Failed to delete session:', error)
-        router.refresh()
-      } finally {
-        setDeletingSessionId(null)
-        setConfirmDeleteId(null)
-      }
-    },
-    [chat, deleteSession, router],
+    [createSession, userId, selectedModel, selectedAgent, prompt, mode, chat, handleSend],
   )
 
   // ---- Submit / keyboard ----
@@ -295,7 +278,6 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
     const oneWeekAgo = now - 7 * oneDay
     const recent = chat.localSessions.filter((s) => s.lastActivity > oneWeekAgo)
 
-    // Build 7 daily buckets (oldest to newest) for chart data
     const sessionsChartData: number[] = []
     const messagesChartData: number[] = []
     const activeReposChartData: number[] = []
@@ -321,6 +303,79 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
 
   const canSubmit = Boolean(
     chat.activeSessionId ? prompt.trim() && !chat.isStreaming : selectedRepo && prompt.trim() && !isCreating,
+  )
+
+  // ---- Build composer context once, reuse everywhere ----
+  const composerContext: ComposerContextValue = useMemo(
+    () => ({
+      activeSessionId: chat.activeSessionId,
+      prompt,
+      onPromptChange: setPrompt,
+      onKeyDown: handleKeyDown,
+      selectedRepo,
+      onRepoSelect: setSelectedRepo,
+      repos,
+      reposLoading: reposLoading ?? false,
+      reposLoadMore,
+      reposHasMore: reposHasMore ?? false,
+      reposLoadingMore: reposLoadingMore ?? false,
+      selectedAgent,
+      onAgentSelect: handleAgentSelect,
+      agents,
+      agentsLoading,
+      selectedModel,
+      onModelSelect: setSelectedModel,
+      modelsLoading: modelsLoading ?? false,
+      groupedByProvider,
+      mode,
+      onModeChange: setMode,
+      availableModes,
+      onSubmit: handleSubmit,
+      onStop: chat.handleStop,
+      isCreating: !!isCreating,
+      isStreaming: !!chat.isStreaming,
+      messageQueueLength: chat.messageQueue.length,
+      canSubmit: !!canSubmit,
+    }),
+    [
+      chat.activeSessionId, prompt, handleKeyDown,
+      selectedRepo, repos, reposLoading, reposLoadMore, reposHasMore, reposLoadingMore,
+      selectedAgent, handleAgentSelect, agents, agentsLoading,
+      selectedModel, modelsLoading, groupedByProvider,
+      mode, availableModes,
+      handleSubmit, chat.handleStop, isCreating, chat.isStreaming, chat.messageQueue.length, canSubmit,
+    ],
+  )
+
+  // ---- Session list handlers ----
+  const handleSessionClick = useCallback(
+    (session: ChatSession) => {
+      chat.setActiveSessionId(session.id)
+      chat.connectWebSocket(session.id)
+      window.history.replaceState({}, '', `/session/${session.id}`)
+    },
+    [chat],
+  )
+
+  const handleDeleteSession = useCallback(
+    async (sessionId: string) => {
+      try {
+        await deleteSession({ sessionId })
+        chat.setLocalSessions((prev) => prev.filter((s) => s.id !== sessionId))
+        if (chat.activeSessionId === sessionId) {
+          chat.setActiveSessionId(null)
+          chat.setMessages([])
+          router.push('/')
+          window.location.href = '/'
+        } else {
+          router.refresh()
+        }
+      } catch (error) {
+        console.error('Failed to delete session:', error)
+        router.refresh()
+      }
+    },
+    [chat, deleteSession, router],
   )
 
   // ---- Render ----
@@ -363,135 +418,14 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
                 {!chat.activeSessionId && (
                   <>
                     <div className="shrink-0">
-                      <DashboardComposer
-                        compactLayout={true}
-                        activeSessionId={chat.activeSessionId}
-                        prompt={prompt}
-                        onPromptChange={setPrompt}
-                        onKeyDown={handleKeyDown}
-                        selectedRepo={selectedRepo}
-                        onRepoSelect={setSelectedRepo}
-                        repos={repos}
-                        reposLoading={reposLoading ?? false}
-                        reposLoadMore={reposLoadMore}
-                        reposHasMore={reposHasMore ?? false}
-                        reposLoadingMore={reposLoadingMore ?? false}
-                        selectedModel={selectedModel}
-                        onModelSelect={setSelectedModel}
-                        modelsLoading={modelsLoading ?? false}
-                        groupedByProvider={groupedByProvider}
-                        mode={mode}
-                        onModeChange={setMode}
-                        onSubmit={handleSubmit}
-                        onStop={chat.handleStop}
-                        isCreating={!!isCreating}
-                        isStreaming={!!chat.isStreaming}
-                        messageQueueLength={chat.messageQueue.length}
-                        stats={stats}
-                        canSubmit={!!canSubmit}
-                      />
+                      <DashboardComposer context={composerContext} stats={stats} compactLayout={true} />
                     </div>
-
-                    {chat.localSessions.length > 0 && (
-                      <div className="flex-1 overflow-y-auto px-3 pb-3 pt-2 min-h-0">
-                        {groupSessionsByTime(chat.localSessions.filter((s) => !s.archivedAt)).map((group) => (
-                          <div key={group.label} className="mb-6">
-                            <h3 className="text-xs font-medium text-muted-foreground mb-2 sticky top-0 bg-background py-1">
-                              {group.label}
-                            </h3>
-                            <div className="space-y-1">
-                              {group.sessions.map((session) => {
-                                const sessionName = session.title || session.repoName
-                                const repoPath = `${session.repoOwner}/${session.repoName}`
-                                return (
-                                  <div
-                                    key={session.id}
-                                    className="group/item relative flex items-stretch gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/40"
-                                  >
-                                    <button
-                                      onClick={() => {
-                                        chat.setActiveSessionId(session.id)
-                                        chat.connectWebSocket(session.id)
-                                        window.history.replaceState({}, '', `/session/${session.id}`)
-                                      }}
-                                      className="flex-1 min-w-0 text-left py-0.5"
-                                    >
-                                      <div className="text-sm font-medium text-foreground truncate leading-tight">
-                                        {sessionName}
-                                      </div>
-                                      <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-[11px] text-muted-foreground/80 truncate">
-                                          {repoPath}
-                                        </span>
-                                        <span className="text-[11px] text-muted-foreground/50 shrink-0">
-                                          {formatRelativeTime(session.lastActivity)}
-                                        </span>
-                                      </div>
-                                    </button>
-                                    {isMobile && (
-                                      <button
-                                        type="button"
-                                        title="Delete chat"
-                                        disabled={deletingSessionId === session.id}
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          handleDeleteSession(session, true)
-                                        }}
-                                        className="shrink-0 self-center p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors disabled:opacity-30"
-                                      >
-                                        <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-3.5" />
-                                      </button>
-                                    )}
-                                    {!isMobile && (
-                                      <DropdownMenu>
-                                        <DropdownMenuTrigger
-                                          render={
-                                            <button
-                                              type="button"
-                                              title="Delete chat"
-                                              disabled={deletingSessionId === session.id}
-                                              onClick={(e) => e.stopPropagation()}
-                                              className="shrink-0 self-center p-1.5 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors disabled:opacity-30 opacity-0 group-hover/item:opacity-100"
-                                            >
-                                              <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-3.5" />
-                                            </button>
-                                          }
-                                        />
-                                        <DropdownMenuContent align="end" className="w-48">
-                                          {confirmDeleteId === session.id ? (
-                                            <>
-                                              <DropdownMenuItem
-                                                onClick={() => handleDeleteSession(session, true)}
-                                                className="cursor-pointer text-red-600 dark:text-red-400"
-                                              >
-                                                Yes, delete
-                                              </DropdownMenuItem>
-                                              <DropdownMenuItem
-                                                onClick={() => setConfirmDeleteId(null)}
-                                                className="cursor-pointer"
-                                              >
-                                                Cancel
-                                              </DropdownMenuItem>
-                                            </>
-                                          ) : (
-                                            <DropdownMenuItem
-                                              onClick={() => handleDeleteSession(session)}
-                                              className="cursor-pointer"
-                                            >
-                                              Delete
-                                            </DropdownMenuItem>
-                                          )}
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
-                                    )}
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <MobileSessionList
+                      sessions={chat.localSessions}
+                      isMobile={isMobile ?? false}
+                      onSessionClick={handleSessionClick}
+                      onDeleteSession={handleDeleteSession}
+                    />
                   </>
                 )}
 
@@ -509,33 +443,7 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
                         onPermissionReply={handlePermissionReply}
                       />
                     </div>
-                    <DashboardComposer
-                      compactLayout={false}
-                      activeSessionId={chat.activeSessionId}
-                      prompt={prompt}
-                      onPromptChange={setPrompt}
-                      onKeyDown={handleKeyDown}
-                      selectedRepo={selectedRepo}
-                      onRepoSelect={setSelectedRepo}
-                      repos={repos}
-                      reposLoading={reposLoading ?? false}
-                      reposLoadMore={reposLoadMore}
-                      reposHasMore={reposHasMore ?? false}
-                      reposLoadingMore={reposLoadingMore ?? false}
-                      selectedModel={selectedModel}
-                      onModelSelect={setSelectedModel}
-                      modelsLoading={modelsLoading}
-                      groupedByProvider={groupedByProvider}
-                      mode={mode}
-                      onModeChange={setMode}
-                      onSubmit={handleSubmit}
-                      onStop={chat.handleStop}
-                      isCreating={!!isCreating}
-                      isStreaming={!!chat.isStreaming}
-                      messageQueueLength={chat.messageQueue.length}
-                      stats={stats}
-                      canSubmit={!!canSubmit}
-                    />
+                    <DashboardComposer context={composerContext} stats={stats} compactLayout={false} />
                   </div>
                 )}
               </div>
@@ -554,32 +462,7 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
                   />
                 </div>
 
-                <DashboardComposer
-                  activeSessionId={chat.activeSessionId}
-                  prompt={prompt}
-                  onPromptChange={setPrompt}
-                  onKeyDown={handleKeyDown}
-                  selectedRepo={selectedRepo}
-                  onRepoSelect={setSelectedRepo}
-                  repos={repos}
-                  reposLoading={reposLoading ?? false}
-                  reposLoadMore={reposLoadMore}
-                  reposHasMore={reposHasMore ?? false}
-                  reposLoadingMore={reposLoadingMore ?? false}
-                  selectedModel={selectedModel}
-                  onModelSelect={setSelectedModel}
-                  modelsLoading={modelsLoading}
-                  groupedByProvider={groupedByProvider}
-                  mode={mode}
-                  onModeChange={setMode}
-                  onSubmit={handleSubmit}
-                  onStop={chat.handleStop}
-                  isCreating={!!isCreating}
-                  isStreaming={!!chat.isStreaming}
-                  messageQueueLength={chat.messageQueue.length}
-                  stats={stats}
-                  canSubmit={!!canSubmit}
-                />
+                <DashboardComposer context={composerContext} stats={stats} />
               </div>
             </div>
           </div>
@@ -590,6 +473,7 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
               data={{
                 sessionId: chat.activeSessionId,
                 selectedRepo,
+                selectedAgent,
                 selectedModel,
                 mode,
                 lastStepCost: chat.lastStepCost,

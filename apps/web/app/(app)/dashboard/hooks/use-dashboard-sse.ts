@@ -29,7 +29,7 @@ import {
 interface UseDashboardSSEParams {
   activeSessionId: string | null
   isStreaming: boolean
-  mode: 'build' | 'plan'
+  mode: string
   setIsStreaming: (value: boolean) => void
   setMessages: React.Dispatch<React.SetStateAction<UIMessage[]>>
   setTotalCost: React.Dispatch<React.SetStateAction<number>>
@@ -91,7 +91,7 @@ export function useDashboardSSE({
   }, [setMessages, streamingMessageRef, assistantTextRef, reasoningRef])
 
   const handleSend = useCallback(
-    async (content: string, modeOverride?: 'build' | 'plan', sessionIdOverride?: string) => {
+    async (content: string, modeOverride?: string, sessionIdOverride?: string) => {
       const targetSessionId = sessionIdOverride || activeSessionId
       if (!targetSessionId) return
 
