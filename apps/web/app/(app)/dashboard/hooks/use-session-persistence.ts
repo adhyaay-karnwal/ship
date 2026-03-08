@@ -6,6 +6,7 @@ import type { TodoItem, FileDiff, StepCostInfo } from '../types'
 
 export function useSessionPersistence(activeSessionId: string | null) {
   const [agentUrl, setAgentUrl] = useState<string>('')
+  const [agentSessionId, setAgentSessionId] = useState<string>('')
   const [sessionTodos, setSessionTodos] = useState<TodoItem[]>([])
   const [fileDiffs, setFileDiffs] = useState<FileDiff[]>([])
   const [totalCost, setTotalCost] = useState<number>(0)
@@ -56,6 +57,9 @@ export function useSessionPersistence(activeSessionId: string | null) {
 
       const savedSandboxStatus = localStorage.getItem(`sandbox-status-${activeSessionId}`)
       if (savedSandboxStatus) setSandboxStatus(savedSandboxStatus)
+
+      const savedAgentSessionId = localStorage.getItem(`agent-session-id-${activeSessionId}`)
+      if (savedAgentSessionId) setAgentSessionId(savedAgentSessionId)
     } catch {}
   }, [activeSessionId])
 
@@ -68,12 +72,15 @@ export function useSessionPersistence(activeSessionId: string | null) {
       if (sessionInfo) localStorage.setItem(`session-info-${activeSessionId}`, JSON.stringify(sessionInfo))
       if (sessionTitle) localStorage.setItem(`session-title-${activeSessionId}`, sessionTitle)
       if (sandboxStatus) localStorage.setItem(`sandbox-status-${activeSessionId}`, sandboxStatus)
+      if (agentSessionId) localStorage.setItem(`agent-session-id-${activeSessionId}`, agentSessionId)
     } catch {}
-  }, [activeSessionId, totalCost, lastStepCost, sessionInfo, sessionTitle, sandboxStatus])
+  }, [activeSessionId, totalCost, lastStepCost, sessionInfo, sessionTitle, sandboxStatus, agentSessionId])
 
   return {
     agentUrl,
     setAgentUrl,
+    agentSessionId,
+    setAgentSessionId,
     sessionTodos,
     setSessionTodos,
     fileDiffs,

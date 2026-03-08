@@ -94,6 +94,14 @@ export function useDashboardChat(initialSessions: ChatSession[]) {
           }
         }
 
+        if (event.type === 'agent-session') {
+          const id = (event as { agentSessionId?: string }).agentSessionId
+          if (id) {
+            persistence.setAgentSessionId(id)
+            try { localStorage.setItem(`agent-session-id-${sessionId}`, id) } catch {}
+          }
+        }
+
         if (event.type === 'sandbox-status') {
           const status = (event as { status?: string }).status
           if (status) persistence.setSandboxStatus(status)

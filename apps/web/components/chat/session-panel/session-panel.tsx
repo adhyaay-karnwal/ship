@@ -22,6 +22,7 @@ export function SessionPanel({
   diffs,
   sessionInfo,
   agentUrl,
+  agentSessionId,
   messages = [],
   className,
 }: SessionPanelProps) {
@@ -80,7 +81,7 @@ export function SessionPanel({
       <SessionActionsSection tokens={tokens} sessionCreatedAt={sessionInfo?.time?.created} />
 
       {/* Agent link */}
-      {agentUrl && <AgentLink url={agentUrl} />}
+      {agentUrl && <AgentLink url={agentUrl} agentSessionId={agentSessionId} />}
 
       {/* Empty state */}
       {!repo && !model && !tokens && !sessionInfo && !agentUrl && messages.length === 0 && (

@@ -42,6 +42,7 @@ function useSessionPanelProps(data: SessionPanelData) {
     todos: data.sessionTodos,
     diffs: data.fileDiffs,
     agentUrl: data.agentUrl || undefined,
+    agentSessionId: data.agentSessionId || undefined,
     sessionInfo: data.sessionInfo || undefined,
     messages: data.messages,
   }

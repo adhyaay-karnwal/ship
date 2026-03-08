@@ -333,6 +333,11 @@ export type AgentUrlEvent = {
   url: string
 }
 
+export type AgentSessionEvent = {
+  type: 'agent-session'
+  agentSessionId: string
+}
+
 /** @deprecated Use AgentUrlEvent */
 export type OpencodeUrlEvent = {
   type: 'opencode-url'
@@ -391,6 +396,7 @@ export type SSEEvent =
   | QuestionRejectedEvent
   | CommandExecutedEvent
   | AgentUrlEvent
+  | AgentSessionEvent
   | OpencodeUrlEvent
   | ServerConnectedEvent
   | ServerHeartbeatEvent

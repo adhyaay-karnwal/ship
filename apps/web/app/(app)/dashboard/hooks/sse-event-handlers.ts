@@ -28,6 +28,7 @@ export interface SSEHandlerContext {
   setAgentUrl: React.Dispatch<React.SetStateAction<string>>
   setSessionTitle: React.Dispatch<React.SetStateAction<string>>
   setSessionInfo: React.Dispatch<React.SetStateAction<SessionInfo | null>>
+  setAgentSessionId: React.Dispatch<React.SetStateAction<string>>
   setStreamStartTime: (value: number | null) => void
   setStreamingStatus: (value: string, appendToSteps?: boolean) => void
   accumulateSetupStepsRef: React.MutableRefObject<boolean>
@@ -174,6 +175,11 @@ export function handleQuestionResolved(
 export function handleAgentUrl(url: string, ctx: SSEHandlerContext) {
   ctx.setAgentUrl(url)
   try { localStorage.setItem(`agent-url-${ctx.targetSessionId}`, url) } catch {}
+}
+
+export function handleAgentSession(agentSessionId: string, ctx: SSEHandlerContext) {
+  ctx.setAgentSessionId(agentSessionId)
+  try { localStorage.setItem(`agent-session-id-${ctx.targetSessionId}`, agentSessionId) } catch {}
 }
 
 /** @deprecated Use handleAgentUrl */

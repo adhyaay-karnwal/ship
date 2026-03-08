@@ -136,6 +136,7 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
         sessionTodos: chat.sessionTodos,
         fileDiffs: chat.fileDiffs,
         agentUrl: chat.agentUrl ?? '',
+        agentSessionId: chat.agentSessionId || undefined,
         sessionInfo: chat.sessionInfo,
         messages: chat.messages,
       }

@@ -30,6 +30,7 @@ export interface SessionPanelData {
   sessionTodos: TodoItem[]
   fileDiffs: FileDiff[]
   agentUrl: string
+  agentSessionId?: string
   sessionInfo: SessionInfo | null
   messages: import('@/lib/ai-elements-adapter').UIMessage[]
 }

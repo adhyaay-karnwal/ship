@@ -21,6 +21,7 @@ import {
   handleQuestionAsked,
   handleQuestionResolved,
   handleAgentUrl,
+  handleAgentSession,
   handleRawDataFallbacks,
 } from './sse-event-handlers'
 import type { useDashboardChat } from './use-dashboard-chat'
@@ -45,6 +46,7 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
     setAgentUrl,
     setSessionTitle,
     setSessionInfo,
+    setAgentSessionId,
     updateSessionTitle,
     streamingMessageRef,
     assistantTextRef,
@@ -120,6 +122,7 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
         setAgentUrl,
         setSessionTitle,
         setSessionInfo,
+        setAgentSessionId,
         setStreamStartTime,
         setStreamingStatus,
         accumulateSetupStepsRef,
@@ -217,6 +220,12 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
                   case 'opencode-url': {
                     const url = (event as { url?: string }).url
                     if (url) handleAgentUrl(url, ctx)
+                    break
+                  }
+
+                  case 'agent-session': {
+                    const id = (event as { agentSessionId?: string }).agentSessionId
+                    if (id) handleAgentSession(id, ctx)
                     break
                   }
 

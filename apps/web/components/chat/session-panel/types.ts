@@ -51,6 +51,7 @@ export interface SessionPanelProps {
   diffs?: DiffSummary[]
   sessionInfo?: SSESessionInfo
   agentUrl?: string
+  agentSessionId?: string
   messages?: UIMessage[]
   className?: string
 }
