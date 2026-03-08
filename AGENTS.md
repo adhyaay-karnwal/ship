@@ -142,6 +142,10 @@ Ship uses **sandbox-agent** (by Rivet) as its agent runtime, which supports mult
 
 Agent configs are defined in `apps/api/src/lib/agent-registry.ts`. Default agent is `opencode`.
 
+#### Cursor agent authentication
+
+Per [Cursor ACP docs](https://cursor.com/docs/cli/acp), Cursor supports non-interactive auth via `CURSOR_API_KEY` — API key from Cursor Dashboard → Integrations (Cloud Agents API). Set in `apps/api/.dev.vars` locally or via `wrangler secret put CURSOR_API_KEY` for production. If you see "cursor-agent CLI is not authenticated. To authenticate, run: cursor-agent login", verify the key type (Cloud Agents API) and that the env var is set in `.dev.vars` or as a Wrangler secret.
+
 ### Key API Files
 
 - **`sandbox-agent.ts`** — SDK wrapper. Functions: `startSandboxAgentServer`, `connectToSandboxAgent`, `createAgentSession`, `promptAgent`, `cancelAgent`, `subscribeToSessionEvents`. Caches client instances per sandbox URL.

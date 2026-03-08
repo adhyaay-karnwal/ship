@@ -19,6 +19,7 @@ API_SECRET=your-api-secret-here
 OPENAI_API_KEY=sk-...
 
 # Cursor API Key (optional, for Cursor agent)
+# Get from: Cursor Dashboard → Integrations (Cloud Agents API)
 CURSOR_API_KEY=
 
 # Allowed CORS Origins (comma-separated)

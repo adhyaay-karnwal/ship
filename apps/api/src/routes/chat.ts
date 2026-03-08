@@ -9,6 +9,7 @@ import {
   cancelAgent,
   resumeAgentSession,
   subscribeToSessionEvents,
+  disposeSandboxAgent,
 } from '../lib/sandbox-agent'
 import { EventTranslatorState } from '../lib/event-translator'
 import { getAgent, getDefaultAgentId } from '../lib/agent-registry'
@@ -78,6 +79,10 @@ app.post('/:sessionId', async (c) => {
     return streamSSE(c, async (stream) => {
       console.log(`[chat:${sessionId}] SSE stream handler started`)
 
+      let currentSandboxId: string | undefined = sandboxId
+      let currentSandboxAgentUrl: string | undefined = sandboxAgentUrl
+      let currentAgentSessionId: string | undefined = agentSessionId
+
       try {
         // Send initial status
         await stream.writeSSE({
@@ -88,11 +93,6 @@ app.post('/:sessionId', async (c) => {
             message: 'Preparing agent...',
           }),
         })
-
-        // Track current state
-        let currentSandboxId: string | undefined = sandboxId
-        let currentSandboxAgentUrl: string | undefined = sandboxAgentUrl
-        let currentAgentSessionId: string | undefined = agentSessionId
 
         // Wait for sandbox if needed
         if (needsSandboxWait) {
@@ -188,6 +188,9 @@ app.post('/:sessionId', async (c) => {
             if (c.env.ANTHROPIC_API_KEY) envVars.ANTHROPIC_API_KEY = c.env.ANTHROPIC_API_KEY
             if (c.env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = c.env.OPENAI_API_KEY
             if (c.env.CURSOR_API_KEY) envVars.CURSOR_API_KEY = c.env.CURSOR_API_KEY
+            if (agentType === 'cursor' && c.env.CURSOR_API_KEY) {
+              console.log(`[chat:${sessionId}] Cursor auth: CURSOR_API_KEY set`)
+            }
 
             const { Sandbox } = await import('../lib/e2b')
             const sandbox = await Sandbox.connect(currentSandboxId, { apiKey: c.env.E2B_API_KEY })
@@ -777,6 +780,14 @@ app.post('/:sessionId', async (c) => {
           })
         } catch {
           // Stream might be closed
+        }
+      } finally {
+        if (currentSandboxAgentUrl) {
+          try {
+            await disposeSandboxAgent(currentSandboxAgentUrl)
+          } catch (e) {
+            console.warn(`[chat:${sessionId}] Dispose warning:`, e)
+          }
         }
       }
     })
