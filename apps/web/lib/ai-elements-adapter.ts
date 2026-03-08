@@ -47,6 +47,8 @@ export interface UIMessage {
   elapsed?: number
   // Plan items from PlanPart events
   planItems?: Array<{ id: string; title: string; status: string }>
+  /** Startup steps (e.g. "Provisioning sandbox...", "Server ready") — persisted, shown collapsible */
+  startupSteps?: string[]
   // Permission/question prompt data
   promptData?: {
     id: string

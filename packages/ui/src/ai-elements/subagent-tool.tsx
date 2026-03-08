@@ -102,9 +102,14 @@ export function SubagentTool({
     }
   }, [status])
 
-  const durationLabel = duration !== undefined
-    ? (duration >= 60000 ? `${Math.floor(duration / 60000)}m ${((duration % 60000) / 1000).toFixed(0)}s` : duration >= 1000 ? `${(duration / 1000).toFixed(1)}s` : `${duration}ms`)
-    : null
+  const durationLabel =
+    duration !== undefined && duration > 0
+      ? duration >= 60000
+        ? `${Math.floor(duration / 60000)}m ${((duration % 60000) / 1000).toFixed(0)}s`
+        : duration >= 1000
+          ? `${(duration / 1000).toFixed(1)}s`
+          : `${duration}ms`
+      : null
 
   const formattedType = formatAgentType(agentType)
   const hasExpandContent = (childTools && childTools.length > 0) || result
@@ -118,7 +123,13 @@ export function SubagentTool({
               'flex-1 flex items-center gap-2 py-1 -mx-1 px-1 rounded hover:bg-muted/40 transition-colors text-left min-w-0',
             )}
           >
-            <AgentIcon />
+            {status === 'in_progress' ? (
+              <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                <span className="h-3 w-3 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+              </span>
+            ) : (
+              <AgentIcon />
+            )}
             <span className="text-sm font-medium text-foreground/90 shrink-0">{formattedType}</span>
             <span className="text-xs text-muted-foreground/50 truncate font-mono">{description}</span>
             <div className="flex items-center gap-2 ml-auto shrink-0">

@@ -71,9 +71,15 @@ export function ReasoningCollapsible({
   className,
 }: ReasoningCollapsibleProps) {
   const [open, setOpen] = React.useState(isStreaming)
+  const prevStreamingRef = React.useRef(isStreaming)
 
   React.useEffect(() => {
-    if (isStreaming) setOpen(true)
+    if (isStreaming) {
+      setOpen(true)
+    } else if (prevStreamingRef.current) {
+      setOpen(false)
+    }
+    prevStreamingRef.current = isStreaming
   }, [isStreaming])
 
   if (!children) return null

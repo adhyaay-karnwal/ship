@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { cn } from '../utils'
 import { Collapsible as CollapsiblePrimitive } from '@base-ui/react/collapsible'
+import { ScrollArea } from '../scroll-area'
 
 interface ToolProps {
   name: string
@@ -128,8 +129,18 @@ function getInputSummary(name: string, input: Record<string, unknown>): string |
 }
 
 function formatOutput(output: unknown): [string, boolean] {
-  const text = typeof output === 'string' ? output : JSON.stringify(output, null, 2)
-  const MAX_LINES = 20
+  let text: string
+  if (typeof output === 'string') {
+    try {
+      const parsed = JSON.parse(output)
+      text = JSON.stringify(parsed, null, 2)
+    } catch {
+      text = output
+    }
+  } else {
+    text = JSON.stringify(output, null, 2)
+  }
+  const MAX_LINES = 30
   const lines = text.split('\n')
   if (lines.length > MAX_LINES) {
     return [lines.slice(0, MAX_LINES).join('\n'), true]
@@ -155,11 +166,27 @@ export function Tool({
 
   const [truncatedOutput, isOutputTruncated] = output !== undefined ? formatOutput(output) : ['', false]
   const fullOutputText =
-    output !== undefined ? (typeof output === 'string' ? output : JSON.stringify(output, null, 2)) : ''
+    output !== undefined
+      ? (() => {
+          if (typeof output === 'string') {
+            try {
+              return JSON.stringify(JSON.parse(output), null, 2)
+            } catch {
+              return output
+            }
+          }
+          return JSON.stringify(output, null, 2)
+        })()
+      : ''
 
-  const durationLabel = duration !== undefined
-    ? (duration >= 60000 ? `${Math.floor(duration / 60000)}m ${((duration % 60000) / 1000).toFixed(0)}s` : duration >= 1000 ? `${(duration / 1000).toFixed(1)}s` : `${duration}ms`)
-    : null
+  const durationLabel =
+    duration !== undefined && duration > 0
+      ? duration >= 60000
+        ? `${Math.floor(duration / 60000)}m ${((duration % 60000) / 1000).toFixed(0)}s`
+        : duration >= 1000
+          ? `${(duration / 1000).toFixed(1)}s`
+          : `${duration}ms`
+      : null
 
   return (
     <CollapsiblePrimitive.Root open={isOpen} onOpenChange={isSubagent ? undefined : setIsOpen}>
@@ -201,32 +228,36 @@ export function Tool({
         </CollapsiblePrimitive.Trigger>
         {hasDetails && !isSubagent && (
           <CollapsiblePrimitive.Panel>
-            <div className="pl-5 pr-2 py-2 border-l border-border/30 ml-1.5 space-y-3 text-[11px]">
+            <div className="pl-5 pr-2 py-2 border-l border-border/30 ml-1.5 space-y-4 text-[11px]">
               {input && Object.keys(input).length > 0 && (
-                <div>
-                  <p className="font-medium mb-1.5 text-muted-foreground/40 text-[10px] uppercase tracking-wider">
+                <div className="space-y-1.5">
+                  <p className="font-medium text-muted-foreground/60 text-[10px] uppercase tracking-wider">
                     Input
                   </p>
-                  <pre className="bg-muted/30 rounded-md px-3 py-2 overflow-x-auto text-foreground/70 leading-relaxed font-mono text-[11px]">
-                    {JSON.stringify(input, null, 2)}
-                  </pre>
+                  <ScrollArea className="rounded-lg border border-border/40 bg-muted/20">
+                    <pre className="p-3.5 text-foreground/80 leading-relaxed font-mono text-[11px] whitespace-pre-wrap break-words">
+                      {JSON.stringify(input, null, 2)}
+                    </pre>
+                  </ScrollArea>
                 </div>
               )}
               {output !== undefined && (
-                <div>
-                  <p className="font-medium mb-1.5 text-muted-foreground/40 text-[10px] uppercase tracking-wider">
+                <div className="space-y-1.5">
+                  <p className="font-medium text-muted-foreground/60 text-[10px] uppercase tracking-wider">
                     Output
                   </p>
-                  <pre className="bg-muted/30 rounded-md px-3 py-2 overflow-x-auto text-foreground/70 leading-relaxed font-mono text-[11px] max-h-[400px] overflow-y-auto">
-                    {showFullOutput ? fullOutputText : truncatedOutput}
-                  </pre>
+                  <ScrollArea className="rounded-lg border border-border/40 bg-muted/20 max-h-[400px]">
+                    <pre className="p-3.5 text-foreground/80 leading-relaxed font-mono text-[11px] whitespace-pre-wrap break-words">
+                      {showFullOutput ? fullOutputText : truncatedOutput}
+                    </pre>
+                  </ScrollArea>
                   {isOutputTruncated && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
                         setShowFullOutput(!showFullOutput)
                       }}
-                      className="text-[10px] text-primary/70 hover:text-primary mt-1.5 transition-colors"
+                      className="text-[10px] text-primary/70 hover:text-primary transition-colors"
                     >
                       {showFullOutput ? 'Show less' : 'Show more'}
                     </button>

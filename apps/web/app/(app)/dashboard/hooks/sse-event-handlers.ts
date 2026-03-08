@@ -30,6 +30,8 @@ export interface SSEHandlerContext {
   setSessionInfo: React.Dispatch<React.SetStateAction<SessionInfo | null>>
   setStreamStartTime: (value: number | null) => void
   setStreamingStatus: (value: string) => void
+  streamingStatusStepsRef: React.MutableRefObject<string[]>
+  clearStreamingStatusSteps: () => void
   streamingMessageRef: React.MutableRefObject<string | null>
   assistantTextRef: React.MutableRefObject<string>
   reasoningRef: React.MutableRefObject<string>
@@ -85,6 +87,9 @@ export function handleDoneOrIdle(
     const elapsed = streamStartTimeRef.current
       ? Date.now() - streamStartTimeRef.current
       : 0
+    const startupSteps = ctx.streamingStatusStepsRef.current.length > 0
+      ? [...ctx.streamingStatusStepsRef.current]
+      : undefined
     ctx.setMessages((prev) =>
       prev.map((m) => {
         if (m.id !== finalMsgId) return m
@@ -92,6 +97,7 @@ export function handleDoneOrIdle(
           ...m,
           content: finalText,
           ...(finalReasoning ? { reasoning: [finalReasoning] } : {}),
+          ...(startupSteps ? { startupSteps } : {}),
           elapsed,
         }
       }),
@@ -100,6 +106,7 @@ export function handleDoneOrIdle(
   ctx.setIsStreaming(false)
   ctx.setStreamStartTime(null)
   ctx.setStreamingStatus('')
+  ctx.clearStreamingStatusSteps()
   ctx.streamingMessageRef.current = null
 }
 

@@ -46,6 +46,8 @@ interface UseDashboardSSEParams {
   reasoningRef: React.MutableRefObject<string>
   setStreamStartTime: (value: number | null) => void
   setStreamingStatus: (value: string) => void
+  streamingStatusStepsRef: React.MutableRefObject<string[]>
+  clearStreamingStatusSteps: () => void
 }
 
 export function useDashboardSSE({
@@ -68,6 +70,8 @@ export function useDashboardSSE({
   reasoningRef,
   setStreamStartTime,
   setStreamingStatus,
+  streamingStatusStepsRef,
+  clearStreamingStatusSteps,
 }: UseDashboardSSEParams) {
   const streamStartTimeRef = useRef<number | null>(null)
 
@@ -103,6 +107,7 @@ export function useDashboardSSE({
       }
 
       setIsStreaming(true)
+      clearStreamingStatusSteps()
       setStreamingStatus('Preparing...')
       assistantTextRef.current = ''
       reasoningRef.current = ''
@@ -130,6 +135,8 @@ export function useDashboardSSE({
         setSessionInfo,
         setStreamStartTime,
         setStreamingStatus,
+        streamingStatusStepsRef,
+        clearStreamingStatusSteps,
         streamingMessageRef,
         assistantTextRef,
         reasoningRef,

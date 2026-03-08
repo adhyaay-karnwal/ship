@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { API_URL } from '@/lib/config'
 import {
   type UIMessage,
@@ -9,6 +9,25 @@ import {
 } from '@/lib/ai-elements-adapter'
 import { parseSSEEvent } from '@/lib/sse-parser'
 import type { MessagePartUpdatedEvent } from '@/lib/sse-types'
+
+function getStatusFromPart(part: { type?: string; tool?: string; state?: { status?: string; input?: Record<string, unknown> } }): string | null {
+  if (!part) return null
+  if (part.type === 'reasoning') return 'Thinking...'
+  if (part.type === 'text') return 'Writing response...'
+  if (part.type === 'tool' && part.tool) {
+    const tool = part.tool.toLowerCase()
+    const state = part.state?.status || 'running'
+    const title = (part.state?.input as Record<string, unknown>)?.description || part.state?.input?.title
+    const short = typeof title === 'string' ? title.slice(0, 40) + (title.length > 40 ? '...' : '') : null
+    if (state === 'pending') return `Starting: ${part.tool}`
+    if (tool.includes('read')) return short ? `Reading: ${short}` : 'Reading files...'
+    if (tool.includes('write') || tool.includes('edit')) return short ? `Writing: ${short}` : 'Writing...'
+    if (tool.includes('bash') || tool.includes('run') || tool.includes('command')) return short ? `Running: ${short}` : 'Running command...'
+    if (tool.includes('glob') || tool.includes('grep') || tool.includes('search')) return short ? `Searching: ${short}` : `Searching: ${part.tool}`
+    return short ? `${part.tool}: ${short}` : `Running: ${part.tool}`
+  }
+  return null
+}
 
 interface UseSubagentStreamParams {
   parentSessionId: string | null
@@ -19,6 +38,7 @@ interface UseSubagentStreamResult {
   messages: UIMessage[]
   isStreaming: boolean
   status: string
+  statusSteps: string[]
 }
 
 export function useSubagentStream({
@@ -28,6 +48,7 @@ export function useSubagentStream({
   const [messages, setMessages] = useState<UIMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [status, setStatus] = useState('')
+  const [statusSteps, setStatusSteps] = useState<string[]>([])
   const messageIdRef = useRef<string | null>(null)
   const textRef = useRef('')
   const reasoningRef = useRef('')
@@ -38,6 +59,7 @@ export function useSubagentStream({
       setMessages([])
       setIsStreaming(false)
       setStatus('')
+      setStatusSteps([])
       return
     }
 
@@ -46,6 +68,7 @@ export function useSubagentStream({
     setMessages([placeholder])
     setIsStreaming(true)
     setStatus('Connecting...')
+    setStatusSteps(['Connecting...'])
     textRef.current = ''
     reasoningRef.current = ''
 
@@ -89,12 +112,13 @@ export function useSubagentStream({
 
                 if (event.type === 'message.part.updated') {
                   const mpu = event as MessagePartUpdatedEvent
+                  const part = mpu.properties?.part
                   const msgId = messageIdRef.current
                   if (msgId) {
                     setMessages((prev) =>
                       processPartUpdated(
-                        mpu.properties.part,
-                        mpu.properties.delta,
+                        part,
+                        mpu.properties?.delta,
                         msgId,
                         prev,
                         textRef,
@@ -102,7 +126,21 @@ export function useSubagentStream({
                       ),
                     )
                   }
-                  setStatus('Working...')
+                  const partStatus = getStatusFromPart(part) || 'Working...'
+                  setStatus(partStatus)
+                  setStatusSteps((prev) => {
+                    if (prev.length > 0 && prev[prev.length - 1] === partStatus) return prev
+                    return [...prev, partStatus]
+                  })
+                }
+
+                if (event.type === 'status' && (event as { message?: string }).message) {
+                  const msg = (event as { message: string }).message
+                  setStatus(msg)
+                  setStatusSteps((prev) => {
+                    if (prev.length > 0 && prev[prev.length - 1] === msg) return prev
+                    return [...prev, msg]
+                  })
                 }
 
                 if (event.type === 'done' || event.type === 'session.idle') {
@@ -136,5 +174,5 @@ export function useSubagentStream({
     }
   }, [parentSessionId, subagentSessionId])
 
-  return { messages, isStreaming, status }
+  return { messages, isStreaming, status, statusSteps }
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Message, Tool, Response, Loader, ReasoningCollapsible, Conversation, ConversationScrollButton } from '@ship/ui'
+import { Message, Tool, Response, Loader, ReasoningCollapsible, SessionSetup, Conversation, ConversationScrollButton } from '@ship/ui'
 import { Markdown } from '@/components/chat/markdown'
 import { mapToolState } from '@/lib/ai-elements-adapter'
 import { useSubagentStream } from '../hooks/use-subagent-stream'
@@ -34,7 +34,7 @@ function formatDuration(ms: number): string {
 }
 
 export function SubagentView({ subagent, onBack, parentSessionId }: SubagentViewProps) {
-  const { messages, isStreaming, status } = useSubagentStream({
+  const { messages, isStreaming, status, statusSteps } = useSubagentStream({
     parentSessionId,
     subagentSessionId: subagent.sessionId || null,
   })
@@ -50,45 +50,50 @@ export function SubagentView({ subagent, onBack, parentSessionId }: SubagentView
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border/30 bg-background/80 backdrop-blur-sm sticky top-0 z-10">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border/30 bg-background/95 backdrop-blur-sm sticky top-0 z-10">
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors -ml-1"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
           Back
         </button>
-        <div className="h-4 w-px bg-border/50" />
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <svg
-            className="w-4 h-4 shrink-0 text-muted-foreground/70"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect x="3" y="3" width="7" height="7" rx="1" />
-            <rect x="14" y="3" width="7" height="7" rx="1" />
-            <rect x="3" y="14" width="7" height="7" rx="1" />
-            <rect x="14" y="14" width="7" height="7" rx="1" />
-          </svg>
-          <span className="text-sm font-medium text-foreground truncate">
-            {subagent.description || subagent.agentType}
-          </span>
-          <span className="text-xs text-muted-foreground/50 shrink-0">(@{subagent.agentType.toLowerCase().replace(/\s+/g, '-')} subagent)</span>
-          {isStreaming && (
-            <span className="relative flex h-2 w-2 shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/40 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+        <div className="h-4 w-px bg-border/40" />
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          {isStreaming ? (
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+              <span className="h-3.5 w-3.5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
             </span>
+          ) : (
+            <svg
+              className="w-4 h-4 shrink-0 text-muted-foreground/60"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
+            </svg>
           )}
+          <div className="min-w-0 flex-1">
+            <span className="text-sm font-medium text-foreground truncate block">
+              {subagent.description || subagent.agentType}
+            </span>
+            <span className="text-xs text-muted-foreground/50">
+              {subagent.agentType}
+              {isStreaming && ' · Working...'}
+            </span>
+          </div>
         </div>
-        {subagent.duration && (
+        {subagent.duration && !isStreaming && (
           <span className="text-xs text-muted-foreground/50 shrink-0">{formatDuration(subagent.duration)}</span>
         )}
       </div>
@@ -99,7 +104,7 @@ export function SubagentView({ subagent, onBack, parentSessionId }: SubagentView
           {/* Agent prompt */}
           {subagent.prompt && (
             <div className="mb-6">
-              <div className="text-sm text-foreground/80 bg-muted/30 rounded-lg px-4 py-3 border border-border/20">
+              <div className="text-sm text-foreground/80 leading-relaxed rounded-lg px-4 py-3.5 bg-muted/20 border border-border/30">
                 {subagent.prompt}
               </div>
             </div>
@@ -108,20 +113,16 @@ export function SubagentView({ subagent, onBack, parentSessionId }: SubagentView
           {/* Live streaming content from child session (priority 1) */}
           {showStreamData && (
             <div className="space-y-4">
-              {status && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground/60">
-                  {isStreaming && (
-                    <span className="relative flex h-1.5 w-1.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/50 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary/60" />
-                    </span>
-                  )}
-                  {status}
-                </div>
+              {statusSteps.length > 0 && (
+                <SessionSetup
+                  steps={statusSteps}
+                  isStreaming={isStreaming}
+                  defaultOpen={isStreaming}
+                />
               )}
               {messages.map((message) => {
                 if (!message.content && !message.toolInvocations?.length && !message.reasoning?.length) {
-                  return isStreaming ? (
+                  return isStreaming && statusSteps.length === 0 ? (
                     <Message key={message.id} role="assistant">
                       <Loader message={status || 'Working...'} />
                     </Message>
@@ -133,17 +134,18 @@ export function SubagentView({ subagent, onBack, parentSessionId }: SubagentView
                   message.toolInvocations &&
                   message.toolInvocations.length > 0
 
-                const hasOnlyReasoning =
-                  message.role === 'assistant' &&
-                  message.reasoning &&
-                  message.reasoning.length > 0 &&
-                  !message.toolInvocations?.length &&
-                  !message.content
+                const hasReasoning =
+                  message.role === 'assistant' && message.reasoning && message.reasoning.length > 0
 
                 return (
                   <Message key={message.id} role={message.role}>
-                    {hasOnlyReasoning && (
-                      <ReasoningCollapsible isStreaming={isStreaming}>
+                    {hasReasoning && (
+                      <ReasoningCollapsible
+                        isStreaming={isStreaming}
+                        duration={
+                          message.elapsed != null ? Math.floor(message.elapsed / 1000) : undefined
+                        }
+                      >
                         {message.reasoning?.join('\n\n') ?? ''}
                       </ReasoningCollapsible>
                     )}
@@ -211,9 +213,12 @@ export function SubagentView({ subagent, onBack, parentSessionId }: SubagentView
           {/* No data at all — shouldn't happen but handle gracefully */}
           {!subagent.sessionId && !showResultFallback && !showChildToolsFallback && (
             <Message role="assistant">
-              <div className="text-sm text-muted-foreground/60">
+              <div className="flex items-center gap-3 text-sm text-muted-foreground/70">
+                {(subagent.toolStatus === 'in_progress' || subagent.toolStatus === 'pending') && (
+                  <span className="h-4 w-4 shrink-0 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                )}
                 {subagent.toolStatus === 'in_progress' || subagent.toolStatus === 'pending'
-                  ? <Loader message="Sub-agent is working..." />
+                  ? 'Working...'
                   : 'Sub-agent completed without output.'}
               </div>
             </Message>

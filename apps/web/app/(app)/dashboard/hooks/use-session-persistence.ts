@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { SessionInfo } from '@/lib/sse-types'
 import type { TodoItem, FileDiff, StepCostInfo } from '../types'
 
@@ -15,6 +15,25 @@ export function useSessionPersistence(activeSessionId: string | null) {
   const [streamStartTime, setStreamStartTime] = useState<number | null>(null)
   const [sandboxStatus, setSandboxStatus] = useState<string>('unknown')
   const [streamingStatus, setStreamingStatus] = useState<string>('')
+  const [streamingStatusSteps, setStreamingStatusSteps] = useState<string[]>([])
+  const streamingStatusStepsRef = useRef<string[]>([])
+
+  const setStreamingStatusWithSteps = useCallback((msg: string) => {
+    setStreamingStatus(msg)
+    if (msg) {
+      setStreamingStatusSteps((prev) => {
+        if (prev.length > 0 && prev[prev.length - 1] === msg) return prev
+        const next = [...prev, msg]
+        streamingStatusStepsRef.current = next
+        return next
+      })
+    }
+  }, [])
+
+  const clearStreamingStatusSteps = useCallback(() => {
+    setStreamingStatusSteps([])
+    streamingStatusStepsRef.current = []
+  }, [])
 
   // Restore persisted sidebar data from localStorage when session changes
   useEffect(() => {
@@ -72,6 +91,9 @@ export function useSessionPersistence(activeSessionId: string | null) {
     sandboxStatus,
     setSandboxStatus,
     streamingStatus,
-    setStreamingStatus,
+    setStreamingStatus: setStreamingStatusWithSteps,
+    streamingStatusSteps,
+    streamingStatusStepsRef,
+    clearStreamingStatusSteps,
   }
 }

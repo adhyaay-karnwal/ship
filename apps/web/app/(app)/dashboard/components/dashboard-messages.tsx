@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Message, Tool, Response, Loader, ReasoningCollapsible, SubagentTool, TodoProgress, Conversation, ConversationScrollButton } from '@ship/ui'
+import { Message, Tool, Response, Loader, ReasoningCollapsible, SubagentTool, TodoProgress, SessionSetup, Conversation, ConversationScrollButton } from '@ship/ui'
 import { Markdown } from '@/components/chat/markdown'
 import { ErrorMessage } from '@/components/chat/error-message'
 import { PermissionPrompt } from './permission-prompt'
@@ -26,6 +26,7 @@ interface DashboardMessagesProps {
   streamingMessageId: string | null
   streamStartTime: number | null
   streamingStatus?: string
+  streamingStatusSteps?: string[]
   sessionTodos?: TodoItem[]
   onPermissionReply?: (permissionId: string, approved: boolean) => Promise<void>
 }
@@ -37,6 +38,7 @@ export function DashboardMessages({
   streamingMessageId,
   streamStartTime,
   streamingStatus = '',
+  streamingStatusSteps = [],
   sessionTodos = [],
   onPermissionReply,
 }: DashboardMessagesProps) {
@@ -192,9 +194,10 @@ export function DashboardMessages({
               !message.reasoning?.length &&
               isCurrentlyStreaming
             ) {
+              const steps = streamingStatusSteps.length > 0 ? streamingStatusSteps : ['Preparing...']
               return (
                 <Message key={message.id} role="assistant">
-                  <Loader message={statusLabel || 'Thinking...'} />
+                  <SessionSetup steps={steps} isStreaming />
                 </Message>
               )
             }
@@ -204,11 +207,8 @@ export function DashboardMessages({
               return null
             }
 
-            const hasOnlyReasoning =
-              message.role === 'assistant' &&
-              (message.reasoning && message.reasoning.length > 0) &&
-              (!message.toolInvocations || message.toolInvocations.length === 0) &&
-              !message.content
+            const hasReasoning =
+              message.role === 'assistant' && message.reasoning && message.reasoning.length > 0
 
             const hasSteps =
               message.role === 'assistant' &&
@@ -225,14 +225,21 @@ export function DashboardMessages({
                   <div className="text-foreground whitespace-pre-wrap">{message.content}</div>
                 )}
 
-                {/* Reasoning-only: show collapsible reasoning content (like ai-elements Reasoning) */}
-                {hasOnlyReasoning && (
+                {/* Session setup steps — persisted, collapsible, no checkboxes */}
+                {message.role === 'assistant' && message.startupSteps && message.startupSteps.length > 0 && (
+                  <SessionSetup steps={message.startupSteps} defaultOpen={false} className="my-1" />
+                )}
+
+                {/* Reasoning/thinking: always show when present, collapsed by default when done */}
+                {hasReasoning && (
                   <ReasoningCollapsible
                     isStreaming={isCurrentlyStreaming}
                     duration={
-                      streamStartTime
+                      isCurrentlyStreaming && streamStartTime
                         ? Math.floor((Date.now() - streamStartTime) / 1000)
-                        : undefined
+                        : message.elapsed != null
+                          ? Math.floor(message.elapsed / 1000)
+                          : undefined
                     }
                   >
                     {message.reasoning?.join('\n\n') ?? ''}
