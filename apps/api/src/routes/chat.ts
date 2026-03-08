@@ -3,6 +3,7 @@ import { streamSSE } from 'hono/streaming'
 import {
   startSandboxAgentServer,
   connectToSandboxAgent,
+  checkSandboxAgentHealth,
   createAgentSession,
   promptAgent,
   cancelAgent,
@@ -269,7 +270,7 @@ app.post('/:sessionId', async (c) => {
             if (cloneResult.exitCode !== 0) throw new Error(`Git clone failed: ${cloneResult.stderr}`)
 
             await sandbox.commands.run(`cd ${repoPath} && git config user.name "Ship Agent"`)
-            await sandbox.commands.run(`cd ${repoPath} && git config user.email "agent@ship.dev"`)
+            await sandbox.commands.run(`cd ${repoPath} && git config user.email "shipagent@dylansteck.com"`)
             await sandbox.commands.run(`cd ${repoPath} && git checkout -b ${branchName}`)
 
             await stub.fetch(
@@ -305,6 +306,141 @@ app.post('/:sessionId', async (c) => {
               }),
             })
             return
+          }
+        }
+
+        // Health-check existing sandbox-agent URL before use
+        if (currentSandboxAgentUrl) {
+          const healthy = await checkSandboxAgentHealth(currentSandboxAgentUrl)
+          if (!healthy) {
+            console.warn(`[chat:${sessionId}] Sandbox agent unhealthy at ${currentSandboxAgentUrl}, re-provisioning...`)
+            await stream.writeSSE({
+              event: 'status',
+              data: JSON.stringify({
+                type: 'status',
+                status: 'reconnecting',
+                message: 'Reconnecting — sandbox expired, re-provisioning...',
+              }),
+            })
+
+            // Clear stale metadata
+            await stub.fetch(
+              new Request(`${doUrl}/meta`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  sandbox_agent_url: '',
+                  agent_session_id: '',
+                  sandbox_id: '',
+                  sandbox_status: '',
+                }),
+              }),
+            )
+            currentSandboxAgentUrl = undefined
+            currentAgentSessionId = undefined
+
+            // Re-provision sandbox
+            try {
+              const { createSessionSandbox, Sandbox } = await import('../lib/e2b')
+              const sandboxInfo = await createSessionSandbox(c.env.E2B_API_KEY, { sessionId })
+              currentSandboxId = sandboxInfo.id
+              const newSandbox = await Sandbox.connect(currentSandboxId, { apiKey: c.env.E2B_API_KEY })
+              console.log(`[chat:${sessionId}] New sandbox provisioned: ${currentSandboxId}`)
+
+              // Save new sandbox ID
+              await stub.fetch(
+                new Request(`${doUrl}/meta`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    sandbox_id: currentSandboxId,
+                    sandbox_status: 'active',
+                  }),
+                }),
+              )
+
+              // Start sandbox-agent server
+              const envVars: Record<string, string> = {}
+              if (c.env.ANTHROPIC_API_KEY) envVars.ANTHROPIC_API_KEY = c.env.ANTHROPIC_API_KEY
+              if (c.env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = c.env.OPENAI_API_KEY
+
+              const { url } = await startSandboxAgentServer(newSandbox, currentSandboxId, agentType, envVars)
+              currentSandboxAgentUrl = url
+              console.log(`[chat:${sessionId}] Re-provisioned sandbox-agent at ${url}`)
+
+              // Save new URL
+              await stub.fetch(
+                new Request(`${doUrl}/meta`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ sandbox_agent_url: url }),
+                }),
+              )
+
+              // Re-clone repo if needed
+              const repoMeta = await stub.fetch(new Request(`${doUrl}/meta`))
+              const repoMetaJson = (await repoMeta.json()) as Record<string, string>
+              if (repoMetaJson.repoOwner || repoMetaJson.repo_owner) {
+                const owner = repoMetaJson.repoOwner || repoMetaJson.repo_owner
+                const name = repoMetaJson.repoName || repoMetaJson.repo_name
+                const uid = repoMetaJson.userId || repoMetaJson.user_id
+
+                if (owner && name && uid) {
+                  await stream.writeSSE({
+                    event: 'status',
+                    data: JSON.stringify({
+                      type: 'status',
+                      status: 'cloning',
+                      message: `Re-cloning ${owner}/${name}...`,
+                    }),
+                  })
+
+                  const accountRes = await c.env.DB.prepare(
+                    'SELECT access_token FROM accounts WHERE user_id = ? AND provider = ? LIMIT 1',
+                  )
+                    .bind(uid, 'github')
+                    .first<{ access_token: string }>()
+
+                  if (accountRes?.access_token) {
+                    const repoUrl = `https://github.com/${owner}/${name}.git`
+                    const branchName = repoMetaJson.current_branch || `ship-${Date.now()}-${sessionId.slice(0, 8)}`
+                    const authUrl = repoUrl.replace('https://', `https://${accountRes.access_token}@`)
+
+                    const cloneResult = await newSandbox.commands.run(`git clone ${authUrl} ${repoPath}`)
+                    if (cloneResult.exitCode === 0) {
+                      await newSandbox.commands.run(`cd ${repoPath} && git config user.name "Ship Agent"`)
+                      await newSandbox.commands.run(`cd ${repoPath} && git config user.email "shipagent@dylansteck.com"`)
+                      await newSandbox.commands.run(`cd ${repoPath} && git checkout -b ${branchName}`)
+
+                      await stub.fetch(
+                        new Request(`${doUrl}/meta`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ repo_url: repoUrl, current_branch: branchName, repo_path: repoPath }),
+                        }),
+                      )
+                    }
+                  }
+                }
+              }
+
+              await stream.writeSSE({
+                event: 'agent-url',
+                data: JSON.stringify({ type: 'agent-url', url }),
+              })
+            } catch (reprovisionError) {
+              console.error(`[chat:${sessionId}] Re-provisioning failed:`, reprovisionError)
+              await stream.writeSSE({
+                event: 'error',
+                data: JSON.stringify({
+                  error: 'Failed to re-provision sandbox',
+                  details: reprovisionError instanceof Error ? reprovisionError.message : 'Unknown error',
+                  category: 'persistent',
+                  retryable: true,
+                }),
+              })
+              return
+            }
           }
         }
 

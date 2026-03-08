@@ -136,12 +136,43 @@ export async function startSandboxAgentServer(
 }
 
 /**
+ * Check if a sandbox-agent server is healthy.
+ * Clears client cache on failure so stale clients aren't reused.
+ * Returns true if healthy, false otherwise.
+ */
+export async function checkSandboxAgentHealth(baseUrl: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${baseUrl}/v1/health`, {
+      signal: AbortSignal.timeout(5000),
+    })
+    if (res.ok) return true
+  } catch {
+    // Health check failed
+  }
+
+  // Unhealthy — clear cached client
+  console.warn(`[sandbox-agent] Health check failed for ${baseUrl}, clearing cache`)
+  const cached = clientCache.get(baseUrl)
+  if (cached) {
+    try { await cached.dispose() } catch { /* ignore */ }
+    clientCache.delete(baseUrl)
+  }
+  return false
+}
+
+/**
  * Connect to a sandbox-agent server.
+ * Health-checks cached clients before reuse, disposes stale ones.
  * Replaces createOpenCodeClientForSandbox()
  */
 export async function connectToSandboxAgent(baseUrl: string): Promise<SandboxAgent> {
   const cached = clientCache.get(baseUrl)
-  if (cached) return cached
+  if (cached) {
+    // Verify cached client is still healthy
+    const healthy = await checkSandboxAgentHealth(baseUrl)
+    if (healthy) return cached
+    // Cache was already cleared by checkSandboxAgentHealth
+  }
 
   const client = await SandboxAgent.connect({
     baseUrl,
@@ -197,9 +228,13 @@ export async function resumeAgentSession(
   }
 }
 
+// Default timeout for prompt calls (5 minutes)
+const PROMPT_TIMEOUT_MS = 5 * 60 * 1000
+
 /**
  * Send a prompt to an agent session and return when the turn completes.
  * Events stream via session.onEvent() callback registered before calling this.
+ * Times out after 5 minutes to prevent indefinite hangs.
  *
  * Replaces promptOpenCode()
  */
@@ -209,7 +244,15 @@ export async function promptAgent(
 ): Promise<{ response: unknown }> {
   console.log(`[sandbox-agent] Sending prompt (${content.length} chars) to session ${session.id}`)
 
-  const response = await session.prompt([{ type: 'text', text: content }])
+  const response = await Promise.race([
+    session.prompt([{ type: 'text', text: content }]),
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`Prompt timed out after ${PROMPT_TIMEOUT_MS / 1000}s`)),
+        PROMPT_TIMEOUT_MS,
+      ),
+    ),
+  ])
 
   console.log(`[sandbox-agent] Prompt completed for session ${session.id}`)
   return { response }
