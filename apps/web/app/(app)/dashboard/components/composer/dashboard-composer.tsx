@@ -1,7 +1,6 @@
 'use client'
 
 import { cn } from '@ship/ui'
-import type { GitHubRepo, ModelInfo } from '@/lib/api/types'
 import { ClientOnly } from '@/components/client-only'
 import { DashboardStats } from '@/components/dashboard-stats'
 import { ComposerProvider, type ComposerContextValue } from './composer-context'
@@ -11,28 +10,8 @@ import { ComposerRepoSelector } from './repo-selector'
 import { SubmitButton } from './submit-button'
 
 interface DashboardComposerProps {
-  activeSessionId: string | null
-  prompt: string
-  onPromptChange: (value: string) => void
-  onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void
-  selectedRepo: GitHubRepo | null
-  onRepoSelect: (repo: GitHubRepo) => void
-  repos: GitHubRepo[]
-  reposLoading: boolean
-  reposLoadMore: () => void
-  reposHasMore: boolean
-  reposLoadingMore: boolean
-  selectedModel: ModelInfo | null
-  onModelSelect: (model: ModelInfo) => void
-  modelsLoading: boolean
-  groupedByProvider: Record<string, ModelInfo[]>
-  mode: 'build' | 'plan'
-  onModeChange: (mode: 'build' | 'plan') => void
-  onSubmit: () => void
-  onStop: () => void
-  isCreating: boolean
-  isStreaming: boolean
-  messageQueueLength: number
+  /** All shared state consumed by composer sub-components via context */
+  context: ComposerContextValue
   stats: {
     sessionsPastWeek: number
     messagesPastWeek: number
@@ -41,42 +20,15 @@ interface DashboardComposerProps {
     messagesChartData: number[]
     activeReposChartData: number[]
   }
-  canSubmit: boolean
   /** When true, use normal flow instead of absolute centering (for mobile with session list below). Default false. */
   compactLayout?: boolean
 }
 
-export function DashboardComposer(props: DashboardComposerProps) {
-  const { activeSessionId, stats, compactLayout = false } = props
-
-  const contextValue: ComposerContextValue = {
-    activeSessionId: props.activeSessionId,
-    prompt: props.prompt,
-    onPromptChange: props.onPromptChange,
-    onKeyDown: props.onKeyDown,
-    selectedRepo: props.selectedRepo,
-    onRepoSelect: props.onRepoSelect,
-    repos: props.repos,
-    reposLoading: props.reposLoading,
-    reposLoadMore: props.reposLoadMore,
-    reposHasMore: props.reposHasMore,
-    reposLoadingMore: props.reposLoadingMore,
-    selectedModel: props.selectedModel,
-    onModelSelect: props.onModelSelect,
-    modelsLoading: props.modelsLoading,
-    groupedByProvider: props.groupedByProvider,
-    mode: props.mode,
-    onModeChange: props.onModeChange,
-    onSubmit: props.onSubmit,
-    onStop: props.onStop,
-    isCreating: props.isCreating,
-    isStreaming: props.isStreaming,
-    messageQueueLength: props.messageQueueLength,
-    canSubmit: props.canSubmit,
-  }
+export function DashboardComposer({ context, stats, compactLayout = false }: DashboardComposerProps) {
+  const { activeSessionId } = context
 
   return (
-    <ComposerProvider value={contextValue}>
+    <ComposerProvider value={context}>
       <div
         className={cn(
           'w-full transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]',

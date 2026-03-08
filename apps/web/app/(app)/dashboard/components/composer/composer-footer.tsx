@@ -3,6 +3,7 @@
 import { cn } from '@ship/ui'
 import { ClientOnly } from '@/components/client-only'
 import { useComposer } from './composer-context'
+import { AgentSelector } from './agent-selector'
 import { ModelSelector } from './model-selector'
 import { ModeToggle } from './mode-toggle'
 import { SubmitButton } from './submit-button'
@@ -19,6 +20,8 @@ export function ComposerFooter() {
     >
       <div className="flex items-center gap-2">
         <ClientOnly>
+          <AgentSelector />
+          <span className="text-[10px] text-muted-foreground/30">/</span>
           <ModelSelector />
         </ClientOnly>
         {activeSessionId && messageQueueLength > 0 && (
