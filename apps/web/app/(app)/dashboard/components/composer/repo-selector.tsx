@@ -27,9 +27,9 @@ export function ComposerRepoSelector() {
       isLoadingMore={reposLoadingMore}
       placeholder="Select repo"
       triggerClassName={
-        !activeSessionId
-          ? 'text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 [&_svg]:text-zinc-400'
-          : undefined
+        activeSessionId
+          ? 'h-auto gap-1 px-1.5 py-0.5 text-[11px] rounded-md text-muted-foreground hover:text-foreground [&_span]:text-[11px] [&_svg]:size-3 [&_svg]:opacity-60'
+          : 'h-auto gap-1 px-1.5 py-0.5 text-[11px] rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 [&_span]:text-[11px] [&_svg]:size-3 [&_svg]:opacity-60'
       }
     />
   )

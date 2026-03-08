@@ -10,10 +10,6 @@ import { SubmitButton } from './submit-button'
 import { AgentModelSelector } from './agent-model-selector'
 import { ModeToggle } from './mode-toggle'
 
-/** Same minimal trigger style as Cursor: text + chevron above input */
-const aboveInputTriggerClass =
-  'text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 [&_svg]:text-zinc-400'
-
 interface DashboardComposerProps {
   /** All shared state consumed by composer sub-components via context */
   context: ComposerContextValue
@@ -44,12 +40,12 @@ export function DashboardComposer({ context, compactLayout = false }: DashboardC
         >
           {/* Repo + branch outside the card, on top (Cursor-style) */}
           {!activeSessionId && (
-            <div className="flex items-center gap-2 pb-2 flex-wrap">
+            <div className="flex items-center gap-1 pb-2 flex-wrap">
               <ClientOnly>
                 <ComposerRepoSelector />
               </ClientOnly>
               <ClientOnly>
-                <BranchSelector triggerClassName={aboveInputTriggerClass} />
+                <BranchSelector />
               </ClientOnly>
             </div>
           )}
@@ -66,8 +62,8 @@ export function DashboardComposer({ context, compactLayout = false }: DashboardC
               <ComposerTextarea />
 
               {/* Bottom row inside the card: selectors on left, submit on right */}
-              <div className="mt-2 flex items-center justify-between">
-                <div className="flex items-center gap-1">
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-0.5 min-w-0">
                   {activeSessionId && (
                     <ClientOnly>
                       <ComposerRepoSelector />

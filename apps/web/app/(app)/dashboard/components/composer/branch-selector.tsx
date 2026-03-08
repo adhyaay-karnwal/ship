@@ -16,8 +16,8 @@ import { useMemo } from 'react'
 
 const COMMON_BRANCHES = ['main', 'master']
 
-export function BranchSelector({ triggerClassName }: { triggerClassName?: string }) {
-  const { selectedRepo, selectedBranch, onBranchSelect } = useComposer()
+export function BranchSelector() {
+  const { selectedRepo, selectedBranch, onBranchSelect, activeSessionId } = useComposer()
 
   const branches = useMemo(() => {
     const defaultBranch = selectedRepo?.defaultBranch
@@ -35,15 +35,17 @@ export function BranchSelector({ triggerClassName }: { triggerClassName?: string
           <Button
             variant="ghost"
             className={cn(
-              'h-8 gap-1.5 px-2 sm:px-3 rounded-full text-sm max-w-[120px] sm:max-w-[140px] truncate',
-              triggerClassName,
+              'h-auto gap-1 px-1.5 py-0.5 text-[11px] max-w-[120px] sm:max-w-[140px] truncate',
+              activeSessionId
+                ? 'text-muted-foreground hover:text-foreground'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800',
             )}
           >
             <span className="truncate">{selectedBranch}</span>
             <HugeiconsIcon
               icon={ArrowDown01Icon}
               strokeWidth={2}
-              className="text-muted-foreground size-3.5 shrink-0"
+              className="size-3 shrink-0 opacity-60"
             />
           </Button>
         }
