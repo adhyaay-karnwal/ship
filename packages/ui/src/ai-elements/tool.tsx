@@ -176,6 +176,120 @@ function formatOutput(output: unknown): [string, boolean] {
   return [text, false]
 }
 
+const FILE_ICON = (
+  <svg className="w-3 h-3 shrink-0 text-muted-foreground/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="16" y1="13" x2="8" y2="13" />
+    <line x1="16" y1="17" x2="8" y2="17" />
+  </svg>
+)
+
+function parseGrepOutput(output: unknown): Array<{ path: string; count?: number }> | null {
+  if (!output) return null
+  let data: unknown
+  if (typeof output === 'string') {
+    try {
+      data = JSON.parse(output)
+    } catch {
+      const pathCounts = new Map<string, number>()
+      for (const line of output.split('\n')) {
+        const colonIdx = line.indexOf(':')
+        if (colonIdx > 0) {
+          const path = line.slice(0, colonIdx).trim()
+          if (path && !path.startsWith('{')) pathCounts.set(path, (pathCounts.get(path) ?? 0) + 1)
+        }
+      }
+      return pathCounts.size > 0
+        ? Array.from(pathCounts.entries()).map(([path, count]) => ({ path, count }))
+        : null
+    }
+  } else {
+    data = output
+  }
+  if (Array.isArray(data)) {
+    return data
+      .map((item) => {
+        if (typeof item === 'string') return { path: item }
+        if (item && typeof item === 'object' && 'path' in item) return { path: String(item.path), count: (item as { count?: number }).count }
+        if (item && typeof item === 'object' && 'file' in item) return { path: String((item as { file: string }).file) }
+        return null
+      })
+      .filter((x): x is { path: string; count?: number } => x !== null)
+  }
+  if (data && typeof data === 'object' && 'matches' in data) {
+    const matches = (data as { matches?: unknown[] }).matches
+    if (Array.isArray(matches)) {
+      const paths = new Map<string, number>()
+      for (const m of matches) {
+        const path = m && typeof m === 'object' && 'path' in m ? String((m as { path: string }).path) : null
+        if (path) paths.set(path, (paths.get(path) ?? 0) + 1)
+      }
+      return Array.from(paths.entries()).map(([path, count]) => ({ path, count }))
+    }
+  }
+  return null
+}
+
+function renderToolOutput(
+  name: string,
+  input: Record<string, unknown> | undefined,
+  output: unknown,
+): React.ReactNode | null {
+  const lower = name.toLowerCase()
+
+  if (lower.includes('grep')) {
+    const items = parseGrepOutput(output)
+    if (items && items.length > 0) {
+      return (
+        <ul className="space-y-1 text-foreground/80 font-mono text-[11px]">
+          {items.map(({ path, count }, i) => (
+            <li key={i} className="flex items-center gap-2 pl-1">
+              {FILE_ICON}
+              <span className="truncate flex-1 min-w-0">{path}</span>
+              {count != null && count > 0 && (
+                <span className="text-muted-foreground/60 text-[10px] shrink-0">
+                  {count === 1 ? '1 match' : `${count} matches`}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  }
+
+  if (lower.includes('read') && input) {
+    const path = String(input.file_path ?? input.path ?? input.filePath ?? '')
+    const start = input.start_line ?? input.startLine ?? input.start
+    const end = input.end_line ?? input.endLine ?? input.end
+    if (path) {
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-foreground/90 font-mono text-[11px]">
+            {FILE_ICON}
+            <span className="font-medium">{path}</span>
+            {(start != null || end != null) && (
+              <span className="text-muted-foreground/60">
+                {start != null && end != null ? `L${start}-${end}` : start != null ? `L${start}` : end != null ? `L${end}` : ''}
+              </span>
+            )}
+          </div>
+          {output != null && (
+            <ScrollArea className="rounded border border-border/40 bg-muted/20 max-h-[300px]">
+              <pre className="p-3 text-foreground/80 font-mono text-[11px] whitespace-pre-wrap wrap-break-word">
+                {typeof output === 'string' ? output : JSON.stringify(output, null, 2)}
+              </pre>
+            </ScrollArea>
+          )}
+        </div>
+      )
+    }
+  }
+
+  return null
+}
+
 export function Tool({
   name,
   status,
@@ -274,21 +388,25 @@ export function Tool({
                   <p className="font-medium text-muted-foreground/60 text-[10px] uppercase tracking-wider">
                     Output
                   </p>
-                  <ScrollArea className="rounded-lg border border-border/40 bg-muted/20 max-h-[400px]">
-                    <pre className="p-3.5 text-foreground/80 leading-relaxed font-mono text-[11px] whitespace-pre-wrap wrap-break-word">
-                      {showFullOutput ? fullOutputText : truncatedOutput}
-                    </pre>
-                  </ScrollArea>
-                  {isOutputTruncated && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setShowFullOutput(!showFullOutput)
-                      }}
-                      className="text-[10px] text-primary/70 hover:text-primary transition-colors"
-                    >
-                      {showFullOutput ? 'Show less' : 'Show more'}
-                    </button>
+                  {renderToolOutput(name, input, output) ?? (
+                    <>
+                      <ScrollArea className="rounded-lg border border-border/40 bg-muted/20 max-h-[400px]">
+                        <pre className="p-3.5 text-foreground/80 leading-relaxed font-mono text-[11px] whitespace-pre-wrap wrap-break-word">
+                          {showFullOutput ? fullOutputText : truncatedOutput}
+                        </pre>
+                      </ScrollArea>
+                      {isOutputTruncated && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setShowFullOutput(!showFullOutput)
+                          }}
+                          className="text-[10px] text-primary/70 hover:text-primary transition-colors"
+                        >
+                          {showFullOutput ? 'Show less' : 'Show more'}
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               )}
