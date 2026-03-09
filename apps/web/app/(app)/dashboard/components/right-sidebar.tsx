@@ -10,6 +10,7 @@ import {
   SheetDescription,
 } from '@ship/ui'
 import { OverviewTab } from '@/components/chat/session-panel/overview-tab'
+import { GitTab } from '@/components/chat/session-panel/git-tab'
 import type { SessionPanelData, RightSidebarTab } from '../types'
 
 const TABS: { id: RightSidebarTab; label: string }[] = [
@@ -207,11 +208,7 @@ function TabContent({
 }) {
   switch (activeTab) {
     case 'git':
-      return (
-        <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-          Code changes pushed to branch will appear here
-        </div>
-      )
+      return <GitTab diffs={data.fileDiffs} sessionInfo={data.sessionInfo ?? undefined} />
     case 'desktop':
       return (
         <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
