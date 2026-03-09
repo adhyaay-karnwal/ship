@@ -9,6 +9,7 @@ import git from './routes/git'
 import models from './routes/models'
 import accounts from './routes/accounts'
 import connectors from './routes/connectors'
+import terminal from './routes/terminal'
 import type { Env } from './env.d'
 
 const app = new Hono<{ Bindings: Env }>()
@@ -40,6 +41,7 @@ app.route('/git', git)
 app.route('/models', models)
 app.route('/accounts', accounts)
 app.route('/connectors', connectors)
+app.route('/terminal', terminal)
 
 // Root endpoint
 app.get('/', (c) => {

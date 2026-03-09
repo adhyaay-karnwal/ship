@@ -19,7 +19,7 @@ import {
   useIsMobile,
 } from '@ship/ui'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { PanelRightIcon, Settings01Icon, Logout01Icon } from '@hugeicons/core-free-icons'
+import { Settings01Icon, Logout01Icon } from '@hugeicons/core-free-icons'
 import type { WebSocketStatus } from '@/lib/websocket'
 import { ClientOnly } from '@/components/client-only'
 
@@ -118,7 +118,10 @@ export function DashboardHeader({
             className="p-1.5 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors"
             title={rightSidebarOpen ? 'Hide context panel' : 'Show context panel'}
           >
-            <HugeiconsIcon icon={PanelRightIcon} className="size-4" strokeWidth={2} />
+            <svg className="size-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M15 3v18" />
+            </svg>
           </button>
         )}
 

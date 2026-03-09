@@ -70,26 +70,15 @@ function MaximizeIcon({ className }: { className?: string }) {
 function PanelToggleIcon({ className }: { className?: string }) {
   return (
     <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
       className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      viewBox="0 0 24 24"
       aria-hidden="true"
     >
-      <rect
-        x="0.5"
-        y="2"
-        width="15"
-        height="12"
-        rx="1.5"
-        ry="1.5"
-        stroke="currentColor"
-        strokeWidth="1"
-        fill="none"
-      />
-      <rect x="10" y="4" width="3.5" height="8" rx="0.5" fill="currentColor" opacity="1" />
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M15 3v18" />
     </svg>
   )
 }
