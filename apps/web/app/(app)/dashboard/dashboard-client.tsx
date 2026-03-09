@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { useIsMobile } from '@ship/ui'
 import { useGitHubRepos } from '@/lib/api/hooks/use-repos'
 import { useGitHubBranches } from '@/lib/api/hooks/use-branches'
-import { useModels, useDefaultModel } from '@/lib/api/hooks/use-models'
+import { useModels, useDefaultModel, useSessionModel } from '@/lib/api/hooks/use-models'
 import { useAgents, useDefaultAgent } from '@/lib/api/hooks/use-agents'
 import { useDefaultRepo } from '@/lib/api/hooks/use-default-repo'
 import { useCreateSession, useDeleteSession, useSessions } from '@/lib/api/hooks/use-sessions'
@@ -65,6 +65,7 @@ export function DashboardClient({
   const { defaultRepoFullName, isLoading: defaultRepoLoading } = useDefaultRepo(userId)
   const { createSession, isCreating } = useCreateSession()
   const { deleteSession } = useDeleteSession()
+  const { sessionModelId } = useSessionModel(chat.activeSessionId ?? undefined)
   const {
     sessions: swrSessions,
     mutate: mutateSessions,
@@ -156,12 +157,47 @@ export function DashboardClient({
 
   modeRef.current = state.mode
 
+  const activeSession = chat.activeSessionId
+    ? chat.localSessions.find((session) => session.id === chat.activeSessionId) ?? null
+    : null
+
+  const activeSessionAgent =
+    chat.activeSessionId
+      ? agents.find(
+          (agent) =>
+            agent.id === chat.sessionInfo?.agentType ||
+            (!!sessionModelId && agent.models.some((model) => model.id === sessionModelId)),
+        ) ?? null
+      : state.selectedAgent
+
+  const activeSessionModel =
+    chat.activeSessionId
+      ? models.find((model) => model.id === sessionModelId) ?? null
+      : state.selectedModel
+
   const rightSidebarData: SessionPanelData | null = chat.activeSessionId
     ? {
         sessionId: chat.activeSessionId,
-        selectedRepo: state.selectedRepo,
-        selectedAgent: state.selectedAgent,
-        selectedModel: state.selectedModel,
+        selectedRepo: activeSession
+          ? {
+              id: -1,
+              name: activeSession.repoName,
+              fullName: `${activeSession.repoOwner}/${activeSession.repoName}`,
+              owner: activeSession.repoOwner,
+              private: false,
+              description: null,
+            }
+          : state.selectedRepo,
+        selectedAgent: activeSessionAgent
+          ? { id: activeSessionAgent.id, name: activeSessionAgent.name }
+          : null,
+        selectedModel: activeSessionModel
+          ? {
+              id: activeSessionModel.id,
+              name: activeSessionModel.name,
+              provider: activeSessionModel.provider,
+            }
+          : null,
         mode: state.mode,
         lastStepCost: chat.lastStepCost,
         totalCost: chat.totalCost,

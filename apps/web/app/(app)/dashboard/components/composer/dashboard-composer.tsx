@@ -64,15 +64,10 @@ export function DashboardComposer({ context, compactLayout = false }: DashboardC
 
             {/* Bottom bar inside the card: selectors left, actions right */}
             <div className="flex items-center gap-1 px-3 h-[42px]">
-              <div className="flex-shrink min-w-0 overflow-hidden">
-                <ClientOnly>
-                  <AgentModelSelector />
-                </ClientOnly>
-              </div>
-              {activeSessionId && (
-                <div className="ml-2">
+              {!activeSessionId && (
+                <div className="shrink min-w-0 overflow-hidden">
                   <ClientOnly>
-                    <ComposerRepoSelector />
+                    <AgentModelSelector />
                   </ClientOnly>
                 </div>
               )}
@@ -82,7 +77,7 @@ export function DashboardComposer({ context, compactLayout = false }: DashboardC
                 </ClientOnly>
               </div>
               <div className="flex-1" />
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center gap-2 shrink-0">
                 <SubmitButton />
               </div>
             </div>
