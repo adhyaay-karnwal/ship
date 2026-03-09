@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@ship/ui'
 import type { ChatSession } from '@/lib/api/server'
+import { getSessionDisplayTitle, getSessionRepoLabel } from '@/lib/session-display'
 
 function formatRelativeTime(timestamp: number): string {
   const seconds = Math.floor(Date.now() / 1000 - timestamp)
@@ -132,8 +133,8 @@ function SessionRow({
   onDelete,
   onCancelDelete,
 }: SessionRowProps) {
-  const sessionName = session.title || session.repoName
-  const repoPath = `${session.repoOwner}/${session.repoName}`
+  const sessionName = getSessionDisplayTitle(session) || session.repoName
+  const repoPath = getSessionRepoLabel(session) || session.repoName
 
   return (
     <div className="group/item relative flex items-stretch gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/40">

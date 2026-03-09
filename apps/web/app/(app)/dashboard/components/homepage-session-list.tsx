@@ -3,6 +3,7 @@
 import { useCallback } from 'react'
 import { cn } from '@ship/ui'
 import type { ChatSession } from '@/lib/api/server'
+import { getSessionDisplayTitle, getSessionRepoLabel } from '@/lib/session-display'
 import { useSessionStatusStore, type SessionLiveStatus } from '../hooks/use-session-status-store'
 
 function formatRelativeTime(timestamp: number): string {
@@ -127,8 +128,8 @@ function HomepageSessionCard({
   const { getStatus } = useSessionStatusStore()
   const liveStatus = getStatus(session.id)
 
-  const title = session.title || session.repoName
-  const repoPath = `${session.repoOwner}/${session.repoName}`
+  const title = getSessionDisplayTitle(session) || session.repoName
+  const repoPath = getSessionRepoLabel(session) || session.repoName
 
   // Determine if this session is actively running
   const isLive = liveStatus?.isRunning || (isStreaming && isActive)

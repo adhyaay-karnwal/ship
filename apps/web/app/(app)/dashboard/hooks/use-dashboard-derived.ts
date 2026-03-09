@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react'
 import type { ModelInfo, AgentInfo, GitHubRepo } from '@/lib/api/types'
+import { getSessionDisplayTitle, getSessionRepoLabel } from '@/lib/session-display'
 import type { useDashboardChat } from './use-dashboard-chat'
 import type { useDashboardState } from './use-dashboard-state'
 import type { ComposerContextValue } from '../components/composer/composer-context'
@@ -58,26 +59,33 @@ export function useDashboardDerived({
     }, {})
   }, [selectedAgent])
 
-  const displayTitle = useMemo(() => {
-    if (chat.sessionInfo?.title) return chat.sessionInfo.title
-    if (chat.sessionTitle) return chat.sessionTitle
-    if (chat.activeSessionId) {
-      const session = chat.localSessions.find((s) => s.id === chat.activeSessionId)
-      if (session?.title) return session.title
-    }
+  const activeSession = useMemo(
+    () => chat.localSessions.find((session) => session.id === chat.activeSessionId),
+    [chat.localSessions, chat.activeSessionId],
+  )
+
+  const fallbackTitle = useMemo(() => {
     const firstUser = chat.messages.find((m) => m.role === 'user')
     if (firstUser?.content) {
       const trimmed = firstUser.content.trim()
       if (trimmed) return trimmed.length > 60 ? `${trimmed.slice(0, 57)}...` : trimmed
     }
     return undefined
+  }, [chat.messages])
+
+  const displayTitle = useMemo(() => {
+    return getSessionDisplayTitle(activeSession, {
+      preferredTitle: chat.sessionInfo?.title || chat.sessionTitle,
+      fallbackTitle,
+    })
   }, [
+    activeSession,
     chat.sessionInfo?.title,
     chat.sessionTitle,
-    chat.activeSessionId,
-    chat.localSessions,
-    chat.messages,
+    fallbackTitle,
   ])
+
+  const displayRepoLabel = useMemo(() => getSessionRepoLabel(activeSession), [activeSession])
 
   const canSubmit = Boolean(
     chat.activeSessionId ? prompt.trim() && !chat.isStreaming : selectedRepo && prompt.trim() && !isCreating,
@@ -151,6 +159,7 @@ export function useDashboardDerived({
 
   return {
     displayTitle,
+    displayRepoLabel,
     canSubmit,
     composerContext,
     groupedByProvider,

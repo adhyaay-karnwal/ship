@@ -19,6 +19,7 @@ export interface DashboardMainColumnProps {
   header: {
     activeSessionId: string | null
     displayTitle?: string
+    displayRepoLabel?: string
     wsStatus: WebSocketStatus
     sandboxStatus: string | null
   }
@@ -67,7 +68,7 @@ export function DashboardMainColumn({
   rightSidebarData,
   agentLabel = 'Ship',
 }: DashboardMainColumnProps) {
-  const { activeSessionId, displayTitle, wsStatus, sandboxStatus } = header
+  const { activeSessionId, displayTitle, displayRepoLabel, wsStatus, sandboxStatus } = header
   const messagesProps = {
     activeSessionId,
     messages: messagesCtx.messages,
@@ -86,11 +87,11 @@ export function DashboardMainColumn({
         <DashboardHeader
           activeSessionId={activeSessionId}
           sessionTitle={displayTitle}
+          repoLabel={displayRepoLabel}
           wsStatus={wsStatus}
           sandboxStatus={sandboxStatus ?? undefined}
           rightSidebarOpen={rightSidebar.desktopOpen}
           onToggleRightSidebar={rightSidebar.toggle}
-          showBackButton={true}
           user={user}
         />
 

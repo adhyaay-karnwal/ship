@@ -198,6 +198,7 @@ export function DashboardClient({
         header={{
           activeSessionId: chat.activeSessionId,
           displayTitle: derived.displayTitle,
+          displayRepoLabel: derived.displayRepoLabel,
           wsStatus: chat.wsStatus,
           sandboxStatus: chat.sandboxStatus,
         }}

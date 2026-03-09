@@ -19,18 +19,18 @@ import {
   useIsMobile,
 } from '@ship/ui'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { PanelRightIcon, Settings01Icon, Logout01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons'
+import { PanelRightIcon, Settings01Icon, Logout01Icon } from '@hugeicons/core-free-icons'
 import type { WebSocketStatus } from '@/lib/websocket'
 import { ClientOnly } from '@/components/client-only'
 
 interface DashboardHeaderProps {
   activeSessionId: string | null
   sessionTitle?: string
+  repoLabel?: string
   wsStatus: WebSocketStatus
   sandboxStatus?: string
   rightSidebarOpen?: boolean
   onToggleRightSidebar?: () => void
-  showBackButton?: boolean
   user?: {
     username: string
     avatarUrl: string | null
@@ -48,11 +48,11 @@ const sandboxStatusConfig: Record<string, { label: string; color: string; pulse?
 export function DashboardHeader({
   activeSessionId,
   sessionTitle,
+  repoLabel,
   wsStatus,
   sandboxStatus,
   rightSidebarOpen,
   onToggleRightSidebar,
-  showBackButton,
   user,
 }: DashboardHeaderProps) {
   const { theme, setTheme } = useTheme()
@@ -72,21 +72,17 @@ export function DashboardHeader({
       {showSidebarTrigger && (
         <SidebarTrigger className="size-5 cursor-pointer text-muted-foreground hover:text-foreground shrink-0" />
       )}
-      {/* Back button + Session title */}
+      {/* Active session title */}
       {activeSessionId && (
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          {showBackButton && (
-            <button
-              onClick={() => (window.location.href = '/')}
-              className="shrink-0 p-1 -ml-1 text-muted-foreground hover:text-foreground"
-              aria-label="Back to home"
-            >
-              <HugeiconsIcon icon={ArrowLeft01Icon} className="size-5" />
-            </button>
-          )}
-          <span className="font-medium truncate text-xs sm:text-sm">
+        <div className="min-w-0 flex-1">
+          <div className="font-medium truncate text-xs sm:text-sm">
             {sessionTitle || 'Untitled session'}
-          </span>
+          </div>
+          {repoLabel && (
+            <div className="truncate text-[11px] text-muted-foreground mt-0.5">
+              {repoLabel}
+            </div>
+          )}
         </div>
       )}
 

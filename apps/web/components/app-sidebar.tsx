@@ -37,6 +37,7 @@ import {
 } from '@ship/ui'
 import { ChatSearchCommand } from './chat-search-command'
 import { ClientOnly } from './client-only'
+import { getSessionDisplayTitle } from '@/lib/session-display'
 
 interface User {
   id: string
@@ -121,8 +122,9 @@ function SessionItem({
 }) {
   const isCurrent = currentSessionId === session.id
   const isCurrentAndStreaming = isStreaming && isCurrent
-  const sessionTitle = isCurrent && currentSessionTitle ? currentSessionTitle : session.title || null
-  const displayTitle = sessionTitle || session.repoName
+  const displayTitle = getSessionDisplayTitle(session, {
+    preferredTitle: isCurrent ? currentSessionTitle : undefined,
+  }) || session.repoName
 
   return (
     <div className="relative group/item">
@@ -454,7 +456,9 @@ export function AppSidebar({
                         className="flex items-baseline justify-between gap-2 px-2 py-1.5 rounded-md text-muted-foreground/50 hover:bg-sidebar-accent hover:text-muted-foreground transition-colors"
                       >
                         <span className="text-xs truncate">
-                          {session.repoOwner}/{session.repoName}
+                          {getSessionDisplayTitle(session, {
+                            fallbackTitle: `${session.repoOwner}/${session.repoName}`,
+                          })}
                         </span>
                         <span className="text-[10px] text-muted-foreground/30 shrink-0">
                           {formatRelativeTime(session.archivedAt ?? session.lastActivity)}
