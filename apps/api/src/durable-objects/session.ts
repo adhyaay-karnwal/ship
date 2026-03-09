@@ -982,10 +982,14 @@ export class SessionDO extends DurableObject<Env> {
 
   /**
    * WebSocket close handler (required for Hibernation API)
-   * CRITICAL: Must reciprocate close to avoid 1006 errors
+   * CRITICAL: Must reciprocate close to avoid 1006 errors.
+   * Codes 1005, 1006, 1015 are reserved and cannot be sent in close() — skip reciprocation.
    */
   async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
-    // Reciprocate the close
+    const RESERVED_CODES = [1005, 1006, 1015]
+    if (RESERVED_CODES.includes(code) || code < 1000 || code > 4999) {
+      return
+    }
     ws.close(code, reason)
   }
 
