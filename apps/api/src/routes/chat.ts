@@ -833,16 +833,18 @@ app.post('/:sessionId', async (c) => {
           }
         }
 
-        // Persist assistant message
+        // Persist assistant message with parts (reasoning, tools) for reload
         const assistantContent = translator.accumulatedText
-        if (assistantContent) {
+        const parts = translator.getAccumulatedParts()
+        if (assistantContent || parts !== '[]') {
           await stub.fetch(
             new Request(`${doUrl}/messages`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 role: 'assistant',
-                content: assistantContent,
+                content: assistantContent || '',
+                parts: parts !== '[]' ? parts : undefined,
               }),
             }),
           )

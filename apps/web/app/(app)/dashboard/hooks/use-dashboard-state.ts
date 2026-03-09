@@ -191,6 +191,9 @@ export function useDashboardState({ chat, handleSend, session, data }: UseDashbo
         })
 
         if (newSession) {
+          const trimmedPrompt = prompt.trim()
+          const initialTitle =
+            trimmedPrompt.length > 60 ? `${trimmedPrompt.slice(0, 57)}...` : trimmedPrompt
           const newSessionData: ChatSession = {
             id: newSession.id,
             userId,
@@ -201,6 +204,7 @@ export function useDashboardState({ chat, handleSend, session, data }: UseDashbo
             createdAt: Math.floor(Date.now() / 1000),
             archivedAt: null,
             messageCount: 0,
+            title: initialTitle || newSession.title,
             model: newSession.model ?? data.model ?? selectedModel?.id,
             agentType: newSession.agentType ?? selectedAgent?.id,
           }
@@ -209,7 +213,6 @@ export function useDashboardState({ chat, handleSend, session, data }: UseDashbo
 
           // Fire-and-forget: send the prompt to the server without navigating.
           // The agent runs server-side; the session list polls for live status.
-          const trimmedPrompt = prompt.trim()
           if (trimmedPrompt) {
             setPrompt('')
             // Stream SSE in background to track live status without navigating

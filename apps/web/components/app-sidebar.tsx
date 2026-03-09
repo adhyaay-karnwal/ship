@@ -11,8 +11,6 @@ import {
   Logout01Icon,
   Cancel01Icon,
   Add01Icon,
-  DashboardSquare01Icon,
-  FilterIcon,
 } from '@hugeicons/core-free-icons'
 import { useDeleteSession, type ChatSession } from '@/lib/api'
 import { cn } from '@ship/ui/utils'
@@ -26,7 +24,9 @@ import {
   SidebarTrigger,
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   DropdownMenuSub,
@@ -34,6 +34,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuCheckboxItem,
 } from '@ship/ui'
 import { ChatSearchCommand } from './chat-search-command'
 import { ClientOnly } from './client-only'
@@ -84,6 +85,29 @@ function FolderIcon({ className }: { className?: string }) {
       strokeLinejoin="round"
     >
       <path d="M3 7a2 2 0 0 1 2-2h3.586a1 1 0 0 1 .707.293L10.707 6.7A1 1 0 0 0 11.414 7H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+    </svg>
+  )
+}
+
+// List filter icon (lucide-list-filter)
+function ListFilterIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M3 6h18" />
+      <path d="M7 12h10" />
+      <path d="M10 18h4" />
     </svg>
   )
 }
@@ -205,15 +229,10 @@ export function AppSidebar({
   // collapsedRepos: keys of repos that are manually collapsed (default = all expanded)
   const [collapsedRepos, setCollapsedRepos] = useState<Set<string>>(new Set())
   const [archiveExpanded, setArchiveExpanded] = useState(false)
-  const [groupByRepo, setGroupByRepo] = useState(false)
-  const [showFilterDropdown, setShowFilterDropdown] = useState(false)
+  const [groupBy, setGroupBy] = useState<'none' | 'project' | 'date' | 'status'>('none')
+  const [compact, setCompact] = useState(true)
 
-  useEffect(() => {
-    if (!showFilterDropdown) return
-    const handleClickOutside = () => setShowFilterDropdown(false)
-    document.addEventListener('click', handleClickOutside)
-    return () => document.removeEventListener('click', handleClickOutside)
-  }, [showFilterDropdown])
+  const groupByRepo = groupBy === 'project'
 
   const toggleRepo = (key: string) => {
     setCollapsedRepos((prev) => {
@@ -310,53 +329,78 @@ export function AppSidebar({
       <div className="flex-1 overflow-y-auto">
         {/* Sessions header with filter dropdown */}
         <div className="px-3 py-2 flex items-center justify-between group-data-[collapsible=icon]:hidden">
-          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">Agents</span>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-              className={cn(
-                'p-1 rounded transition-colors cursor-pointer',
-                groupByRepo
-                  ? 'bg-sidebar-accent text-foreground'
-                  : 'text-muted-foreground/40 hover:text-muted-foreground hover:bg-sidebar-accent/50',
-              )}
-              title="Filter"
-            >
-              <HugeiconsIcon icon={FilterIcon} strokeWidth={2} className="size-3.5" />
-            </button>
-            {showFilterDropdown && (
-              <div className="absolute right-0 top-full mt-1 w-36 bg-sidebar border border-sidebar-border rounded-md shadow-lg py-1 z-50">
+          <span className="text-[11px] font-medium text-muted-foreground/60">Agents</span>
+          <ClientOnly
+            fallback={
+              <button
+                type="button"
+                className="p-1 rounded text-muted-foreground/40"
+                aria-label="Filter"
+              >
+                <ListFilterIcon className="size-3.5 text-muted-foreground" />
+              </button>
+            }
+          >
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
                 <button
                   type="button"
-                  onClick={() => {
-                    setGroupByRepo(false)
-                    setShowFilterDropdown(false)
-                  }}
                   className={cn(
-                    'w-full px-2 py-1.5 text-left text-sm hover:bg-sidebar-accent cursor-pointer',
-                    !groupByRepo && 'bg-sidebar-accent',
+                    'p-1 rounded transition-colors cursor-pointer',
+                    groupByRepo
+                      ? 'bg-sidebar-accent text-foreground'
+                      : 'text-muted-foreground/40 hover:text-muted-foreground hover:bg-sidebar-accent/50',
                   )}
+                  title="Filter"
+                  aria-label="Filter and group options"
                 >
-                  All sessions
+                  <ListFilterIcon className="size-3.5 text-muted-foreground" />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setGroupByRepo(true)
-                    setShowFilterDropdown(false)
-                  }}
-                  className={cn(
-                    'w-full px-2 py-1.5 text-left text-sm hover:bg-sidebar-accent cursor-pointer flex items-center gap-2',
-                    groupByRepo && 'bg-sidebar-accent',
-                  )}
-                >
-                  <HugeiconsIcon icon={DashboardSquare01Icon} className="size-4" />
-                  Group by repo
-                </button>
-              </div>
-            )}
-          </div>
+              }
+            />
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Group</DropdownMenuLabel>
+                <DropdownMenuRadioGroup value={groupBy} onValueChange={(v) => setGroupBy(v as typeof groupBy)}>
+                <DropdownMenuRadioItem value="project" className="cursor-pointer">
+                  Project
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="date" className="cursor-pointer">
+                  Date
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="status" className="cursor-pointer">
+                  Status
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="none" className="cursor-pointer">
+                  None
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="cursor-pointer">
+                  Filter
+                  <span className="ml-auto text-muted-foreground text-[10px]">None</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuRadioGroup value="none" onValueChange={() => {}}>
+                    <DropdownMenuRadioItem value="none" className="cursor-pointer">
+                      None
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuCheckboxItem
+                checked={compact}
+                onCheckedChange={(v) => setCompact(v === true)}
+                className="cursor-pointer"
+              >
+                Compact
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          </ClientOnly>
         </div>
 
         {/* Sessions list */}

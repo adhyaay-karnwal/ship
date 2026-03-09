@@ -64,6 +64,7 @@ export function useDashboardDerived({
     [chat.localSessions, chat.activeSessionId],
   )
 
+  // Use first prompt as initial title until AI-generated title arrives from session.updated
   const fallbackTitle = useMemo(() => {
     const firstUser = chat.messages.find((m) => m.role === 'user')
     if (firstUser?.content) {
@@ -78,12 +79,7 @@ export function useDashboardDerived({
       preferredTitle: chat.sessionInfo?.title || chat.sessionTitle,
       fallbackTitle,
     })
-  }, [
-    activeSession,
-    chat.sessionInfo?.title,
-    chat.sessionTitle,
-    fallbackTitle,
-  ])
+  }, [activeSession, chat.sessionInfo?.title, chat.sessionTitle, fallbackTitle])
 
   const displayRepoLabel = useMemo(() => getSessionRepoLabel(activeSession), [activeSession])
 

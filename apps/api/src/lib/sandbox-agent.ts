@@ -277,10 +277,8 @@ export async function createAgentSession(
   if (config.model) {
     try {
       await session.setModel(config.model)
-    } catch (err) {
-      console.warn(
-        `[sandbox-agent] Agent does not support model configuration, using default. Error: ${err instanceof Error ? err.message : err}`,
-      )
+    } catch {
+      // Agent doesn't support session/set_config_option — use default model (expected for opencode)
     }
   }
 
@@ -303,10 +301,8 @@ export async function configureAgentSession(
   if (config.model) {
     try {
       await session.setModel(config.model)
-    } catch (err) {
-      console.warn(
-        `[sandbox-agent] Agent does not support model configuration. Error: ${err instanceof Error ? err.message : err}`,
-      )
+    } catch {
+      // Agent doesn't support session/set_config_option — use default model
     }
   }
 }

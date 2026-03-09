@@ -184,7 +184,15 @@ function HomepageSessionCard({
             ))}
           </div>
         ) : isLive ? (
-          <span className="text-[11px] font-medium text-primary truncate">{currentStatus || 'Starting...'}</span>
+          <div className="flex items-center gap-1.5">
+            <span
+              className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse shrink-0"
+              aria-hidden
+            />
+            <span className="text-[11px] font-medium text-primary truncate">
+              {currentStatus || steps[steps.length - 1] || 'Starting...'}
+            </span>
+          </div>
         ) : isWaitingForUser ? (
           <div className="flex-1 min-h-0 flex items-center justify-center">
             <div className="inline-flex items-center rounded-full font-medium px-2 py-0.5 text-sm gap-1.5 bg-muted text-muted-foreground">

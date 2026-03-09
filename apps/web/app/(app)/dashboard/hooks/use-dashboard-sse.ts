@@ -2,7 +2,8 @@
 
 import { useCallback, useRef } from 'react'
 import { sendChatMessage } from '@/lib/api/server'
-import { parseSSEEvent } from '@/lib/sse-parser'
+import { parseSSEEvent, getEventStatus, extractTextDelta } from '@/lib/sse-parser'
+import { sessionStatusStore } from './use-session-status-store'
 import {
   type UIMessage,
   createUserMessage,
@@ -48,6 +49,7 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
     setSessionInfo,
     setAgentSessionId,
     updateSessionTitle,
+    updateSessionTitleIfEmpty,
     streamingMessageRef,
     assistantTextRef,
     reasoningRef,
@@ -104,8 +106,16 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
       )
       const accumulateSetupStepsRef = { current: !hasCompletedAssistant }
       setStreamingStatus('Preparing...', accumulateSetupStepsRef.current)
+      sessionStatusStore.update(targetSessionId, {
+        isRunning: true,
+        status: 'Preparing...',
+        steps: [],
+        contentPreview: '',
+      })
 
       const userMessage = createUserMessage(content)
+      const isFirstUserMessage = !messagesRef.current.some((m) => m.role === 'user')
+      if (isFirstUserMessage) updateSessionTitleIfEmpty(targetSessionId, content)
       setMessages((prev) => [...prev, userMessage])
 
       const assistantMessage = createAssistantPlaceholder()
@@ -147,6 +157,7 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
             return [...filtered, createErrorMessage(errorContent, category, retryable)]
           })
 
+          sessionStatusStore.update(targetSessionId, { isRunning: false, status: 'Error' })
           setIsStreaming(false)
           setStreamingStatus('')
           streamingMessageRef.current = null
@@ -185,9 +196,21 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
                 if (!event) continue
 
                 switch (event.type) {
-                  case 'message.part.updated':
+                  case 'message.part.updated': {
                     handleMessagePartUpdated(event as any, ctx, scheduleFlush)
+                    const textDelta = extractTextDelta(event as any)
+                    if (textDelta) {
+                      sessionStatusStore.update(targetSessionId, {
+                        contentPreview: ctx.assistantTextRef.current,
+                      })
+                    }
+                    const eventStatus = getEventStatus(event as any)
+                    if (eventStatus) {
+                      sessionStatusStore.update(targetSessionId, { status: eventStatus.label })
+                      sessionStatusStore.addStep(targetSessionId, eventStatus.label)
+                    }
                     break
+                  }
 
                   case 'message.updated':
                     break
@@ -254,16 +277,24 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
                     break
 
                   case 'done':
-                  case 'session.idle':
+                  case 'session.idle': {
                     handleDoneOrIdle(ctx, streamStartTimeRef)
+                    sessionStatusStore.update(targetSessionId, {
+                      isRunning: false,
+                      status: 'Done',
+                      contentPreview: ctx.assistantTextRef.current || undefined,
+                    })
                     break
+                  }
 
                   case 'session.error':
                     handleSessionError((event as any).properties.error, ctx)
+                    sessionStatusStore.update(targetSessionId, { isRunning: false, status: 'Error' })
                     break
 
                   case 'error':
                     handleGenericError((event as any).error, ctx)
+                    sessionStatusStore.update(targetSessionId, { isRunning: false, status: 'Error' })
                     break
 
                   case 'status':
@@ -272,6 +303,8 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
                     const msg = ev.message ?? ev.status
                     if (typeof msg === 'string') {
                       ctx.setStreamingStatus(msg, ctx.accumulateSetupStepsRef.current)
+                      sessionStatusStore.update(targetSessionId, { status: msg })
+                      sessionStatusStore.addStep(targetSessionId, msg)
                     }
                     break
                   }
@@ -300,8 +333,17 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
             }
           }
         }
+        const current = sessionStatusStore.get(targetSessionId)
+        if (current?.isRunning) {
+          sessionStatusStore.update(targetSessionId, {
+            isRunning: false,
+            status: 'Done',
+            contentPreview: ctx.assistantTextRef.current || undefined,
+          })
+        }
       } catch (err) {
         console.error('Chat error:', err)
+        sessionStatusStore.update(targetSessionId, { isRunning: false, status: 'Error' })
 
         setMessages((prev) => {
           const filtered = prev.filter((m) => m.id !== streamingMessageRef.current)

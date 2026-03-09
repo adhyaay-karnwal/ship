@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { SessionInfo } from '@/lib/sse-types'
 import type { TodoItem, FileDiff, StepCostInfo } from '../types'
+import { sessionStatusStore } from './use-session-status-store'
 
 export function useSessionPersistence(activeSessionId: string | null) {
   const [agentUrl, setAgentUrl] = useState<string>('')
@@ -35,6 +36,27 @@ export function useSessionPersistence(activeSessionId: string | null) {
     setStreamingStatusSteps([])
     streamingStatusStepsRef.current = []
   }, [])
+
+  // Sync from sessionStatusStore when navigating to a session that's already streaming
+  // (e.g. created from homepage with streamSessionInBackground)
+  useEffect(() => {
+    if (!activeSessionId) return
+    const syncFromStore = () => {
+      const live = sessionStatusStore.get(activeSessionId)
+      if (live?.isRunning && (live.status || live.steps.length > 0)) {
+        if (live.status) setStreamingStatus(live.status)
+        if (live.steps.length > 0) {
+          setStreamingStatusSteps(live.steps)
+          streamingStatusStepsRef.current = live.steps
+        }
+      }
+    }
+    syncFromStore()
+    const unsubscribe = sessionStatusStore.subscribe(syncFromStore)
+    return () => {
+      unsubscribe()
+    }
+  }, [activeSessionId])
 
   // Restore persisted sidebar data from localStorage when session changes
   useEffect(() => {
