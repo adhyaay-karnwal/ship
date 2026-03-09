@@ -148,10 +148,10 @@ function HomepageSessionCard({
         isLive && 'border-primary/30',
       )}
     >
-      {/* Left preview panel */}
+      {/* Left preview panel — tall square like Cursor */}
       <div
         className={cn(
-          'shrink-0 w-[140px] rounded-l-xl flex flex-col items-center justify-center gap-1.5 p-3 border-r border-border/30',
+          'shrink-0 w-[160px] min-h-[100px] rounded-l-xl flex flex-col items-center justify-end gap-1.5 p-4 border-r border-border/30',
           isLive ? 'bg-primary/5' : 'bg-muted/20',
         )}
       >
@@ -203,9 +203,9 @@ function HomepageSessionCard({
       </div>
 
       {/* Right content */}
-      <div className="flex-1 min-w-0 p-3 flex flex-col justify-center">
-        <div className="text-sm font-medium text-foreground truncate leading-tight">{title}</div>
-        <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
+      <div className="flex-1 min-w-0 p-4 flex flex-col justify-center">
+        <div className="text-base font-medium text-foreground truncate leading-tight">{title}</div>
+        <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
           {isLive && (
             <span className="flex items-center gap-1 text-primary">
               <span className="relative flex h-1.5 w-1.5">
