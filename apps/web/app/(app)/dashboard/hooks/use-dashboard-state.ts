@@ -265,9 +265,9 @@ export function useDashboardState({ chat, handleSend, session, data }: UseDashbo
     (session: ChatSession) => {
       chat.setActiveSessionId(session.id)
       chat.connectWebSocket(session.id)
-      window.history.replaceState({}, '', `/session/${session.id}`)
+      router.push(`/session/${session.id}`)
     },
-    [chat],
+    [chat, router],
   )
 
   const handleDeleteSession = useCallback(

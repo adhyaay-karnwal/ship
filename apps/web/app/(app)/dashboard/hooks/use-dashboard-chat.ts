@@ -141,14 +141,15 @@ export function useDashboardChat(
     getChatMessages(activeSessionId, { limit: 100 })
       .then((apiMessages) => {
         const uiMessages = mapApiMessagesToUI(apiMessages)
-        setMessages((prev) => {
-          if (prev.length > 0) return prev
-          return uiMessages
-        })
+        setMessages(uiMessages)
       })
       .catch((err) => {
         console.error('Failed to load messages:', err)
       })
+
+    return () => {
+      historyLoadedRef.current = null
+    }
   }, [activeSessionId])
 
   const handleStop = useCallback(async () => {
