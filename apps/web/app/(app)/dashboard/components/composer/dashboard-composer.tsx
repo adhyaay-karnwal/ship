@@ -29,7 +29,7 @@ export function DashboardComposer({ context, compactLayout = false }: DashboardC
             ? 'mt-auto pb-3 px-3 sm:pb-4 sm:px-6'
             : compactLayout
               ? 'flex flex-col px-3 pt-4 pb-2'
-              : 'absolute inset-0 flex items-start justify-center px-3 sm:px-6 pt-[6vh] sm:pt-[8vh]',
+              : 'flex items-start justify-center px-3 sm:px-6 pt-[6vh] sm:pt-[8vh]',
         )}
       >
         <div
@@ -54,7 +54,7 @@ export function DashboardComposer({ context, compactLayout = false }: DashboardC
               'rounded-2xl border overflow-hidden transition-all',
               activeSessionId
                 ? 'bg-card/95 backdrop-blur-sm border-border/40 shadow-md focus-within:border-border/60 focus-within:shadow-lg'
-                : 'rounded-3xl bg-card border-border/50 shadow-lg focus-within:shadow-xl focus-within:ring-2 focus-within:ring-foreground/10',
+                : 'rounded-3xl bg-card border-border/50 focus-within:ring-2 focus-within:ring-foreground/10',
             )}
           >
             {/* Textarea */}

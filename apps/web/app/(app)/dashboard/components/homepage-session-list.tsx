@@ -73,8 +73,8 @@ export function HomepageSessionList({
   if (activeSessions.length === 0) return null
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-6 pb-6 pt-2">
-      <div className="max-w-[540px] mx-auto sm:max-w-3xl">
+    <div className="px-3 sm:px-6 pb-6 pt-2">
+      <div className="max-w-2xl mx-auto">
         {groupSessionsByTime(activeSessions).map((group) => (
           <div key={group.label} className="mb-6">
             <h3 className="text-xs font-medium text-muted-foreground mb-2 sticky top-0 bg-background py-1 z-10">

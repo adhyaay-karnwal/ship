@@ -136,10 +136,8 @@ export function DashboardMainColumn({
                 <DashboardComposer context={composer.context} />
               </>
             ) : (
-              <>
-                <div className="shrink-0">
-                  <DashboardComposer context={composer.context} />
-                </div>
+              <div className="flex-1 overflow-y-auto">
+                <DashboardComposer context={composer.context} />
                 <HomepageSessionList
                   sessions={sessions.localSessions}
                   activeSessionId={activeSessionId}
@@ -150,7 +148,7 @@ export function DashboardMainColumn({
                   onSessionClick={sessions.onSessionClick}
                   onDeleteSession={sessions.onDeleteSession}
                 />
-              </>
+              </div>
             )}
           </div>
         </div>
