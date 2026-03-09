@@ -9,10 +9,37 @@
  */
 
 import { Hono } from 'hono'
+import { CallToolResultSchema, ListToolsResultSchema } from '@modelcontextprotocol/sdk/types.js'
 import { createVercelMCPServer } from '../lib/mcp/vercel'
 import type { Env } from '../env.d'
 
 const mcp = new Hono<{ Bindings: Env }>()
+
+interface VercelMcpBody {
+  userId?: string
+  jsonrpc?: string
+  id?: string | number | null
+  method?: string
+  params?: unknown
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object'
+}
+
+function isJsonRpcLikeRequest(
+  body: VercelMcpBody,
+): body is VercelMcpBody & { method: string } {
+  return body.jsonrpc === '2.0' && typeof body.method === 'string'
+}
+
+function isCallToolParams(
+  value: unknown,
+): value is { name: string; arguments?: Record<string, unknown> } {
+  if (!isObject(value) || typeof value.name !== 'string') return false
+  if (value.arguments === undefined) return true
+  return isObject(value.arguments)
+}
 
 /**
  * POST /mcp/vercel
@@ -37,11 +64,9 @@ mcp.post('/vercel', async (c) => {
     // Get userId from header (OpenCode MCP) or body (direct API calls)
     const userIdFromHeader = c.req.header('X-User-Id')
     const sessionIdFromHeader = c.req.header('X-Session-Id')
-    const body = await c.req.json<{
-      userId?: string
-      method?: string
-      params?: unknown
-    }>().catch(() => ({})) // Allow empty body for MCP protocol requests
+    const body = await c.req
+      .json<VercelMcpBody>()
+      .catch((): VercelMcpBody => ({})) // Allow empty body for MCP protocol requests
 
     let userId = userIdFromHeader || body.userId
 
@@ -70,48 +95,40 @@ mcp.post('/vercel', async (c) => {
     // OpenCode sends JSON-RPC requests, so we need to parse the body as JSON-RPC
     // If body is a JSON-RPC request, use it directly; otherwise use method/params from body
     
-    let jsonRpcRequest: { jsonrpc: string; id: number; method: string; params?: unknown }
+    let requestMethod = body.method || 'tools/list'
+    let requestId = typeof body.id === 'number' ? body.id : 1
+    let requestParams = body.params
     
     // Check if body is already a JSON-RPC request (from OpenCode MCP)
-    if (body.jsonrpc && body.method) {
-      jsonRpcRequest = body as { jsonrpc: string; id: number; method: string; params?: unknown }
-    } else {
-      // Legacy format: construct JSON-RPC request from method/params
-      jsonRpcRequest = {
-        jsonrpc: '2.0',
-        id: 1,
-        method,
-        params: body.params,
-      }
+    if (isJsonRpcLikeRequest(body)) {
+      requestMethod = body.method
+      requestId = typeof body.id === 'number' ? body.id : 1
+      requestParams = body.params
     }
 
-    if (jsonRpcRequest.method === 'tools/list') {
+    if (requestMethod === 'tools/list') {
       const response = await server.request(
         {
-          jsonrpc: '2.0',
-          id: jsonRpcRequest.id || 1,
           method: 'tools/list',
         },
-        {},
+        ListToolsResultSchema,
       )
       return c.json(response)
-    } else if (jsonRpcRequest.method === 'tools/call') {
-      if (!jsonRpcRequest.params || typeof jsonRpcRequest.params !== 'object') {
+    } else if (requestMethod === 'tools/call') {
+      if (!isCallToolParams(requestParams)) {
         return c.json({ error: 'params required for tools/call' }, 400)
       }
 
       const response = await server.request(
         {
-          jsonrpc: '2.0',
-          id: jsonRpcRequest.id || 1,
           method: 'tools/call',
-          params: jsonRpcRequest.params as { name: string; arguments?: unknown },
+          params: requestParams,
         },
-        {},
+        CallToolResultSchema,
       )
       return c.json(response)
     } else {
-      return c.json({ error: `Unknown method: ${jsonRpcRequest.method}` }, 400)
+      return c.json({ error: `Unknown method: ${requestMethod}`, id: requestId }, 400)
     }
   } catch (error) {
     console.error('Error handling MCP request:', error)

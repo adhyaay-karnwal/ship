@@ -41,6 +41,49 @@ interface ListDeploymentsParams {
   limit?: number
 }
 
+function asObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : null
+}
+
+function requireString(value: unknown, fieldName: string): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error(`${fieldName} is required`)
+  }
+  return value
+}
+
+function parseDeployPreviewParams(value: unknown): DeployPreviewParams {
+  const params = asObject(value)
+  return {
+    branch: requireString(params?.branch, 'branch'),
+    projectId: requireString(params?.projectId, 'projectId'),
+  }
+}
+
+function parseDeployProductionParams(value: unknown): DeployProductionParams {
+  const params = asObject(value)
+  return {
+    branch: requireString(params?.branch, 'branch'),
+    projectId: requireString(params?.projectId, 'projectId'),
+  }
+}
+
+function parseGetDeploymentParams(value: unknown): GetDeploymentParams {
+  const params = asObject(value)
+  return {
+    deploymentId: requireString(params?.deploymentId, 'deploymentId'),
+  }
+}
+
+function parseListDeploymentsParams(value: unknown): ListDeploymentsParams {
+  const params = asObject(value)
+  const limit = typeof params?.limit === 'number' ? params.limit : undefined
+  return {
+    projectId: requireString(params?.projectId, 'projectId'),
+    limit,
+  }
+}
+
 /**
  * Get Vercel access token for user
  * This would be called with userId from the request context
@@ -177,7 +220,7 @@ export function createVercelMCPServer(userId: string, db: D1Database): Server {
 
       switch (name) {
         case 'vercel_deploy_preview': {
-          const params = args as DeployPreviewParams
+          const params = parseDeployPreviewParams(args)
           // TODO: Implement actual Vercel API call
           return {
             content: [
@@ -190,7 +233,7 @@ export function createVercelMCPServer(userId: string, db: D1Database): Server {
         }
 
         case 'vercel_deploy_production': {
-          const params = args as DeployProductionParams
+          const params = parseDeployProductionParams(args)
           // TODO: Implement actual Vercel API call
           return {
             content: [
@@ -203,7 +246,7 @@ export function createVercelMCPServer(userId: string, db: D1Database): Server {
         }
 
         case 'vercel_get_deployment': {
-          const params = args as GetDeploymentParams
+          const params = parseGetDeploymentParams(args)
           // TODO: Implement actual Vercel API call
           return {
             content: [
@@ -216,7 +259,7 @@ export function createVercelMCPServer(userId: string, db: D1Database): Server {
         }
 
         case 'vercel_list_deployments': {
-          const params = args as ListDeploymentsParams
+          const params = parseListDeploymentsParams(args)
           // TODO: Implement actual Vercel API call
           return {
             content: [
