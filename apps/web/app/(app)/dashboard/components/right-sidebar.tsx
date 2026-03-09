@@ -11,6 +11,7 @@ import {
 } from '@ship/ui'
 import { OverviewTab } from '@/components/chat/session-panel/overview-tab'
 import { GitTab } from '@/components/chat/session-panel/git-tab'
+import { DesktopTab } from '@/components/chat/session-panel/desktop-tab'
 import type { SessionPanelData, RightSidebarTab } from '../types'
 
 const TABS: { id: RightSidebarTab; label: string }[] = [
@@ -210,11 +211,7 @@ function TabContent({
     case 'git':
       return <GitTab diffs={data.fileDiffs} sessionInfo={data.sessionInfo ?? undefined} />
     case 'desktop':
-      return (
-        <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-          Could not connect to Desktop
-        </div>
-      )
+      return <DesktopTab agentUrl={data.agentUrl || undefined} />
     case 'terminal':
       return (
         <div className="flex-1 flex items-center justify-center">
