@@ -39,19 +39,8 @@ export interface UseDashboardStateParams {
   }
 }
 
-export function useDashboardState({
-  chat,
-  handleSend,
-  session,
-  data,
-}: UseDashboardStateParams) {
-  const {
-    createSession,
-    deleteSession,
-    userId,
-    user,
-    mutateSessions,
-  } = session
+export function useDashboardState({ chat, handleSend, session, data }: UseDashboardStateParams) {
+  const { createSession, deleteSession, userId, user, mutateSessions } = session
   const {
     repos,
     isCreating,
@@ -145,12 +134,16 @@ export function useDashboardState({
               const eventStatus = getEventStatus(event as any)
               if (eventStatus) {
                 sessionStatusStore.update(sessionId, { status: eventStatus.label })
-                sessionStatusStore.addStep(sessionId, eventStatus.label)
+                // Only add step if it's not a status event (those are handled separately below)
+                if (type !== 'status' && type !== 'session.status') {
+                  sessionStatusStore.addStep(sessionId, eventStatus.label)
+                }
               }
 
               if (type === 'status' || type === 'session.status') {
-                const msg = (event as { message?: string; status?: string }).message
-                  ?? (event as { message?: string; status?: string }).status
+                const msg =
+                  (event as { message?: string; status?: string }).message ??
+                  (event as { message?: string; status?: string }).status
                 if (typeof msg === 'string') {
                   sessionStatusStore.update(sessionId, { status: msg })
                   sessionStatusStore.addStep(sessionId, msg)

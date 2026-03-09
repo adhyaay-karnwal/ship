@@ -132,12 +132,18 @@ function HomepageSessionCard({
 
   // Determine if this session is actively running
   const isLive = liveStatus?.isRunning || (isStreaming && isActive)
-  const currentStatus = liveStatus?.status
-    || (isStreaming && isActive ? (streamingStatus || streamingStatusSteps[streamingStatusSteps.length - 1] || 'Running...') : '')
+  const currentStatus =
+    liveStatus?.status ||
+    (isStreaming && isActive
+      ? streamingStatus || streamingStatusSteps[streamingStatusSteps.length - 1] || 'Running...'
+      : '')
   const steps = liveStatus?.steps || (isStreaming && isActive ? streamingStatusSteps : [])
   const contentPreview = liveStatus?.contentPreview || ''
 
   const timeLabel = isLive ? 'now' : formatRelativeTime(session.lastActivity)
+
+  // Show branch when waiting for user input (not live, not done, not error)
+  const isWaitingForUser = !isLive && !liveStatus?.status && !liveStatus?.contentPreview
 
   return (
     <button
@@ -169,9 +175,7 @@ function HomepageSessionCard({
                 key={i}
                 className={cn(
                   'text-[10px] leading-tight truncate',
-                  i === steps.slice(-4).length - 1
-                    ? 'text-foreground/80 font-medium'
-                    : 'text-muted-foreground/50',
+                  i === steps.slice(-4).length - 1 ? 'text-foreground/80 font-medium' : 'text-muted-foreground/50',
                 )}
               >
                 {step}
@@ -179,22 +183,29 @@ function HomepageSessionCard({
             ))}
           </div>
         ) : isLive ? (
-          <span className="text-[11px] font-medium text-primary truncate">
-            {currentStatus || 'Starting...'}
-          </span>
-        ) : contentPreview ? (
-          <div className="w-full">
-            <p className="text-[10px] leading-tight text-foreground/50 line-clamp-5 whitespace-pre-wrap">
-              {contentPreview.slice(0, 200)}
-            </p>
+          <span className="text-[11px] font-medium text-primary truncate">{currentStatus || 'Starting...'}</span>
+        ) : isWaitingForUser ? (
+          <div className="flex items-center gap-1.5">
+            <svg className="h-3.5 w-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span className="text-[11px] font-medium text-muted-foreground">Branch</span>
           </div>
         ) : liveStatus?.status === 'Done' ? (
-          <div className="flex items-center gap-1.5">
-            <svg className="h-3.5 w-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            <span className="text-[11px] font-medium text-emerald-500">Done</span>
-          </div>
+          contentPreview ? (
+            <div className="w-full">
+              <p className="text-[10px] leading-tight text-foreground/50 line-clamp-5 whitespace-pre-wrap">
+                {contentPreview.slice(0, 200)}
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <svg className="h-3.5 w-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span className="text-[11px] font-medium text-emerald-500">Done</span>
+            </div>
+          )
         ) : liveStatus?.status === 'Error' ? (
           <div className="flex items-center gap-1.5">
             <svg className="h-3.5 w-3.5 text-destructive" fill="none" stroke="currentColor" viewBox="0 0 24 24">

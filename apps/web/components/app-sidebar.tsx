@@ -5,7 +5,15 @@ import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { useTheme } from 'next-themes'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Search01Icon, Settings01Icon, Logout01Icon, Cancel01Icon, Add01Icon } from '@hugeicons/core-free-icons'
+import {
+  Search01Icon,
+  Settings01Icon,
+  Logout01Icon,
+  Cancel01Icon,
+  Add01Icon,
+  DashboardSquare01Icon,
+  FilterIcon,
+} from '@hugeicons/core-free-icons'
 import { useDeleteSession, type ChatSession } from '@/lib/api'
 import { cn } from '@ship/ui/utils'
 import {
@@ -96,6 +104,68 @@ function ChevronIcon({ className }: { className?: string }) {
   )
 }
 
+function SessionItem({
+  session,
+  currentSessionId,
+  currentSessionTitle,
+  isStreaming,
+  deletingSessionId,
+  onDelete,
+}: {
+  session: ChatSession
+  currentSessionId?: string
+  currentSessionTitle?: string
+  isStreaming: boolean
+  deletingSessionId: string | null
+  onDelete: (session: ChatSession) => void
+}) {
+  const isCurrent = currentSessionId === session.id
+  const isCurrentAndStreaming = isStreaming && isCurrent
+  const sessionTitle = isCurrent && currentSessionTitle ? currentSessionTitle : session.title || null
+  const displayTitle = sessionTitle || session.repoName
+
+  return (
+    <div className="relative group/item">
+      <Link
+        href={`/session/${session.id}`}
+        className={cn(
+          'flex items-center gap-2 py-1.5 pr-6 pl-2 rounded-md text-left w-full transition-colors',
+          isCurrent
+            ? 'bg-sidebar-accent text-foreground'
+            : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground',
+        )}
+      >
+        {isCurrentAndStreaming && (
+          <span className="shrink-0 w-2.5 h-2.5 border-[1.5px] border-primary/30 border-t-primary rounded-full animate-spin" />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className={cn('text-xs truncate', isCurrent ? 'font-medium' : 'font-normal')}>{displayTitle}</span>
+            <span className="text-[10px] text-muted-foreground/40 shrink-0">
+              {formatRelativeTime(session.lastActivity)}
+            </span>
+          </div>
+        </div>
+      </Link>
+      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/item:opacity-100">
+        <button
+          type="button"
+          title="Delete session"
+          disabled={deletingSessionId === session.id}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onDelete(session)
+          }}
+          className="p-0.5 rounded hover:bg-muted transition-colors disabled:opacity-30 text-muted-foreground/60 hover:text-foreground"
+        >
+          <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-3" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function AppSidebar({
   sessions,
   user,
@@ -133,6 +203,15 @@ export function AppSidebar({
   // collapsedRepos: keys of repos that are manually collapsed (default = all expanded)
   const [collapsedRepos, setCollapsedRepos] = useState<Set<string>>(new Set())
   const [archiveExpanded, setArchiveExpanded] = useState(false)
+  const [groupByRepo, setGroupByRepo] = useState(false)
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false)
+
+  useEffect(() => {
+    if (!showFilterDropdown) return
+    const handleClickOutside = () => setShowFilterDropdown(false)
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [showFilterDropdown])
 
   const toggleRepo = (key: string) => {
     setCollapsedRepos((prev) => {
@@ -227,92 +306,121 @@ export function AppSidebar({
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {/* Repo-grouped sessions */}
-        <div className="px-2 py-1 group-data-[collapsible=icon]:hidden">
-          {repoEntries.map(([repoKey, repoSessions]) => {
-            const isExpanded = !collapsedRepos.has(repoKey)
-            const repoName = repoKey.split('/')[1] ?? repoKey
-
-            return (
-              <div key={repoKey} className="mb-1">
-                {/* Repo header */}
+        {/* Sessions header with filter dropdown */}
+        <div className="px-3 py-2 flex items-center justify-between group-data-[collapsible=icon]:hidden">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">Agents</span>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+              className={cn(
+                'p-1 rounded transition-colors cursor-pointer',
+                groupByRepo
+                  ? 'bg-sidebar-accent text-foreground'
+                  : 'text-muted-foreground/40 hover:text-muted-foreground hover:bg-sidebar-accent/50',
+              )}
+              title="Filter"
+            >
+              <HugeiconsIcon icon={FilterIcon} strokeWidth={2} className="size-3.5" />
+            </button>
+            {showFilterDropdown && (
+              <div className="absolute right-0 top-full mt-1 w-36 bg-sidebar border border-sidebar-border rounded-md shadow-lg py-1 z-50">
                 <button
                   type="button"
-                  onClick={() => toggleRepo(repoKey)}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-sidebar-accent transition-colors group/repo"
+                  onClick={() => {
+                    setGroupByRepo(false)
+                    setShowFilterDropdown(false)
+                  }}
+                  className={cn(
+                    'w-full px-2 py-1.5 text-left text-sm hover:bg-sidebar-accent cursor-pointer',
+                    !groupByRepo && 'bg-sidebar-accent',
+                  )}
                 >
-                  <FolderIcon className="size-4 shrink-0 text-muted-foreground/60 group-hover/repo:text-muted-foreground transition-colors" />
-                  <span className="text-xs font-medium text-muted-foreground flex-1 truncate">{repoName}</span>
-                  <ChevronIcon
-                    className={cn(
-                      'size-3.5 shrink-0 text-muted-foreground/40 transition-transform duration-150',
-                      isExpanded ? 'rotate-0' : '-rotate-90',
-                    )}
-                  />
+                  All sessions
                 </button>
-
-                {/* Sessions under this repo */}
-                {isExpanded && (
-                  <div className="mt-0.5 ml-3 pl-3 border-l border-sidebar-border/60">
-                    {repoSessions
-                      .sort((a, b) => b.lastActivity - a.lastActivity)
-                      .map((session) => {
-                        const isCurrent = currentSessionId === session.id
-                        const isCurrentAndStreaming = isStreaming && isCurrent
-                        const sessionTitle =
-                          isCurrent && currentSessionTitle ? currentSessionTitle : session.title || null
-                        const displayTitle = sessionTitle || session.repoName
-                        const tooltipText = sessionTitle || `${session.repoOwner}/${session.repoName}`
-
-                        return (
-                          <div key={session.id} className="relative group/item">
-                            <Link
-                              href={`/session/${session.id}`}
-                              className={cn(
-                                'flex items-center gap-2 py-1.5 pr-6 pl-2 rounded-md text-left w-full transition-colors',
-                                isCurrent
-                                  ? 'bg-sidebar-accent text-foreground'
-                                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground',
-                              )}
-                            >
-                              {isCurrentAndStreaming && (
-                                <span className="shrink-0 w-2.5 h-2.5 border-[1.5px] border-primary/30 border-t-primary rounded-full animate-spin" />
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-baseline justify-between gap-2">
-                                  <span className={cn('text-xs truncate', isCurrent ? 'font-medium' : 'font-normal')}>
-                                    {displayTitle}
-                                  </span>
-                                  <span className="text-[10px] text-muted-foreground/40 shrink-0">
-                                    {formatRelativeTime(session.lastActivity)}
-                                  </span>
-                                </div>
-                              </div>
-                            </Link>
-                            {/* Delete action */}
-                            <div className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/item:opacity-100">
-                              <button
-                                type="button"
-                                title="Delete session"
-                                disabled={deletingSessionId === session.id}
-                                onClick={(e) => {
-                                  e.preventDefault()
-                                  e.stopPropagation()
-                                  handleDeleteSession(session)
-                                }}
-                                className="p-0.5 rounded hover:bg-muted transition-colors disabled:opacity-30 text-muted-foreground/60 hover:text-foreground"
-                              >
-                                <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-3" />
-                              </button>
-                            </div>
-                          </div>
-                        )
-                      })}
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGroupByRepo(true)
+                    setShowFilterDropdown(false)
+                  }}
+                  className={cn(
+                    'w-full px-2 py-1.5 text-left text-sm hover:bg-sidebar-accent cursor-pointer flex items-center gap-2',
+                    groupByRepo && 'bg-sidebar-accent',
+                  )}
+                >
+                  <HugeiconsIcon icon={DashboardSquare01Icon} className="size-4" />
+                  Group by repo
+                </button>
               </div>
-            )
-          })}
+            )}
+          </div>
+        </div>
+
+        {/* Sessions list */}
+        <div className="px-2 group-data-[collapsible=icon]:hidden">
+          {groupByRepo ? (
+            /* Grouped by repo view */
+            repoEntries.map(([repoKey, repoSessions]) => {
+              const isExpanded = !collapsedRepos.has(repoKey)
+              const repoName = repoKey.split('/')[1] ?? repoKey
+
+              return (
+                <div key={repoKey} className="mb-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleRepo(repoKey)}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-sidebar-accent transition-colors group/repo"
+                  >
+                    <FolderIcon className="size-4 shrink-0 text-muted-foreground/60 group-hover/repo:text-muted-foreground transition-colors" />
+                    <span className="text-xs font-medium text-muted-foreground flex-1 truncate">{repoName}</span>
+                    <span className="text-[10px] text-muted-foreground/40">{repoSessions.length}</span>
+                    <ChevronIcon
+                      className={cn(
+                        'size-3.5 shrink-0 text-muted-foreground/40 transition-transform duration-150',
+                        isExpanded ? 'rotate-0' : '-rotate-90',
+                      )}
+                    />
+                  </button>
+
+                  {isExpanded && (
+                    <div className="mt-0.5 ml-3 pl-3 border-l border-sidebar-border/60 space-y-0.5">
+                      {repoSessions
+                        .sort((a, b) => b.lastActivity - a.lastActivity)
+                        .map((session) => (
+                          <SessionItem
+                            key={session.id}
+                            session={session}
+                            currentSessionId={currentSessionId}
+                            currentSessionTitle={currentSessionTitle}
+                            isStreaming={isStreaming}
+                            deletingSessionId={deletingSessionId}
+                            onDelete={handleDeleteSession}
+                          />
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })
+          ) : (
+            /* Flat list view */
+            <div className="space-y-0.5">
+              {nonArchived
+                .sort((a, b) => b.lastActivity - a.lastActivity)
+                .map((session) => (
+                  <SessionItem
+                    key={session.id}
+                    session={session}
+                    currentSessionId={currentSessionId}
+                    currentSessionTitle={currentSessionTitle}
+                    isStreaming={isStreaming}
+                    deletingSessionId={deletingSessionId}
+                    onDelete={handleDeleteSession}
+                  />
+                ))}
+            </div>
+          )}
         </div>
 
         {/* Archive section */}

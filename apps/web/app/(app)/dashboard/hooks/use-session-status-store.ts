@@ -40,8 +40,8 @@ function createSessionStatusStore() {
     },
     addStep(sessionId: string, step: string) {
       const existing = statuses.get(sessionId) ?? { status: '', steps: [], isRunning: false }
-      // Keep last 5 steps
-      const steps = [...existing.steps, step].slice(-5)
+      // Keep last 5 steps, avoid duplicates
+      const steps = [...existing.steps, step].filter((s, i, arr) => arr.indexOf(s) === i).slice(-5)
       statuses.set(sessionId, { ...existing, steps })
       notify()
     },
@@ -62,10 +62,7 @@ export function useSessionStatusStore() {
     storeRef.current.getSnapshot,
   )
 
-  const getStatus = useCallback(
-    (sessionId: string): SessionLiveStatus | undefined => map.get(sessionId),
-    [map],
-  )
+  const getStatus = useCallback((sessionId: string): SessionLiveStatus | undefined => map.get(sessionId), [map])
 
   return {
     getStatus,
