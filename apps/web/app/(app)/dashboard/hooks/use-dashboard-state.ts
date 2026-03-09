@@ -4,9 +4,11 @@ import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { ChatSession } from '@/lib/api/server'
 import { sendChatMessage } from '@/lib/api/server'
+import { parseSSEEvent } from '@/lib/sse-parser'
 import type { GitHubRepo, ModelInfo, AgentInfo, AgentMode, AgentModeId, User } from '@/lib/api/types'
 import type { useDashboardChat } from './use-dashboard-chat'
 import type { CreateSessionParams } from '@/lib/api/types'
+import { sessionStatusStore } from './use-session-status-store'
 
 const DEFAULT_MODES: AgentMode[] = [
   { id: 'agent', label: 'agent' },
@@ -95,6 +97,79 @@ export function useDashboardState({
     }
   }, [])
 
+  /** Read SSE stream in background to populate live status for a homepage session card */
+  const streamSessionInBackground = useCallback(
+    async (sessionId: string, content: string, sessionMode: string) => {
+      sessionStatusStore.update(sessionId, { isRunning: true, status: 'Starting...', steps: [] })
+      try {
+        const response = await sendChatMessage(sessionId, content, sessionMode)
+        if (!response.ok || !response.body) {
+          sessionStatusStore.update(sessionId, { isRunning: false, status: 'Error' })
+          return
+        }
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+
+          let currentEventType = ''
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              currentEventType = line.slice(7).trim()
+              continue
+            }
+            if (!line.startsWith('data: ')) continue
+            try {
+              const rawData = JSON.parse(line.slice(6))
+              if (!rawData.type && currentEventType) rawData.type = currentEventType
+              const event = parseSSEEvent(rawData)
+              if (!event) continue
+
+              const type = (event as { type: string }).type
+              if (type === 'status' || type === 'session.status') {
+                const msg = (event as { message?: string; status?: string }).message
+                  ?? (event as { message?: string; status?: string }).status
+                if (typeof msg === 'string') {
+                  sessionStatusStore.update(sessionId, { status: msg })
+                  sessionStatusStore.addStep(sessionId, msg)
+                }
+              } else if (type === 'session.updated') {
+                const info = (event as any).properties?.info
+                if (info?.title) {
+                  // Update session title in local sessions list
+                  chat.setLocalSessions((prev) =>
+                    prev.map((s) => (s.id === sessionId ? { ...s, title: info.title } : s)),
+                  )
+                }
+              } else if (type === 'done' || type === 'session.idle') {
+                sessionStatusStore.update(sessionId, { isRunning: false, status: 'Done' })
+              } else if (type === 'session.error' || type === 'error') {
+                sessionStatusStore.update(sessionId, { isRunning: false, status: 'Error' })
+              }
+            } catch {
+              // Ignore parse errors
+            }
+          }
+        }
+        // Stream ended
+        const current = sessionStatusStore.get(sessionId)
+        if (current?.isRunning) {
+          sessionStatusStore.update(sessionId, { isRunning: false, status: 'Done' })
+        }
+      } catch (err) {
+        console.error('Background SSE error:', err)
+        sessionStatusStore.update(sessionId, { isRunning: false, status: 'Error' })
+      }
+    },
+    [chat],
+  )
+
   const handleCreate = useCallback(
     async (data: { repoOwner: string; repoName: string; model?: string; baseBranch?: string }) => {
       try {
@@ -127,11 +202,8 @@ export function useDashboardState({
           const trimmedPrompt = prompt.trim()
           if (trimmedPrompt) {
             setPrompt('')
-            // Don't use handleSend (which sets streaming state on the homepage).
-            // Just POST to the chat endpoint — the agent runs server-side.
-            sendChatMessage(newSession.id, trimmedPrompt, mode).catch((err) => {
-              console.error('Failed to send initial message:', err)
-            })
+            // Stream SSE in background to track live status without navigating
+            streamSessionInBackground(newSession.id, trimmedPrompt, mode)
           }
         }
       } catch (error) {

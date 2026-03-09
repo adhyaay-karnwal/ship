@@ -3,6 +3,7 @@
 import { useCallback } from 'react'
 import { cn } from '@ship/ui'
 import type { ChatSession } from '@/lib/api/server'
+import { useSessionStatusStore, type SessionLiveStatus } from '../hooks/use-session-status-store'
 
 function formatRelativeTime(timestamp: number): string {
   const seconds = Math.floor(Date.now() / 1000 - timestamp)
@@ -77,10 +78,10 @@ export function HomepageSessionList({
       <div className="max-w-2xl mx-auto">
         {groupSessionsByTime(activeSessions).map((group) => (
           <div key={group.label} className="mb-6">
-            <h3 className="text-xs font-medium text-muted-foreground mb-2 sticky top-0 bg-background py-1 z-10">
+            <h3 className="text-xs font-medium text-muted-foreground mb-3 sticky top-0 bg-background py-1 z-10">
               {group.label}
             </h3>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {group.sessions.map((session) => (
                 <HomepageSessionCard
                   key={session.id}
@@ -123,39 +124,97 @@ function HomepageSessionCard({
   onSessionClick,
 }: HomepageSessionCardProps) {
   const handleClick = useCallback(() => onSessionClick(session), [onSessionClick, session])
+  const { getStatus } = useSessionStatusStore()
+  const liveStatus = getStatus(session.id)
+
   const title = session.title || session.repoName
   const repoPath = `${session.repoOwner}/${session.repoName}`
 
-  const statusLabel = isStreaming
-    ? streamingStatus || streamingStatusSteps[streamingStatusSteps.length - 1] || 'Running...'
-    : 'Branch'
-  const timeLabel = isStreaming && isActive ? 'now' : formatRelativeTime(session.lastActivity)
+  // Determine if this session is actively running
+  const isLive = liveStatus?.isRunning || (isStreaming && isActive)
+  const currentStatus = liveStatus?.status
+    || (isStreaming && isActive ? (streamingStatus || streamingStatusSteps[streamingStatusSteps.length - 1] || 'Running...') : '')
+  const steps = liveStatus?.steps || (isStreaming && isActive ? streamingStatusSteps : [])
+
+  const timeLabel = isLive ? 'now' : formatRelativeTime(session.lastActivity)
 
   return (
     <button
       type="button"
       onClick={handleClick}
       className={cn(
-        'w-full flex items-stretch gap-3 rounded-xl border text-left transition-colors',
+        'w-full flex items-stretch rounded-xl border text-left transition-colors',
         'border-border/50 bg-card hover:bg-muted/30 hover:border-border',
-        'px-3 py-2.5',
+        isLive && 'border-primary/30',
       )}
     >
-      <div className="shrink-0 flex items-center">
-        <span
-          className={cn(
-            'rounded-md px-2 py-0.5 text-[11px] font-medium',
-            isStreaming
-              ? 'bg-primary/15 text-primary'
-              : 'bg-muted/60 text-muted-foreground',
-          )}
-        >
-          {statusLabel}
-        </span>
+      {/* Left preview panel */}
+      <div
+        className={cn(
+          'shrink-0 w-[140px] rounded-l-xl flex flex-col items-center justify-center gap-1.5 p-3 border-r border-border/30',
+          isLive ? 'bg-primary/5' : 'bg-muted/20',
+        )}
+      >
+        {isLive && steps.length > 0 ? (
+          <div className="w-full space-y-1 overflow-hidden">
+            {steps.slice(-3).map((step, i) => (
+              <div
+                key={i}
+                className={cn(
+                  'text-[10px] leading-tight truncate',
+                  i === steps.slice(-3).length - 1
+                    ? 'text-primary font-medium'
+                    : 'text-muted-foreground/60',
+                )}
+              >
+                {step}
+              </div>
+            ))}
+          </div>
+        ) : isLive ? (
+          <div className="flex items-center gap-1.5">
+            <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+            <span className="text-[11px] font-medium text-primary">
+              {currentStatus || 'Running...'}
+            </span>
+          </div>
+        ) : liveStatus?.status === 'Done' ? (
+          <div className="flex items-center gap-1.5">
+            <svg className="h-3.5 w-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="text-[11px] font-medium text-emerald-500">Done</span>
+          </div>
+        ) : liveStatus?.status === 'Error' ? (
+          <div className="flex items-center gap-1.5">
+            <svg className="h-3.5 w-3.5 text-destructive" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            <span className="text-[11px] font-medium text-destructive">Error</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <svg className="h-3.5 w-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span className="text-[11px] font-medium text-muted-foreground">Branch</span>
+          </div>
+        )}
       </div>
-      <div className="flex-1 min-w-0 py-0.5">
+
+      {/* Right content */}
+      <div className="flex-1 min-w-0 p-3 flex flex-col justify-center">
         <div className="text-sm font-medium text-foreground truncate leading-tight">{title}</div>
-        <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
+          {isLive && (
+            <span className="flex items-center gap-1 text-primary">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary" />
+              </span>
+              Running
+            </span>
+          )}
           <span className="truncate">{agentLabel}</span>
           <span className="shrink-0 truncate">{repoPath}</span>
           <span className="shrink-0">{timeLabel}</span>
