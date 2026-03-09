@@ -1,4 +1,5 @@
 import { getSession } from '@/lib/session'
+import { getUser } from '@/lib/dal'
 import { SettingsClient } from './settings-client'
 
 export default async function SettingsPage() {
@@ -12,5 +13,13 @@ export default async function SettingsPage() {
     )
   }
 
-  return <SettingsClient userId={session.userId} />
+  let user: { username: string; avatarUrl: string | null } | undefined
+  try {
+    const userData = await getUser()
+    user = { username: userData.username, avatarUrl: userData.avatarUrl ?? null }
+  } catch {
+    // User fetch failed, proceed without avatar
+  }
+
+  return <SettingsClient userId={session.userId} user={user} />
 }

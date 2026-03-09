@@ -19,7 +19,7 @@ export function BranchSelector() {
         render={
           <Button
             variant="ghost"
-            className="group h-auto gap-1 px-0 py-0 rounded-full text-muted-foreground hover:text-foreground hover:bg-transparent max-w-[140px]"
+            className="group h-auto gap-1 px-0 py-0 rounded-full text-muted-foreground hover:text-foreground hover:bg-transparent! max-w-[140px]"
           >
             <span className="truncate text-sm">{selectedBranch}</span>
             <svg

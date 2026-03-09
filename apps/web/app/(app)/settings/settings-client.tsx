@@ -16,7 +16,7 @@ import { DefaultAgentCard } from './default-agent-card'
 import { DefaultModelCard } from './default-model-card'
 import { DefaultRepoCard } from './default-repo-card'
 
-export function SettingsClient({ userId }: { userId: string }) {
+export function SettingsClient({ userId, user }: { userId: string; user?: { username: string; avatarUrl: string | null } }) {
   // Agent hooks
   const { agents, isLoading: agentsLoading } = useAgents()
   const { defaultAgentId, isLoading: defaultAgentLoading } = useDefaultAgent(userId)
@@ -53,7 +53,7 @@ export function SettingsClient({ userId }: { userId: string }) {
 
   if (loading) {
     return (
-      <SettingsShell>
+      <SettingsShell user={user}>
         <div className="flex items-center justify-center py-24">
           <div className="w-4 h-4 border-2 border-muted border-t-foreground rounded-full animate-spin" />
         </div>
@@ -62,7 +62,7 @@ export function SettingsClient({ userId }: { userId: string }) {
   }
 
   return (
-    <SettingsShell>
+    <SettingsShell user={user}>
       <div className="mx-auto max-w-xl px-4 py-6">
         <h1 className="text-lg font-semibold text-foreground mb-1">Settings</h1>
         <p className="text-[12px] text-muted-foreground mb-5">Manage your preferences</p>
@@ -106,7 +106,7 @@ export function SettingsClient({ userId }: { userId: string }) {
   )
 }
 
-function SettingsShell({ children }: { children: React.ReactNode }) {
+function SettingsShell({ children, user }: { children: React.ReactNode; user?: { username: string; avatarUrl: string | null } }) {
   return (
     <div className="min-h-screen bg-muted/30">
       <header className="h-11 border-b border-border bg-background">
@@ -114,12 +114,41 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
           <Link href="/" className="flex items-center gap-2">
             <span className="text-[13px] font-semibold text-foreground">Ship</span>
           </Link>
+
+          {/* Desktop: simple logout link */}
           <a
             href="/api/auth/logout"
-            className="text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+            className="hidden md:block text-[12px] text-muted-foreground hover:text-foreground transition-colors"
           >
             Logout
           </a>
+
+          {/* Mobile: Agents / Settings tabs + avatar */}
+          <div className="flex items-center gap-2 md:hidden">
+            <nav className="flex items-center gap-0.5">
+              <Link href="/" className="px-1.5 py-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                Agents
+              </Link>
+              <Link href="/settings" className="px-1.5 py-1 text-sm text-foreground font-medium transition-colors">
+                Settings
+              </Link>
+            </nav>
+            <Link href="/settings" className="shrink-0">
+              {user?.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={user.username}
+                  width={28}
+                  height={28}
+                  className="size-7 rounded-full object-cover"
+                />
+              ) : (
+                <div className="size-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
+                  {user?.username?.[0]?.toUpperCase() || '?'}
+                </div>
+              )}
+            </Link>
+          </div>
         </div>
       </header>
       {children}
