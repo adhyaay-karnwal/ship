@@ -1,11 +1,10 @@
 'use client'
 
-import { cn } from '@ship/ui'
 import type { ChatSession } from '@/lib/api/server'
 import type { WebSocketStatus } from '@/lib/websocket'
 import type { UIMessage } from '@/lib/ai-elements-adapter'
 import type { ComposerContextValue } from './composer/composer-context'
-import type { SessionPanelData, TodoItem } from '../types'
+import type { SessionPanelData, TodoItem, RightSidebarTab } from '../types'
 import { DashboardHeader } from './dashboard-header'
 import { DashboardMessages } from './dashboard-messages'
 import { DashboardComposer } from './composer'
@@ -47,6 +46,10 @@ export interface DashboardMainColumnProps {
     isMobile: boolean | null
     toggle: () => void
     setMobileOpen: (open: boolean) => void
+    activeTab: RightSidebarTab
+    setActiveTab: (tab: RightSidebarTab) => void
+    expanded: boolean
+    toggleExpanded: () => void
   }
   rightSidebarData: SessionPanelData | null
   /** When on homepage, optional agent label for session cards (e.g. "OpenCode") */
@@ -163,7 +166,12 @@ export function DashboardMainColumn({
           desktopOpen={rightSidebar.desktopOpen}
           mobileOpen={rightSidebar.mobileOpen}
           isMobile={rightSidebar.isMobile ?? false}
+          expanded={rightSidebar.expanded}
+          activeTab={rightSidebar.activeTab}
+          onTabChange={rightSidebar.setActiveTab}
+          onToggleExpanded={rightSidebar.toggleExpanded}
           onMobileOpenChange={rightSidebar.setMobileOpen}
+          onTogglePanel={rightSidebar.toggle}
         />
       )}
     </div>
