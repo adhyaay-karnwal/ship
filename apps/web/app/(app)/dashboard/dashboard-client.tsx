@@ -26,14 +26,20 @@ interface DashboardClientProps {
   sessions: ChatSession[]
   userId: string
   user: User
+  initialSessionId?: string | null
 }
 
-export function DashboardClient({ sessions: initialSessions, userId, user }: DashboardClientProps) {
+export function DashboardClient({
+  sessions: initialSessions,
+  userId,
+  user,
+  initialSessionId = null,
+}: DashboardClientProps) {
   const searchParams = useSearchParams()
   const isMobile = useIsMobile()
   const modeRef = useRef('agent')
 
-  const chat = useDashboardChat(initialSessions)
+  const chat = useDashboardChat(initialSessions, initialSessionId)
 
   const handlePermissionReply = useCallback(
     async (permissionId: string, approved: boolean) => {
@@ -118,6 +124,7 @@ export function DashboardClient({ sessions: initialSessions, userId, user }: Das
   })
 
   useSessionSync({
+    initialSessionId,
     sessionParam: searchParams.get('session'),
     handleSend,
     chat: {

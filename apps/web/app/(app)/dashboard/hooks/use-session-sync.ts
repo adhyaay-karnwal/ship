@@ -5,6 +5,7 @@ import type { ChatSession } from '@/lib/api/server'
 import type { GitHubRepo, ModelInfo } from '@/lib/api/types'
 
 export interface UseSessionSyncParams {
+  initialSessionId: string | null
   sessionParam: string | null
   handleSend: (content: string) => void
   chat: {
@@ -40,6 +41,7 @@ export interface UseSessionSyncParams {
  * - Processing queued messages when streaming completes
  */
 export function useSessionSync({
+  initialSessionId,
   sessionParam,
   handleSend,
   chat,
@@ -49,7 +51,6 @@ export function useSessionSync({
   const {
     activeSessionId,
     setActiveSessionId,
-    connectWebSocket,
     localSessions,
     isStreaming,
     messageQueue,
@@ -69,14 +70,13 @@ export function useSessionSync({
     defaultRepoLoading,
     defaultRepoFullName,
   } = repo
-  // Activate session from URL param (e.g., /?session=abc123 from /session/[id] redirect)
+  // Support the legacy /?session=<id> bootstrap as a fallback.
   useEffect(() => {
-    if (sessionParam && !activeSessionId) {
+    if (!initialSessionId && sessionParam && !activeSessionId) {
       setActiveSessionId(sessionParam)
-      connectWebSocket(sessionParam)
       window.history.replaceState({}, '', `/session/${sessionParam}`)
     }
-  }, [sessionParam, activeSessionId, setActiveSessionId, connectWebSocket])
+  }, [initialSessionId, sessionParam, activeSessionId, setActiveSessionId])
 
   // Set default model once defaults have loaded — prefer user's saved default from settings
   // Wait for defaultModelLoading to finish so we don't pick Kimi before "big pickle" loads

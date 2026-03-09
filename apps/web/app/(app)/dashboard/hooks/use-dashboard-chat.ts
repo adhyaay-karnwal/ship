@@ -9,9 +9,12 @@ import type { ChatSession } from '@/lib/api/server'
 import { API_URL } from '@/lib/config'
 import { useSessionPersistence } from './use-session-persistence'
 
-export function useDashboardChat(initialSessions: ChatSession[]) {
+export function useDashboardChat(
+  initialSessions: ChatSession[],
+  initialActiveSessionId: string | null = null,
+) {
   const [localSessions, setLocalSessions] = useState<ChatSession[]>(initialSessions)
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(initialActiveSessionId)
   const [messages, setMessages] = useState<UIMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [wsStatus, setWsStatus] = useState<WebSocketStatus>('disconnected')
@@ -19,6 +22,7 @@ export function useDashboardChat(initialSessions: ChatSession[]) {
 
   // Sidebar / session persistence state
   const persistence = useSessionPersistence(activeSessionId)
+  const { setAgentUrl, setAgentSessionId, setSandboxStatus } = persistence
 
   const wsRef = useRef<ReturnType<typeof createReconnectingWebSocket> | null>(null)
   const streamingMessageRef = useRef<string | null>(null)
@@ -89,7 +93,7 @@ export function useDashboardChat(initialSessions: ChatSession[]) {
         if (event.type === 'agent-url' || event.type === 'opencode-url') {
           const url = (event as { url?: string }).url
           if (url) {
-            persistence.setAgentUrl(url)
+            setAgentUrl(url)
             try { localStorage.setItem(`agent-url-${sessionId}`, url) } catch {}
           }
         }
@@ -97,23 +101,31 @@ export function useDashboardChat(initialSessions: ChatSession[]) {
         if (event.type === 'agent-session') {
           const id = (event as { agentSessionId?: string }).agentSessionId
           if (id) {
-            persistence.setAgentSessionId(id)
+            setAgentSessionId(id)
             try { localStorage.setItem(`agent-session-id-${sessionId}`, id) } catch {}
           }
         }
 
         if (event.type === 'sandbox-status') {
           const status = (event as { status?: string }).status
-          if (status) persistence.setSandboxStatus(status)
+          if (status) setSandboxStatus(status)
         }
       },
       onStatusChange: setWsStatus,
     })
-  }, [persistence])
+  }, [setAgentSessionId, setAgentUrl, setSandboxStatus])
 
   useEffect(() => {
     return () => wsRef.current?.disconnect()
   }, [])
+
+  useEffect(() => {
+    if (!activeSessionId) {
+      wsRef.current?.disconnect()
+      return
+    }
+    connectWebSocket(activeSessionId)
+  }, [activeSessionId, connectWebSocket])
 
   // Load chat history when session changes
   const historyLoadedRef = useRef<string | null>(null)
