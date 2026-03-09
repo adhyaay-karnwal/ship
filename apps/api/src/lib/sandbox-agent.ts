@@ -271,8 +271,18 @@ export async function createAgentSession(
       mcpServers: [],
     },
     mode: config.mode,
-    model: config.model,
+    // model omitted — set below with graceful fallback for agents that don't support session/set_config_option
   })
+
+  if (config.model) {
+    try {
+      await session.setModel(config.model)
+    } catch (err) {
+      console.warn(
+        `[sandbox-agent] Agent does not support model configuration, using default. Error: ${err instanceof Error ? err.message : err}`,
+      )
+    }
+  }
 
   console.log(`[sandbox-agent] Session created: ${session.id}`)
 
@@ -291,7 +301,13 @@ export async function configureAgentSession(
   }
 
   if (config.model) {
-    await session.setModel(config.model)
+    try {
+      await session.setModel(config.model)
+    } catch (err) {
+      console.warn(
+        `[sandbox-agent] Agent does not support model configuration. Error: ${err instanceof Error ? err.message : err}`,
+      )
+    }
   }
 }
 
