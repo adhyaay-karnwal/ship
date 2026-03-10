@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useRef, useEffect } from 'react'
+import { postSessionSync, subscribeSessionSync } from '@/lib/session-sync-channel'
 import { useSearchParams } from 'next/navigation'
 import { useIsMobile } from '@ship/ui'
 import { useGitHubRepos } from '@/lib/api/hooks/use-repos'
@@ -19,6 +20,7 @@ import { useDashboardState } from './hooks/use-dashboard-state'
 import { useDashboardDerived } from './hooks/use-dashboard-derived'
 import { useRightSidebar } from './hooks/use-right-sidebar'
 import { useSessionSync } from './hooks/use-session-sync'
+import { useProvisionSandboxWhenNeeded } from './hooks/use-provision-sandbox-when-needed'
 import { DashboardLayout } from './components/dashboard-layout'
 import { DashboardMainColumn } from './components/dashboard-main-column'
 
@@ -40,6 +42,9 @@ export function DashboardClient({
   const modeRef = useRef('agent')
 
   const chat = useDashboardChat(initialSessions, initialSessionId)
+
+  // Provision sandbox when opening a session that has none (error or never provisioned)
+  useProvisionSandboxWhenNeeded(chat.activeSessionId)
 
   const handlePermissionReply = useCallback(
     async (permissionId: string, approved: boolean) => {
@@ -75,7 +80,7 @@ export function DashboardClient({
   })
 
   // Sync SWR sessions into local state when on homepage so list/sidebar stay fresh.
-  // Merge to preserve optimistic session creates (in localSessions but not yet in swrSessions).
+  // Merge to preserve optimistic session creates and titles (in localSessions but not yet in swrSessions).
   const prevSwrLenRef = useRef(0)
   const { activeSessionId, setLocalSessions } = chat
   useEffect(() => {
@@ -85,14 +90,34 @@ export function DashboardClient({
     setLocalSessions((prev) => {
       const swrIds = new Set(swrSessions.map((s) => s.id))
       const optimisticOnly = prev.filter((s) => !swrIds.has(s.id))
-      return [...optimisticOnly, ...swrSessions]
+      // Preserve optimistic titles when API returns session without title
+      const merged = swrSessions.map((s) => {
+        const p = prev.find((x) => x.id === s.id)
+        return p && p.title && !s.title ? { ...s, title: p.title } : s
+      })
+      return [...optimisticOnly, ...merged]
     })
   }, [activeSessionId, swrSessions, setLocalSessions])
+
+  // Cross-tab sync: when another tab creates/deletes a session, revalidate
+  useEffect(() => {
+    return subscribeSessionSync(() => {
+      mutateSessions()
+    })
+  }, [mutateSessions])
 
   const state = useDashboardState({
     chat,
     handleSend,
-    session: { createSession, deleteSession, userId, user, mutateSessions },
+    session: {
+      createSession,
+      deleteSession,
+      userId,
+      user,
+      mutateSessions,
+      onSessionCreated: () => postSessionSync({ type: 'session-created' }),
+      onSessionDeleted: () => postSessionSync({ type: 'session-deleted' }),
+    },
     data: {
       repos,
       isCreating,

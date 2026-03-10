@@ -195,12 +195,14 @@ function TabContent({
   panelProps,
   desktopAgentUrl,
   desktopSandboxStatus,
+  sandbox,
 }: {
   activeTab: RightSidebarTab
   data: SessionPanelData
   panelProps: ReturnType<typeof useSessionPanelProps>
   desktopAgentUrl: string | undefined
   desktopSandboxStatus: string | undefined
+  sandbox: { sandboxId?: string | null; status?: string | null } | undefined
 }) {
   switch (activeTab) {
     case 'git':
@@ -216,6 +218,8 @@ function TabContent({
       return (
         <TerminalTab
           sessionId={data.sessionId}
+          sandboxStatus={desktopSandboxStatus}
+          sandboxId={sandbox?.sandboxId ?? undefined}
         />
       )
     case 'overview':
@@ -261,6 +265,7 @@ export function RightSidebar({
           panelProps={panelProps}
           desktopAgentUrl={desktopAgentUrl}
           desktopSandboxStatus={desktopSandboxStatus}
+          sandbox={sandbox}
         />
       </div>
     </div>

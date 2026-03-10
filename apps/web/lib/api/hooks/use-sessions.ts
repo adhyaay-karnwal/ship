@@ -129,6 +129,24 @@ export function useDeleteAllSessions() {
 }
 
 /**
+ * Provision sandbox for a session (e.g. when opening one that has no sandbox)
+ */
+export function useProvisionSandbox() {
+  const { trigger, isMutating, error } = useSWRMutation(
+    'provision-sandbox',
+    async (_key: string, { arg }: { arg: { sessionId: string } }) => {
+      return post<{ sessionId: string }, unknown>(apiUrl('/sandbox'), { sessionId: arg.sessionId })
+    }
+  )
+
+  return {
+    provisionSandbox: trigger,
+    isProvisioning: isMutating,
+    error,
+  }
+}
+
+/**
  * Mutation hook to retry a failed session operation
  */
 export function useRetrySession() {

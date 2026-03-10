@@ -25,6 +25,8 @@ export interface UseDashboardStateParams {
     userId: string
     user: User
     mutateSessions?: () => void
+    onSessionCreated?: () => void
+    onSessionDeleted?: () => void
   }
   data: {
     repos: GitHubRepo[]
@@ -40,7 +42,7 @@ export interface UseDashboardStateParams {
 }
 
 export function useDashboardState({ chat, handleSend, session, data }: UseDashboardStateParams) {
-  const { createSession, deleteSession, userId, user, mutateSessions } = session
+  const { createSession, deleteSession, userId, user, mutateSessions, onSessionCreated, onSessionDeleted } = session
   const {
     repos,
     isCreating,
@@ -182,6 +184,9 @@ export function useDashboardState({ chat, handleSend, session, data }: UseDashbo
   const handleCreate = useCallback(
     async (data: { repoOwner: string; repoName: string; model?: string; baseBranch?: string }) => {
       try {
+        const trimmedPrompt = prompt.trim()
+        const initialTitle =
+          trimmedPrompt.length > 60 ? `${trimmedPrompt.slice(0, 57)}...` : trimmedPrompt
         const newSession = await createSession({
           userId,
           repoOwner: data.repoOwner,
@@ -189,12 +194,10 @@ export function useDashboardState({ chat, handleSend, session, data }: UseDashbo
           model: data.model || selectedModel?.id || 'cursor/default',
           agentType: selectedAgent?.id || 'cursor',
           baseBranch: data.baseBranch || selectedBranch || 'main',
+          title: initialTitle || undefined,
         })
 
         if (newSession) {
-          const trimmedPrompt = prompt.trim()
-          const initialTitle =
-            trimmedPrompt.length > 60 ? `${trimmedPrompt.slice(0, 57)}...` : trimmedPrompt
           const newSessionData: ChatSession = {
             id: newSession.id,
             userId,
@@ -205,12 +208,13 @@ export function useDashboardState({ chat, handleSend, session, data }: UseDashbo
             createdAt: Math.floor(Date.now() / 1000),
             archivedAt: null,
             messageCount: 0,
-            title: initialTitle || newSession.title,
+            title: (initialTitle || newSession.title) ?? undefined,
             model: newSession.model ?? data.model ?? selectedModel?.id,
             agentType: newSession.agentType ?? selectedAgent?.id,
           }
           chat.setLocalSessions((prev) => [newSessionData, ...prev])
           mutateSessions?.()
+          onSessionCreated?.()
 
           // Fire-and-forget: send the prompt to the server without navigating.
           // The agent runs server-side; the session list polls for live status.
@@ -224,7 +228,7 @@ export function useDashboardState({ chat, handleSend, session, data }: UseDashbo
         console.error('Failed to create session:', error)
       }
     },
-    [createSession, userId, selectedModel, selectedAgent, selectedBranch, prompt, mode, chat, mutateSessions],
+    [createSession, userId, selectedModel, selectedAgent, selectedBranch, prompt, mode, chat, mutateSessions, onSessionCreated],
   )
 
   const handleSubmit = useCallback(() => {
@@ -279,6 +283,8 @@ export function useDashboardState({ chat, handleSend, session, data }: UseDashbo
       try {
         await deleteSession({ sessionId })
         chat.setLocalSessions((prev) => prev.filter((s) => s.id !== sessionId))
+        mutateSessions?.()
+        onSessionDeleted?.()
         if (chat.activeSessionId === sessionId) {
           chat.setActiveSessionId(null)
           chat.setMessages([])
@@ -292,7 +298,7 @@ export function useDashboardState({ chat, handleSend, session, data }: UseDashbo
         router.refresh()
       }
     },
-    [chat, deleteSession, router],
+    [chat, deleteSession, mutateSessions, onSessionDeleted, router],
   )
 
   // Default repo fallback when no saved default

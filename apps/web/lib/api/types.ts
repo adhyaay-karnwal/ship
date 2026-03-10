@@ -14,6 +14,8 @@ export interface CreateSessionParams {
   model: string
   agentType?: string
   initialPrompt?: string
+  /** Initial title (e.g. from first prompt); persisted for cross-tab sync */
+  title?: string
   /** Base branch to clone and create ship branch from (e.g. main). Defaults to main. */
   baseBranch?: string
 }
@@ -22,6 +24,8 @@ export interface SandboxStatus {
   ready: boolean
   url?: string
   terminalUrl?: string
+  /** Sandbox ID from E2B; from GET /sessions/:id/sandbox */
+  sandboxId?: string | null
   /** Sandbox-agent URL for Desktop iframe; from GET /sessions/:id/sandbox */
   sandboxAgentUrl?: string | null
   /** Raw status from DO: provisioning, active, resuming, error, etc. */

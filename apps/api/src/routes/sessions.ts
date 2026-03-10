@@ -36,6 +36,8 @@ interface CreateSessionInput {
   repoName: string
   model?: string
   agentType?: string
+  /** Initial title (e.g. from first prompt) */
+  title?: string
   /** Base branch to create ship branch from (e.g. main). Defaults to main. */
   baseBranch?: string
 }
@@ -104,10 +106,10 @@ sessions.post('/', async (c) => {
 
     // Store session record in D1 FIRST — ensures session exists before any DO cold start
     await c.env.DB.prepare(
-      `INSERT INTO chat_sessions (id, user_id, repo_owner, repo_name, status, last_activity, created_at)
-       VALUES (?, ?, ?, ?, 'active', ?, ?)`,
+      `INSERT INTO chat_sessions (id, user_id, repo_owner, repo_name, status, last_activity, created_at, title)
+       VALUES (?, ?, ?, ?, 'active', ?, ?, ?)`,
     )
-      .bind(sessionId, input.userId, input.repoOwner, input.repoName, now, now)
+      .bind(sessionId, input.userId, input.repoOwner, input.repoName, now, now, input.title ?? null)
       .run()
 
     // Start DO init + sandbox provisioning in background (don't block session creation)
@@ -177,6 +179,7 @@ sessions.post('/', async (c) => {
       lastActivity: now,
       createdAt: now,
       archivedAt: null,
+      title: input.title ?? undefined,
       model: input.model,
       agentType: input.agentType,
       sandboxId: null,

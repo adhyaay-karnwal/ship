@@ -6,6 +6,8 @@ import { API_URL } from '@/lib/config'
 
 interface TerminalTabProps {
   sessionId?: string
+  sandboxStatus?: string | null
+  sandboxId?: string | null
 }
 
 function TerminalPlaceholder({ message, showSpinner }: { message: string; showSpinner?: boolean }) {
@@ -23,15 +25,42 @@ function TerminalPlaceholder({ message, showSpinner }: { message: string; showSp
 
 const RETRY_INTERVAL = 5000
 
-export function TerminalTab({ sessionId }: TerminalTabProps) {
+export function TerminalTab({ sessionId, sandboxStatus, sandboxId }: TerminalTabProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<import('@xterm/xterm').Terminal | null>(null)
   const fitRef = useRef<import('@xterm/addon-fit').FitAddon | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const retryCountRef = useRef(0)
+  const maxRetries = 3
+
+  const isProvisioning = sandboxStatus === 'provisioning' || sandboxStatus === 'resuming'
+  const hasNoSandbox =
+    sandboxStatus === 'error' || (!sandboxId && sandboxStatus !== undefined && !isProvisioning)
+  const canConnect = sessionId && sandboxId && !isProvisioning && !hasNoSandbox
+
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'unavailable'>(
-    sessionId ? 'connecting' : 'unavailable',
+    'unavailable',
   )
+
+  // Update status when sandbox state changes
+  useEffect(() => {
+    if (!sessionId) {
+      setStatus('unavailable')
+      return
+    }
+    if (hasNoSandbox) {
+      setStatus('unavailable')
+      return
+    }
+    if (isProvisioning) {
+      setStatus('unavailable')
+      return
+    }
+    if (sandboxId) {
+      setStatus('connecting')
+    }
+  }, [sessionId, sandboxId, isProvisioning, hasNoSandbox])
 
   const cleanup = useCallback(() => {
     if (retryTimerRef.current) {
@@ -50,12 +79,13 @@ export function TerminalTab({ sessionId }: TerminalTabProps) {
   }, [])
 
   useEffect(() => {
-    if (!containerRef.current || !sessionId) {
-      setStatus('unavailable')
+    if (!containerRef.current || !sessionId || !canConnect) {
+      if (!canConnect && sessionId) setStatus('unavailable')
       return
     }
 
     let cancelled = false
+    retryCountRef.current = 0
 
     async function initTerminal() {
       const [{ Terminal }, { FitAddon }, { WebLinksAddon }] = await Promise.all([
@@ -117,14 +147,19 @@ export function TerminalTab({ sessionId }: TerminalTabProps) {
 
         ws.onclose = () => {
           if (!cancelled) {
-            setStatus('connecting')
-            scheduleRetry(term)
+            retryCountRef.current += 1
+            if (retryCountRef.current >= maxRetries) {
+              setStatus('unavailable')
+            } else {
+              setStatus('disconnected')
+              scheduleRetry(term)
+            }
           }
         }
 
         ws.onerror = () => {
           if (!cancelled) {
-            setStatus('connecting')
+            setStatus('disconnected')
             // onclose will fire after onerror, retry handled there
           }
         }
@@ -176,10 +211,17 @@ export function TerminalTab({ sessionId }: TerminalTabProps) {
       resizeObserver.disconnect()
       cleanup()
     }
-  }, [sessionId, cleanup])
+  }, [sessionId, canConnect, cleanup])
 
   if (status === 'unavailable') {
-    return <TerminalPlaceholder message="Terminal unavailable — no active session" />
+    const message = !sessionId
+      ? 'Terminal unavailable — no active session'
+      : isProvisioning
+        ? 'Sandbox provisioning...'
+        : hasNoSandbox
+          ? 'Sandbox unavailable — send a message to start the session'
+          : 'Terminal unavailable'
+    return <TerminalPlaceholder message={message} showSpinner={isProvisioning} />
   }
 
   return (
