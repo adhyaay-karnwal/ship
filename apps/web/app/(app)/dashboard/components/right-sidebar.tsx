@@ -13,6 +13,7 @@ import { OverviewTab } from '@/components/chat/session-panel/overview-tab'
 import { GitTab } from '@/components/chat/session-panel/git-tab'
 import { DesktopTab } from '@/components/chat/session-panel/desktop-tab'
 import { TerminalTab } from '@/components/chat/session-panel/terminal-tab'
+import { useSandboxStatus } from '@/lib/api/hooks/use-sessions'
 import type { SessionPanelData, RightSidebarTab } from '../types'
 
 const TABS: { id: RightSidebarTab; label: string }[] = [
@@ -192,16 +193,25 @@ function TabContent({
   activeTab,
   data,
   panelProps,
+  desktopAgentUrl,
+  desktopSandboxStatus,
 }: {
   activeTab: RightSidebarTab
   data: SessionPanelData
   panelProps: ReturnType<typeof useSessionPanelProps>
+  desktopAgentUrl: string | undefined
+  desktopSandboxStatus: string | undefined
 }) {
   switch (activeTab) {
     case 'git':
       return <GitTab diffs={data.fileDiffs} sessionInfo={data.sessionInfo ?? undefined} />
     case 'desktop':
-      return <DesktopTab agentUrl={data.agentUrl || undefined} />
+      return (
+        <DesktopTab
+          agentUrl={desktopAgentUrl}
+          sandboxStatus={desktopSandboxStatus}
+        />
+      )
     case 'terminal':
       return (
         <TerminalTab
@@ -230,6 +240,11 @@ export function RightSidebar({
   onTogglePanel,
 }: RightSidebarProps) {
   const panelProps = useSessionPanelProps(data)
+  const { sandbox } = useSandboxStatus(data.sessionId)
+
+  // Desktop tab: use agentUrl from chat/SSE, fallback to sandbox API when empty
+  const desktopAgentUrl = data.agentUrl || sandbox?.sandboxAgentUrl || undefined
+  const desktopSandboxStatus = data.sandboxStatus ?? sandbox?.status ?? undefined
 
   const content = (
     <div className="flex flex-col h-full">
@@ -240,7 +255,13 @@ export function RightSidebar({
         onTogglePanel={onTogglePanel}
       />
       <div className="flex-1 overflow-y-auto no-scrollbar">
-        <TabContent activeTab={activeTab} data={data} panelProps={panelProps} />
+        <TabContent
+          activeTab={activeTab}
+          data={data}
+          panelProps={panelProps}
+          desktopAgentUrl={desktopAgentUrl}
+          desktopSandboxStatus={desktopSandboxStatus}
+        />
       </div>
     </div>
   )

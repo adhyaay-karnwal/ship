@@ -102,33 +102,7 @@ sessions.post('/', async (c) => {
     const sessionId = crypto.randomUUID()
     const now = Math.floor(Date.now() / 1000)
 
-    // Create DO instance and initialize metadata
-    const doId = c.env.SESSION_DO.idFromName(sessionId)
-    const doStub = c.env.SESSION_DO.get(doId)
-
-    // Initialize session metadata in DO
-    await doStub.setSessionMeta('userId', input.userId)
-    await doStub.setSessionMeta('repoOwner', input.repoOwner)
-    await doStub.setSessionMeta('repoName', input.repoName)
-    await doStub.setSessionMeta('createdAt', now.toString())
-
-    // Store model override if provided
-    if (input.model) {
-      await doStub.setSessionMeta('model', input.model)
-    }
-
-    // Store agent type if provided
-    if (input.agentType) {
-      await doStub.setSessionMeta('agent_type', input.agentType)
-    }
-
-    // Store base branch for clone (default main)
-    await doStub.setSessionMeta('base_branch', input.baseBranch || 'main')
-
-    // Set initial sandbox status to provisioning
-    await doStub.setSessionMeta('sandbox_status', 'provisioning')
-
-    // Store session record in D1 FIRST (don't block on sandbox)
+    // Store session record in D1 FIRST — ensures session exists before any DO cold start
     await c.env.DB.prepare(
       `INSERT INTO chat_sessions (id, user_id, repo_owner, repo_name, status, last_activity, created_at)
        VALUES (?, ?, ?, ?, 'active', ?, ?)`,
@@ -136,32 +110,47 @@ sessions.post('/', async (c) => {
       .bind(sessionId, input.userId, input.repoOwner, input.repoName, now, now)
       .run()
 
-    // Start sandbox provisioning in background (don't block session creation)
+    // Start DO init + sandbox provisioning in background (don't block session creation)
     c.executionCtx.waitUntil(
-      doStub
-        .fetch(`http://do/sandbox/provision`, {
-          method: 'POST',
-        })
-        .then(async (res) => {
-          if (!res.ok) {
-            const error = await res.json().catch(() => ({ error: 'Unknown error' }))
-            console.error(`[sessions] Sandbox provisioning failed for ${sessionId}:`, error)
-            // Set error status so chat endpoint knows
-            await doStub.setSessionMeta('sandbox_status', 'error')
-            await doStub.fetch(`http://do/broadcast`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                type: 'sandbox-status',
-                status: 'error',
-                error: (error as { error?: string }).error || 'Sandbox provisioning failed',
-              }),
-            })
-          }
-        })
-        .catch(async (err) => {
-          console.error(`[sessions] Sandbox provisioning error for ${sessionId}:`, err)
-          // Set error status
+      (async () => {
+        const doId = c.env.SESSION_DO.idFromName(sessionId)
+        const doStub = c.env.SESSION_DO.get(doId)
+
+        // Initialize session metadata in DO
+        await doStub.setSessionMeta('userId', input.userId)
+        await doStub.setSessionMeta('repoOwner', input.repoOwner)
+        await doStub.setSessionMeta('repoName', input.repoName)
+        await doStub.setSessionMeta('createdAt', now.toString())
+        if (input.model) {
+          await doStub.setSessionMeta('model', input.model)
+        }
+        if (input.agentType) {
+          await doStub.setSessionMeta('agent_type', input.agentType)
+        }
+        await doStub.setSessionMeta('base_branch', input.baseBranch || 'main')
+        await doStub.setSessionMeta('sandbox_status', 'provisioning')
+
+        // Sandbox provision
+        const res = await doStub.fetch(`http://do/sandbox/provision`, { method: 'POST' })
+        if (!res.ok) {
+          const error = await res.json().catch(() => ({ error: 'Unknown error' }))
+          console.error(`[sessions] Sandbox provisioning failed for ${sessionId}:`, error)
+          await doStub.setSessionMeta('sandbox_status', 'error')
+          await doStub.fetch(`http://do/broadcast`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'sandbox-status',
+              status: 'error',
+              error: (error as { error?: string }).error || 'Sandbox provisioning failed',
+            }),
+          })
+        }
+      })().catch(async (err) => {
+        console.error(`[sessions] Sandbox provisioning error for ${sessionId}:`, err)
+        try {
+          const doId = c.env.SESSION_DO.idFromName(sessionId)
+          const doStub = c.env.SESSION_DO.get(doId)
           await doStub.setSessionMeta('sandbox_status', 'error')
           await doStub.fetch(`http://do/broadcast`, {
             method: 'POST',
@@ -172,7 +161,10 @@ sessions.post('/', async (c) => {
               error: err instanceof Error ? err.message : 'Sandbox provisioning failed',
             }),
           })
-        }),
+        } catch {
+          /* ignore */
+        }
+      }),
     )
 
     // Return session object immediately with provisioning status

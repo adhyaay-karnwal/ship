@@ -235,6 +235,7 @@ export function DashboardClient({
         agentSessionId: chat.agentSessionId || undefined,
         sessionInfo: chat.sessionInfo,
         messages: chat.messages,
+        sandboxStatus: chat.sandboxStatus ?? undefined,
       }
     : null
 

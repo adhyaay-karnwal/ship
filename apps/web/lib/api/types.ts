@@ -22,6 +22,10 @@ export interface SandboxStatus {
   ready: boolean
   url?: string
   terminalUrl?: string
+  /** Sandbox-agent URL for Desktop iframe; from GET /sessions/:id/sandbox */
+  sandboxAgentUrl?: string | null
+  /** Raw status from DO: provisioning, active, resuming, error, etc. */
+  status?: string | null
 }
 
 // ============ Chat ============

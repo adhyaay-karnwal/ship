@@ -35,4 +35,5 @@ export interface SessionPanelData {
   agentSessionId?: string
   sessionInfo: SessionInfo | null
   messages: import('@/lib/ai-elements-adapter').UIMessage[]
+  sandboxStatus?: string
 }

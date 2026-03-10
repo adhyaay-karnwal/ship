@@ -4,3 +4,8 @@ node_modules
 .wrangler
 .agents
 .cursor
+.planning
+.claude
+AGENTS.md
+DEPLOYMENT.md
+LOCAL-SETUP.md
