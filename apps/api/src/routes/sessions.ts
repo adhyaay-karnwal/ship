@@ -218,12 +218,18 @@ sessions.get('/:id', async (c) => {
       return c.json({ error: 'Session not found' }, 404)
     }
 
-    // Get message count from DO
-    const doId = c.env.SESSION_DO.idFromName(id)
-    const doStub = c.env.SESSION_DO.get(doId)
-    const messages = await doStub.getRecentMessages(1000)
-    const messageCount = messages.length
-    const meta = await doStub.getSessionMeta()
+    // Get message count and metadata from DO (best-effort — DO may be cold-starting)
+    let messageCount = 0
+    let meta: Record<string, string> = {}
+    try {
+      const doId = c.env.SESSION_DO.idFromName(id)
+      const doStub = c.env.SESSION_DO.get(doId)
+      const messages = await doStub.getRecentMessages(1000)
+      messageCount = messages.length
+      meta = await doStub.getSessionMeta()
+    } catch (doError) {
+      console.warn(`[sessions] DO calls failed for session ${id}, returning partial data:`, doError)
+    }
 
     // Map to DTO with message count
     const session: SessionDTO & { messageCount: number } = {
@@ -245,6 +251,61 @@ sessions.get('/:id', async (c) => {
   } catch (error) {
     console.error('Error fetching session:', error)
     return c.json({ error: 'Failed to fetch session' }, 500)
+  }
+})
+
+/**
+ * DELETE /sessions
+ * Bulk delete all sessions for a user (soft delete in D1, best-effort sandbox termination)
+ * Query param: userId (required)
+ */
+sessions.delete('/', async (c) => {
+  try {
+    const userId = c.req.query('userId')
+    if (!userId) {
+      return c.json({ error: 'userId query parameter is required' }, 400)
+    }
+
+    // Get all active sessions for this user
+    const cursor = await c.env.DB.prepare(
+      `SELECT id FROM chat_sessions WHERE user_id = ? AND status != 'deleted'`,
+    )
+      .bind(userId)
+      .all<{ id: string }>()
+
+    const sessionIds = cursor.results.map((r) => r.id)
+
+    if (sessionIds.length === 0) {
+      return c.json({ success: true, deletedCount: 0 })
+    }
+
+    // Bulk soft-delete in D1
+    const now = Math.floor(Date.now() / 1000)
+    await c.env.DB.prepare(
+      `UPDATE chat_sessions SET status = 'deleted', archived_at = ? WHERE user_id = ? AND status != 'deleted'`,
+    )
+      .bind(now, userId)
+      .run()
+
+    // Best-effort sandbox termination in background
+    c.executionCtx.waitUntil(
+      Promise.allSettled(
+        sessionIds.map(async (sessionId) => {
+          try {
+            const doId = c.env.SESSION_DO.idFromName(sessionId)
+            const doStub = c.env.SESSION_DO.get(doId)
+            await doStub.fetch('http://do/sandbox/terminate', { method: 'POST' })
+          } catch (err) {
+            console.warn(`[sessions] Failed to terminate sandbox for session ${sessionId}:`, err)
+          }
+        }),
+      ),
+    )
+
+    return c.json({ success: true, deletedCount: sessionIds.length })
+  } catch (error) {
+    console.error('Error bulk deleting sessions:', error)
+    return c.json({ error: 'Failed to delete sessions' }, 500)
   }
 })
 

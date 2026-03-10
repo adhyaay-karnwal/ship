@@ -1,7 +1,7 @@
-import { notFound } from 'next/navigation'
 import { verifySession, getUser } from '@/lib/dal'
 import { fetchSessions, getSession, type ChatSession } from '@/lib/api'
 import { DashboardClient } from '../../dashboard/dashboard-client'
+import { SessionLoadingFallback } from '@/components/session/session-loading-fallback'
 
 interface SessionPageProps {
   params: Promise<{ id: string }>
@@ -27,8 +27,16 @@ export default async function SessionPage({ params }: SessionPageProps) {
   }
 
   const matchingSession = sessionDetails || sessions.find((existingSession) => existingSession.id === id)
+
+  // If we can't find the session server-side, render a client fallback that retries
   if (!matchingSession || matchingSession.userId !== session.userId) {
-    notFound()
+    return (
+      <SessionLoadingFallback
+        sessionId={id}
+        userId={session.userId}
+        user={user}
+      />
+    )
   }
 
   const mergedSessions = sessions.some((existingSession) => existingSession.id === id)

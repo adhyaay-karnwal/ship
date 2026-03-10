@@ -111,6 +111,24 @@ export function useDeleteSession() {
 }
 
 /**
+ * Mutation hook to delete all sessions for a user
+ */
+export function useDeleteAllSessions() {
+  const { trigger, isMutating, error } = useSWRMutation(
+    'delete-all-sessions',
+    async (_key: string, { arg }: { arg: { userId: string } }) => {
+      return del<{ success: boolean; deletedCount: number }>(apiUrl('/sessions', { userId: arg.userId }))
+    }
+  )
+
+  return {
+    deleteAllSessions: trigger,
+    isDeleting: isMutating,
+    error,
+  }
+}
+
+/**
  * Mutation hook to retry a failed session operation
  */
 export function useRetrySession() {

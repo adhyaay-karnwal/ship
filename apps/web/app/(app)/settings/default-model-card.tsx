@@ -48,16 +48,16 @@ export function DefaultModelCard({ userId, models, defaultModelId }: DefaultMode
   }
 
   return (
-    <Card className="mb-4">
+    <Card className="shadow-sm">
       <CardHeader className="pb-3">
-        <CardTitle className="text-[14px]">Default Model</CardTitle>
-        <CardDescription className="text-[11px]">
+        <CardTitle className="text-sm">Default Model</CardTitle>
+        <CardDescription className="text-xs">
           Choose which model is selected by default for new sessions
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div>
-          <label className="block text-[11px] font-medium text-muted-foreground mb-1.5">Model</label>
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Model</label>
           <ModelSelector
             value={selected}
             onChange={setSelected}
@@ -67,7 +67,7 @@ export function DefaultModelCard({ userId, models, defaultModelId }: DefaultMode
         </div>
         {selected && (
           <div>
-            <p className="text-[11px] text-muted-foreground mb-1">Current:</p>
+            <p className="text-xs text-muted-foreground mb-1">Current:</p>
             <ModelBadge
               modelId={selected}
               modelName={models.find((m) => m.id === selected)?.name}
@@ -76,12 +76,12 @@ export function DefaultModelCard({ userId, models, defaultModelId }: DefaultMode
         )}
         {error && (
           <div className="rounded-md bg-destructive/10 px-3 py-2">
-            <p className="text-[11px] text-destructive">{error}</p>
+            <p className="text-xs text-destructive">{error}</p>
           </div>
         )}
         {saveSuccess && (
           <div className="rounded-md bg-emerald-500/10 px-3 py-2">
-            <p className="text-[11px] text-emerald-600">Saved!</p>
+            <p className="text-xs text-emerald-600">Saved!</p>
           </div>
         )}
         <div className="flex justify-end pt-1">

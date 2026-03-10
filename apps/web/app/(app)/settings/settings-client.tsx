@@ -16,6 +16,7 @@ import {
 import { DefaultAgentCard } from './default-agent-card'
 import { DefaultModelCard } from './default-model-card'
 import { DefaultRepoCard } from './default-repo-card'
+import { DeleteAllSessionsCard } from './delete-all-sessions-card'
 
 export function SettingsClient({ userId, user }: { userId: string; user?: { username: string; avatarUrl: string | null } }) {
   // Agent hooks
@@ -64,44 +65,58 @@ export function SettingsClient({ userId, user }: { userId: string; user?: { user
 
   return (
     <SettingsShell user={user}>
-      <div className="mx-auto max-w-xl px-4 py-6">
+      <div className="mx-auto max-w-2xl px-4 py-8">
         <h1 className="text-lg font-semibold text-foreground mb-1">Settings</h1>
-        <p className="text-[12px] text-muted-foreground mb-5">Manage your preferences</p>
+        <p className="text-xs text-muted-foreground mb-6">Manage your preferences</p>
 
-        <DefaultAgentCard
-          userId={userId}
-          agents={agents}
-          defaultAgentId={defaultAgentId}
-          onAgentChange={setSelectedAgentId}
-        />
-
-        {agentModels.length > 1 && (
-          <DefaultModelCard
+        {/* Defaults */}
+        <h2 className="text-sm font-medium text-muted-foreground mb-3">Defaults</h2>
+        <div className="space-y-4 mb-8">
+          <DefaultAgentCard
             userId={userId}
-            models={agentModels}
-            defaultModelId={defaultModelId}
+            agents={agents}
+            defaultAgentId={defaultAgentId}
+            onAgentChange={setSelectedAgentId}
           />
-        )}
 
-        <DefaultRepoCard
-          userId={userId}
-          repos={repos}
-          reposLoading={reposLoading}
-          reposLoadMore={reposLoadMore}
-          reposHasMore={reposHasMore ?? false}
-          reposLoadingMore={reposLoadingMore ?? false}
-          defaultRepoFullName={defaultRepoFullName}
-        />
+          {agentModels.length > 1 && (
+            <DefaultModelCard
+              userId={userId}
+              models={agentModels}
+              defaultModelId={defaultModelId}
+            />
+          )}
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-[14px]">Integrations</CardTitle>
-            <CardDescription className="text-[11px]">Connect external services</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ConnectorSettings userId={userId} />
-          </CardContent>
-        </Card>
+          <DefaultRepoCard
+            userId={userId}
+            repos={repos}
+            reposLoading={reposLoading}
+            reposLoadMore={reposLoadMore}
+            reposHasMore={reposHasMore ?? false}
+            reposLoadingMore={reposLoadingMore ?? false}
+            defaultRepoFullName={defaultRepoFullName}
+          />
+        </div>
+
+        {/* Integrations */}
+        <h2 className="text-sm font-medium text-muted-foreground mb-3">Integrations</h2>
+        <div className="space-y-4 mb-8">
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">Integrations</CardTitle>
+              <CardDescription className="text-xs">Connect external services</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ConnectorSettings userId={userId} />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Data */}
+        <h2 className="text-sm font-medium text-muted-foreground mb-3">Data</h2>
+        <div className="space-y-4">
+          <DeleteAllSessionsCard userId={userId} />
+        </div>
       </div>
     </SettingsShell>
   )
