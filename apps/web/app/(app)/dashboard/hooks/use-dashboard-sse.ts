@@ -365,5 +365,95 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
     [activeSessionId],
   )
 
-  return { handleSend }
+  /** Process SSE event for a session when streamSessionInBackground receives it and user is viewing that session */
+  const processStreamEventForSession = useCallback(
+    (sessionId: string, event: { type: string; [k: string]: unknown }) => {
+      if (!streamingMessageRef.current) return
+      const accumulateSetupStepsRef = { current: true }
+      const ctx: SSEHandlerContext = {
+        setMessages,
+        setIsStreaming,
+        setTotalCost,
+        setLastStepCost,
+        setSessionTodos,
+        setFileDiffs,
+        setAgentUrl,
+        setSessionTitle,
+        setSessionInfo,
+        setAgentSessionId,
+        setStreamStartTime,
+        setStreamingStatus,
+        accumulateSetupStepsRef,
+        streamingStatusStepsRef,
+        clearStreamingStatusSteps,
+        streamingMessageRef,
+        assistantTextRef,
+        reasoningRef,
+        targetSessionId: sessionId,
+      }
+      switch (event.type) {
+        case 'message.part.updated':
+          handleMessagePartUpdated(event as any, ctx, scheduleFlush)
+          break
+        case 'done':
+        case 'session.idle':
+          handleDoneOrIdle(ctx, streamStartTimeRef)
+          break
+        case 'session.error':
+          handleSessionError((event as any).properties?.error, ctx)
+          break
+        case 'error':
+          handleGenericError((event as any).error, ctx)
+          break
+        case 'agent-url':
+          handleAgentUrl((event as any).url, ctx)
+          break
+        case 'agent-session':
+          handleAgentSession((event as any).agentSessionId, ctx)
+          break
+        case 'permission.asked':
+          handlePermissionAsked((event as any).properties, ctx)
+          break
+        case 'permission.granted':
+          handlePermissionResolved((event as any).properties?.id, 'granted', ctx)
+          break
+        case 'permission.denied':
+          handlePermissionResolved((event as any).properties?.id, 'denied', ctx)
+          break
+        case 'question.asked':
+          handleQuestionAsked((event as any).properties, ctx)
+          break
+        case 'question.replied':
+          handleQuestionResolved((event as any).properties?.id, 'replied', ctx)
+          break
+        case 'question.rejected':
+          handleQuestionResolved((event as any).properties?.id, 'rejected', ctx)
+          break
+        default:
+          handleRawDataFallbacks(event, ctx)
+      }
+    },
+    [
+      setMessages,
+      setIsStreaming,
+      setTotalCost,
+      setLastStepCost,
+      setSessionTodos,
+      setFileDiffs,
+      setAgentUrl,
+      setSessionTitle,
+      setSessionInfo,
+      setAgentSessionId,
+      setStreamStartTime,
+      setStreamingStatus,
+      streamingStatusStepsRef,
+      clearStreamingStatusSteps,
+      streamingMessageRef,
+      assistantTextRef,
+      reasoningRef,
+      scheduleFlush,
+    ],
+  )
+
+  return { handleSend, processStreamEventForSession }
 }

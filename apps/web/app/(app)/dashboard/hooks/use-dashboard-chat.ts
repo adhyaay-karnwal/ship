@@ -45,6 +45,11 @@ export function useDashboardChat(
   const assistantTextRef = useRef<string>('')
   const reasoningRef = useRef<string>('')
   const messagesRef = useRef<UIMessage[]>([])
+  const activeSessionIdRef = useRef<string | null>(activeSessionId)
+
+  useEffect(() => {
+    activeSessionIdRef.current = activeSessionId
+  }, [activeSessionId])
 
   useEffect(() => {
     messagesRef.current = messages
@@ -237,6 +242,7 @@ export function useDashboardChat(
     assistantTextRef,
     reasoningRef,
     messagesRef,
+    activeSessionIdRef,
     // Persistence (sidebar data)
     ...persistence,
     // Actions

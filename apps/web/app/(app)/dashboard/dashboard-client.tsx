@@ -54,7 +54,7 @@ export function DashboardClient({
     [chat.activeSessionId],
   )
 
-  const { handleSend } = useDashboardSSE({ chat, modeRef })
+  const { handleSend, processStreamEventForSession } = useDashboardSSE({ chat, modeRef })
 
   const {
     repos,
@@ -109,6 +109,7 @@ export function DashboardClient({
   const state = useDashboardState({
     chat,
     handleSend,
+    processStreamEventForSession,
     session: {
       createSession,
       deleteSession,

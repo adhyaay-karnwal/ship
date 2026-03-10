@@ -19,6 +19,7 @@ const DEFAULT_MODES: AgentMode[] = [
 export interface UseDashboardStateParams {
   chat: ReturnType<typeof useDashboardChat>
   handleSend: (content: string, modeOverride?: string, sessionIdOverride?: string) => void
+  processStreamEventForSession?: (sessionId: string, event: { type: string; [k: string]: unknown }) => void
   session: {
     createSession: (arg: CreateSessionParams) => Promise<ChatSession | undefined>
     deleteSession: (arg: { sessionId: string }) => Promise<unknown>
@@ -41,7 +42,7 @@ export interface UseDashboardStateParams {
   }
 }
 
-export function useDashboardState({ chat, handleSend, session, data }: UseDashboardStateParams) {
+export function useDashboardState({ chat, handleSend, processStreamEventForSession, session, data }: UseDashboardStateParams) {
   const { createSession, deleteSession, userId, user, mutateSessions, onSessionCreated, onSessionDeleted } = session
   const {
     repos,
@@ -125,6 +126,16 @@ export function useDashboardState({ chat, handleSend, session, data }: UseDashbo
 
               const type = (event as { type: string }).type
 
+              // When user navigated to this session, forward events to message handlers so response appears
+              if (chat.activeSessionIdRef?.current === sessionId && processStreamEventForSession) {
+                // Seed assistant text from store if we joined mid-stream (user navigated after stream started)
+                const stored = sessionStatusStore.get(sessionId)
+                if (stored?.contentPreview && !chat.assistantTextRef?.current) {
+                  chat.assistantTextRef.current = stored.contentPreview
+                }
+                processStreamEventForSession(sessionId, event as { type: string; [k: string]: unknown })
+              }
+
               // Capture assistant text content for preview
               const textDelta = extractTextDelta(event)
               if (textDelta) {
@@ -178,7 +189,7 @@ export function useDashboardState({ chat, handleSend, session, data }: UseDashbo
         sessionStatusStore.update(sessionId, { isRunning: false, status: 'Error' })
       }
     },
-    [chat],
+    [chat, processStreamEventForSession],
   )
 
   const handleCreate = useCallback(
