@@ -24,6 +24,7 @@ function TerminalPlaceholder({ message, showSpinner }: { message: string; showSp
 }
 
 const RETRY_INTERVAL = 5000
+const CONNECTION_TIMEOUT_MS = 15000
 
 export function TerminalTab({ sessionId, sandboxStatus, sandboxId }: TerminalTabProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -31,7 +32,9 @@ export function TerminalTab({ sessionId, sandboxStatus, sandboxId }: TerminalTab
   const fitRef = useRef<import('@xterm/addon-fit').FitAddon | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const timeoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const retryCountRef = useRef(0)
+  const exhaustedRef = useRef(false)
   const maxRetries = 3
 
   const isProvisioning = sandboxStatus === 'provisioning' || sandboxStatus === 'resuming'
@@ -42,8 +45,15 @@ export function TerminalTab({ sessionId, sandboxStatus, sandboxId }: TerminalTab
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'unavailable'>(
     'unavailable',
   )
+  const [connectionFailed, setConnectionFailed] = useState(false)
 
-  // Update status when sandbox state changes
+  // Reset exhausted when session or sandbox eligibility changes (e.g. new session, sandbox just provisioned)
+  useEffect(() => {
+    exhaustedRef.current = false
+    setConnectionFailed(false)
+  }, [sessionId, canConnect])
+
+  // Update status when sandbox state changes — don't override 'unavailable' if we've exhausted retries
   useEffect(() => {
     if (!sessionId) {
       setStatus('unavailable')
@@ -57,7 +67,7 @@ export function TerminalTab({ sessionId, sandboxStatus, sandboxId }: TerminalTab
       setStatus('unavailable')
       return
     }
-    if (sandboxId) {
+    if (sandboxId && !exhaustedRef.current) {
       setStatus('connecting')
     }
   }, [sessionId, sandboxId, isProvisioning, hasNoSandbox])
@@ -66,6 +76,10 @@ export function TerminalTab({ sessionId, sandboxStatus, sandboxId }: TerminalTab
     if (retryTimerRef.current) {
       clearTimeout(retryTimerRef.current)
       retryTimerRef.current = null
+    }
+    if (timeoutTimerRef.current) {
+      clearTimeout(timeoutTimerRef.current)
+      timeoutTimerRef.current = null
     }
     if (wsRef.current) {
       wsRef.current.close()
@@ -127,12 +141,31 @@ export function TerminalTab({ sessionId, sandboxStatus, sandboxId }: TerminalTab
 
       const wsUrl = `${API_URL.replace('http', 'ws')}/terminal/${sessionId}`
 
+      // Connection timeout: if we don't connect in 15s, give up
+      timeoutTimerRef.current = setTimeout(() => {
+        if (cancelled) return
+        if (wsRef.current?.readyState !== WebSocket.OPEN) {
+          retryCountRef.current = maxRetries
+          exhaustedRef.current = true
+          setConnectionFailed(true)
+          setStatus('unavailable')
+          if (wsRef.current) {
+            wsRef.current.close()
+            wsRef.current = null
+          }
+        }
+      }, CONNECTION_TIMEOUT_MS)
+
       try {
         const ws = new WebSocket(wsUrl)
         wsRef.current = ws
 
         ws.onopen = () => {
           if (!cancelled) {
+            if (timeoutTimerRef.current) {
+              clearTimeout(timeoutTimerRef.current)
+              timeoutTimerRef.current = null
+            }
             setStatus('connected')
             const dims = { cols: term.cols, rows: term.rows }
             ws.send(JSON.stringify({ type: 'resize', ...dims }))
@@ -147,8 +180,14 @@ export function TerminalTab({ sessionId, sandboxStatus, sandboxId }: TerminalTab
 
         ws.onclose = () => {
           if (!cancelled) {
+            if (timeoutTimerRef.current) {
+              clearTimeout(timeoutTimerRef.current)
+              timeoutTimerRef.current = null
+            }
             retryCountRef.current += 1
             if (retryCountRef.current >= maxRetries) {
+              exhaustedRef.current = true
+              setConnectionFailed(true)
               setStatus('unavailable')
             } else {
               setStatus('disconnected')
@@ -220,7 +259,9 @@ export function TerminalTab({ sessionId, sandboxStatus, sandboxId }: TerminalTab
         ? 'Sandbox provisioning...'
         : hasNoSandbox
           ? 'Sandbox unavailable — send a message to start the session'
-          : 'Terminal unavailable'
+          : connectionFailed
+            ? 'Connection failed — send a message to restart the session'
+            : 'Terminal unavailable'
     return <TerminalPlaceholder message={message} showSpinner={isProvisioning} />
   }
 

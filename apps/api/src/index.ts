@@ -19,11 +19,20 @@ app.use(
   '/*',
   cors({
     origin: (origin, c) => {
-      if (!origin) return undefined
-      const allowedOrigins = new Set(
-        (c.env.ALLOWED_ORIGINS ?? 'http://localhost:3000').split(',').map((s: string) => s.trim()),
-      )
-      return allowedOrigins.has(origin) ? origin : undefined
+      const raw = c.env.ALLOWED_ORIGINS ?? 'http://localhost:3000'
+      const allowed = raw.split(',').map((s) => s.trim()).filter(Boolean)
+      const allowedSet = new Set(allowed)
+
+      // No origin (e.g. server-side fetch, curl) — allow if we have any origins configured
+      if (!origin) return allowed[0] ?? '*'
+
+      // Exact match
+      if (allowedSet.has(origin)) return origin
+
+      // Wildcard: *.vercel.app matches any Vercel deployment
+      if (allowedSet.has('*.vercel.app') && origin.endsWith('.vercel.app')) return origin
+
+      return undefined
     },
     credentials: true,
     allowHeaders: ['Content-Type', 'Accept', 'Authorization'],
