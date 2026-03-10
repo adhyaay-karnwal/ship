@@ -52,28 +52,39 @@ const SHARED_MCP_CONFIGS: Record<string, McpServerConfig> = {
 
 const REMOVED_SHARED_MCP_NAMES = ['context7'] as const
 
-async function syncSharedMcpConfigs(client: SandboxAgent, workingDir: string): Promise<void> {
-  for (const [mcpName, config] of Object.entries(SHARED_MCP_CONFIGS)) {
-    await client.setMcpConfig(
-      {
-        directory: workingDir,
-        mcpName,
-      },
-      config,
-    )
-  }
+const MCP_SYNC_TIMEOUT_MS = 25_000
 
-  for (const mcpName of REMOVED_SHARED_MCP_NAMES) {
-    try {
-      await client.deleteMcpConfig({
-        directory: workingDir,
-        mcpName,
-      })
-    } catch (error) {
-      if (error instanceof SandboxAgentError && error.status === 404) continue
-      console.warn(`[sandbox-agent] Failed to delete MCP config "${mcpName}" for ${workingDir}`, error)
-    }
-  }
+async function syncSharedMcpConfigs(client: SandboxAgent, workingDir: string): Promise<void> {
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('MCP config sync timed out')), MCP_SYNC_TIMEOUT_MS),
+  )
+
+  await Promise.race([
+    (async () => {
+      for (const [mcpName, config] of Object.entries(SHARED_MCP_CONFIGS)) {
+        await client.setMcpConfig(
+          {
+            directory: workingDir,
+            mcpName,
+          },
+          config,
+        )
+      }
+
+      for (const mcpName of REMOVED_SHARED_MCP_NAMES) {
+        try {
+          await client.deleteMcpConfig({
+            directory: workingDir,
+            mcpName,
+          })
+        } catch (error) {
+          if (error instanceof SandboxAgentError && error.status === 404) continue
+          console.warn(`[sandbox-agent] Failed to delete MCP config "${mcpName}" for ${workingDir}`, error)
+        }
+      }
+    })(),
+    timeoutPromise,
+  ])
 }
 
 /**

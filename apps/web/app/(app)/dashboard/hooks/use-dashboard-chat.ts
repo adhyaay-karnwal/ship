@@ -14,10 +14,18 @@ import { API_URL } from '@/lib/config'
 import { useSessionPersistence } from './use-session-persistence'
 import { sessionStatusStore } from './use-session-status-store'
 
+export interface UseDashboardChatOptions {
+  onAgentEventRef?: React.MutableRefObject<
+    ((sessionId: string, event: { type: string; [k: string]: unknown }) => void) | null
+  >
+}
+
 export function useDashboardChat(
   initialSessions: ChatSession[],
   initialActiveSessionId: string | null = null,
+  options?: UseDashboardChatOptions,
 ) {
+  const { onAgentEventRef } = options ?? {}
   const [localSessions, setLocalSessions] = useState<ChatSession[]>(initialSessions)
   const [activeSessionId, setActiveSessionId] = useState<string | null>(initialActiveSessionId)
   const [messages, setMessages] = useState<UIMessage[]>([])
@@ -149,10 +157,17 @@ export function useDashboardChat(
           const status = (event as { status?: string }).status
           if (status) setSandboxStatus(status)
         }
+
+        if (event.type === 'agent-event') {
+          const inner = (event as { event?: { type: string; [k: string]: unknown } }).event
+          if (inner) {
+            onAgentEventRef?.current?.(sessionId, inner)
+          }
+        }
       },
       onStatusChange: setWsStatus,
     })
-  }, [setAgentSessionId, setAgentUrl, setSandboxStatus])
+  }, [setAgentSessionId, setAgentUrl, setSandboxStatus, onAgentEventRef])
 
   useEffect(() => {
     return () => wsRef.current?.disconnect()

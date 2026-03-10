@@ -40,8 +40,11 @@ export function DashboardClient({
   const searchParams = useSearchParams()
   const isMobile = useIsMobile()
   const modeRef = useRef('agent')
+  const onAgentEventRef = useRef<((sessionId: string, event: { type: string; [k: string]: unknown }) => void) | null>(
+    null,
+  )
 
-  const chat = useDashboardChat(initialSessions, initialSessionId)
+  const chat = useDashboardChat(initialSessions, initialSessionId, { onAgentEventRef })
 
   // Provision sandbox when opening a session that has none (error or never provisioned)
   useProvisionSandboxWhenNeeded(chat.activeSessionId)
@@ -55,6 +58,13 @@ export function DashboardClient({
   )
 
   const { handleSend, processStreamEventForSession } = useDashboardSSE({ chat, modeRef })
+
+  useEffect(() => {
+    onAgentEventRef.current = processStreamEventForSession
+    return () => {
+      onAgentEventRef.current = null
+    }
+  }, [processStreamEventForSession])
 
   const {
     repos,

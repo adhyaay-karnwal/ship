@@ -495,14 +495,18 @@ export class SessionDO extends DurableObject<Env> {
   async getSandboxStatus(): Promise<{
     sandboxId: string | null
     status: string | null
+    ready?: boolean
     sandboxAgentUrl?: string | null
     agentSessionId?: string | null
     agentType?: string | null
   }> {
     const meta = await this.getSessionMeta()
+    const sandboxId = meta['sandbox_id'] || null
+    const status = meta['sandbox_status'] || null
     return {
-      sandboxId: meta['sandbox_id'] || null,
-      status: meta['sandbox_status'] || null,
+      sandboxId,
+      status,
+      ready: !!(sandboxId && (status === 'active' || status === 'ready')),
       sandboxAgentUrl: meta['sandbox_agent_url'] || null,
       agentSessionId: meta['agent_session_id'] || null,
       agentType: meta['agent_type'] || null,

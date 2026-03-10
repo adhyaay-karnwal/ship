@@ -20,7 +20,7 @@ app.use(
   cors({
     origin: (origin, c) => {
       const raw = c.env.ALLOWED_ORIGINS ?? 'http://localhost:3000'
-      const allowed = raw.split(',').map((s) => s.trim()).filter(Boolean)
+      const allowed = raw.split(',').map((s: string) => s.trim()).filter(Boolean)
       const allowedSet = new Set(allowed)
 
       // No origin (e.g. server-side fetch, curl) — allow if we have any origins configured

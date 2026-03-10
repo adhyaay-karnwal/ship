@@ -12,6 +12,8 @@ import {
   subscribeToSessionEvents,
   disposeSandboxAgent,
   validateAgentRuntime,
+  type SandboxAgent,
+  type AgentSessionConfig,
 } from '../lib/sandbox-agent'
 import { EventTranslatorState } from '../lib/event-translator'
 import { getAgent, getDefaultAgentId } from '../lib/agent-registry'
@@ -19,6 +21,39 @@ import { executeWithRetry, classifyError, sanitizeError, safeErrorForLog } from 
 import { generateBranchName } from '../lib/git-workflow'
 import { generateSessionTitle } from '../lib/generate-session-title'
 import type { Env } from '../env.d'
+
+const CREATE_SESSION_TIMEOUT_MS = 25_000
+const RESUME_SESSION_TIMEOUT_MS = 15_000
+
+async function createAgentSessionWithTimeout(
+  client: SandboxAgent,
+  agentType: string,
+  repoPath: string,
+  config: AgentSessionConfig,
+) {
+  return Promise.race([
+    createAgentSession(client, agentType, repoPath, config),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Create agent session timed out')), CREATE_SESSION_TIMEOUT_MS),
+    ),
+  ])
+}
+
+async function resumeAgentSessionWithTimeout(
+  client: SandboxAgent,
+  sessionId: string,
+): Promise<Awaited<ReturnType<typeof resumeAgentSession>> | null> {
+  try {
+    return await Promise.race([
+      resumeAgentSession(client, sessionId),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Resume agent session timed out')), RESUME_SESSION_TIMEOUT_MS),
+      ),
+    ])
+  } catch {
+    return null
+  }
+}
 
 const app = new Hono<{ Bindings: Env }>()
 
@@ -77,8 +112,9 @@ app.post('/:sessionId', async (c) => {
     `[chat:${sessionId}] Meta: sandboxId=${sandboxId}, sandboxAgentUrl=${sandboxAgentUrl}, agentSessionId=${agentSessionId}, agentType=${agentType}`,
   )
 
-  // Check if sandbox is still provisioning
-  const needsSandboxWait = !sandboxId && sandboxStatus === 'provisioning'
+  // Wait for sandbox when we don't have one — unless we know it failed (error).
+  // Covers: provisioning in progress, or DO cold start (meta not yet set).
+  const needsSandboxWait = !sandboxId && sandboxStatus !== 'error'
 
   try {
     return streamSSE(c, async (stream) => {
@@ -540,7 +576,7 @@ app.post('/:sessionId', async (c) => {
         // Verify/create agent session
         if (currentAgentSessionId) {
           try {
-            const existingSession = await resumeAgentSession(client, currentAgentSessionId)
+            const existingSession = await resumeAgentSessionWithTimeout(client, currentAgentSessionId)
             if (!existingSession) {
               console.log(`[chat:${sessionId}] Stored agent session is invalid, recreating...`)
               currentAgentSessionId = undefined
@@ -564,10 +600,28 @@ app.post('/:sessionId', async (c) => {
           })
 
           try {
-            const result = await createAgentSession(client, agentType, repoPath, sessionConfig)
-            currentAgentSessionId = result.sessionId
-            session = result.session
-            console.log(`[chat:${sessionId}] Agent session created: ${currentAgentSessionId}`)
+            const heartbeatInterval = setInterval(async () => {
+              try {
+                await stream.writeSSE({
+                  event: 'status',
+                  data: JSON.stringify({
+                    type: 'status',
+                    status: 'creating-session',
+                    message: 'Still creating agent session...',
+                  }),
+                })
+              } catch {
+                // Stream may be closed
+              }
+            }, 12000)
+            try {
+              const result = await createAgentSessionWithTimeout(client, agentType, repoPath, sessionConfig)
+              currentAgentSessionId = result.sessionId
+              session = result.session
+              console.log(`[chat:${sessionId}] Agent session created: ${currentAgentSessionId}`)
+            } finally {
+              clearInterval(heartbeatInterval)
+            }
 
             // Save session ID and agent type
             await stub.fetch(
@@ -595,10 +649,10 @@ app.post('/:sessionId', async (c) => {
           }
         } else {
           // Resume existing session
-          session = await resumeAgentSession(client, currentAgentSessionId)
+          session = await resumeAgentSessionWithTimeout(client, currentAgentSessionId)
           if (!session) {
             // Recreate if resume fails
-            const result = await createAgentSession(client, agentType, repoPath, sessionConfig)
+            const result = await createAgentSessionWithTimeout(client, agentType, repoPath, sessionConfig)
             currentAgentSessionId = result.sessionId
             session = result.session
 
@@ -1009,7 +1063,7 @@ app.get('/:sessionId/subagent/:subagentSessionId/stream', async (c) => {
   return streamSSE(c, async (stream) => {
     try {
       const client = await connectToSandboxAgent(sandboxAgentUrl)
-      const session = await resumeAgentSession(client, subagentSessionId)
+      const session = await resumeAgentSessionWithTimeout(client, subagentSessionId)
 
       if (!session) {
         await stream.writeSSE({
@@ -1200,7 +1254,7 @@ app.post('/:sessionId/permission/:permissionId', async (c) => {
     }
 
     // Get the session and send permission reply via ACP
-    const session = await resumeAgentSession(client, agentSessionId)
+    const session = await resumeAgentSessionWithTimeout(client, agentSessionId)
     if (!session) {
       return c.json({ error: 'Agent session not found' }, 400)
     }

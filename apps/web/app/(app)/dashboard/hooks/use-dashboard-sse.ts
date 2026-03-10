@@ -368,7 +368,25 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
   /** Process SSE event for a session when streamSessionInBackground receives it and user is viewing that session */
   const processStreamEventForSession = useCallback(
     (sessionId: string, event: { type: string; [k: string]: unknown }) => {
-      if (!streamingMessageRef.current) return
+      if (!streamingMessageRef.current) {
+        const isStreamingEvent = [
+          'status',
+          'session.status',
+          'message.part.updated',
+          'heartbeat',
+          'agent-url',
+          'agent-session',
+        ].includes(event.type)
+        if (isStreamingEvent) {
+          const placeholder = createAssistantPlaceholder()
+          streamingMessageRef.current = placeholder.id
+          setMessages((prev) => [...prev, placeholder])
+          setIsStreaming(true)
+          const now = Date.now()
+          setStreamStartTime(now)
+          streamStartTimeRef.current = now
+        } else return
+      }
       const accumulateSetupStepsRef = { current: true }
       const ctx: SSEHandlerContext = {
         setMessages,
@@ -428,6 +446,17 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
           break
         case 'question.rejected':
           handleQuestionResolved((event as any).properties?.id, 'rejected', ctx)
+          break
+        case 'status':
+        case 'session.status': {
+          const ev = event as { message?: string; status?: string }
+          const msg = ev.message ?? ev.status
+          if (typeof msg === 'string') {
+            ctx.setStreamingStatus(msg, accumulateSetupStepsRef.current)
+          }
+          break
+        }
+        case 'heartbeat':
           break
         default:
           handleRawDataFallbacks(event, ctx)
