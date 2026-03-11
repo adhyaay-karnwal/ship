@@ -31,9 +31,8 @@ interface SettingsClientProps {
 }
 
 export function SettingsClient({ userId, user, sessions, apiToken }: SettingsClientProps) {
-  useEffect(() => {
-    if (apiToken) setApiToken(apiToken)
-  }, [apiToken])
+  // Set API auth token synchronously so SWR fetches have it before they run
+  if (apiToken) setApiToken(apiToken)
   const router = useRouter()
   const isMobile = useIsMobile()
   const [searchQuery, setSearchQuery] = useState('')

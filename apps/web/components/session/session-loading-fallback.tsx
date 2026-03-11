@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { setApiToken } from '@/lib/api/client'
 import { useSession } from '@/lib/api/hooks/use-sessions'
 import { DashboardClient } from '@/app/(app)/dashboard/dashboard-client'
 import type { ChatSession } from '@/lib/api/server'
@@ -11,9 +12,11 @@ interface SessionLoadingFallbackProps {
   sessionId: string
   userId: string
   user: User
+  apiToken?: string
 }
 
-export function SessionLoadingFallback({ sessionId, userId, user }: SessionLoadingFallbackProps) {
+export function SessionLoadingFallback({ sessionId, userId, user, apiToken }: SessionLoadingFallbackProps) {
+  if (apiToken) setApiToken(apiToken)
   const { session, isError } = useSession(sessionId)
   const [timedOut, setTimedOut] = useState(false)
 
@@ -29,6 +32,7 @@ export function SessionLoadingFallback({ sessionId, userId, user }: SessionLoadi
         userId={userId}
         user={user}
         initialSessionId={sessionId}
+        apiToken={apiToken}
       />
     )
   }

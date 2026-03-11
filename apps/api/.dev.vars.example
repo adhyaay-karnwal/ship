@@ -2,7 +2,7 @@
 # Copy this file to .dev.vars and fill in actual values
 # .dev.vars is gitignored and used by wrangler dev
 
-# Anthropic API Key (for agent operations)
+# Anthropic API Key (for Claude Code agent)
 # Get from: https://console.anthropic.com/settings/keys
 ANTHROPIC_API_KEY=sk-ant-...
 
@@ -13,6 +13,10 @@ E2B_API_KEY=e2b_...
 # Internal API Secret (for authentication between web and API services)
 # Generate with: openssl rand -hex 32
 API_SECRET=your-api-secret-here
+
+# Session JWT signing key (must match SESSION_SECRET in apps/web/.env.local)
+# Used to verify session JWTs from client-side API calls
+SESSION_SECRET=your-session-secret-here
 
 # OpenAI API Key (optional, for Codex agent)
 # Get from: https://platform.openai.com/api-keys

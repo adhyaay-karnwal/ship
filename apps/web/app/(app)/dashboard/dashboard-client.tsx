@@ -49,10 +49,8 @@ export function DashboardClient({
   serverTimestamp = Math.floor(Date.now() / 1000),
   apiToken,
 }: DashboardClientProps) {
-  // Set API auth token on mount (session JWT passed from server component)
-  useEffect(() => {
-    if (apiToken) setApiToken(apiToken)
-  }, [apiToken])
+  // Set API auth token synchronously so SWR fetches (which run in child useEffects) have it
+  if (apiToken) setApiToken(apiToken)
   const searchParams = useSearchParams()
   const isMobile = useIsMobile()
   const modeRef = useRef('agent')

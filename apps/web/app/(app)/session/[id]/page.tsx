@@ -39,6 +39,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
         sessionId={id}
         userId={session.userId}
         user={user}
+        apiToken={apiToken}
       />
     )
   }

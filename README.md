@@ -1,6 +1,6 @@
 # Ship
 
-A background agent platform for building software. Sign in with GitHub, chat with an AI agent (powered by OpenCode SDK) that works on code in sandboxed environments. The agent writes code, runs tests, and deploys while you focus on other things.
+A background agent platform for building software. Sign in with GitHub, chat with AI coding agents (Claude Code, OpenCode, Codex) via the Agent Client Protocol (ACP) in sandboxed environments. The agent writes code, runs tests, and deploys while you focus on other things.
 
 **Core value**: The agent works autonomously in the background on real coding tasks — you come back to working code, not just suggestions.
 
@@ -22,7 +22,7 @@ Inspired by Ramp's [Inspect background coding agent](https://builders.ramp.com/p
 - **Cloudflare account** (free tier)
 - **GitHub account** (for OAuth)
 - **E2B account** (for sandboxes) — [e2b.dev](https://e2b.dev)
-- **Anthropic API key** (for the agent)
+- **Anthropic API key** (for Claude Code agent) or **OpenAI API key** (for Codex agent); OpenCode has no required key
 
 ### 1. Clone and install
 
@@ -63,10 +63,12 @@ Edit `.dev.vars`:
 
 | Variable                          | Description                                                             |
 | --------------------------------- | ----------------------------------------------------------------------- |
-| `ANTHROPIC_API_KEY`               | [console.anthropic.com](https://console.anthropic.com/settings/keys)    |
+| `ANTHROPIC_API_KEY`               | [console.anthropic.com](https://console.anthropic.com/settings/keys) — for Claude Code agent |
 | `E2B_API_KEY`                     | [e2b.dev/dashboard](https://e2b.dev/dashboard) → Settings → API Keys    |
 | `API_SECRET`                      | `openssl rand -hex 32` (must match web app expectations)                |
+| `SESSION_SECRET`                  | Same as web app; for JWT verification                                   |
 | `ALLOWED_ORIGINS`                 | `http://localhost:3000`                                                 |
+| `OPENAI_API_KEY`                  | _(optional)_ [platform.openai.com](https://platform.openai.com/api-keys) — for Codex agent |
 | `LOGIN_RESTRICTED_TO_SINGLE_USER` | _(optional)_ `true` to restrict login to one user                       |
 | `ALLOWED_USER_ID`                 | _(optional)_ Your user ID from `users` table (required when restricted) |
 
@@ -153,8 +155,8 @@ pnpm dev
 
 1. **Sign in** with GitHub OAuth
 2. **Create a session** linked to a GitHub repo
-3. **Chat** with the AI agent
-4. **Agent runs** in an E2B sandbox — writes code, runs tests, creates PRs
+3. **Chat** with the AI agent (Claude Code, OpenCode, or Codex)
+4. **sandbox-agent** runs in an E2B sandbox, hosts the ACP agent — writes code, runs tests, creates PRs
 5. **Watch progress** via SSE (tool calls, reasoning, file changes)
 6. **Review & deploy** via MCP (Vercel, GitHub, docs)
 
@@ -168,9 +170,10 @@ For a detailed architecture overview, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 graph TD
     A[Next.js Web] -->|SSE| B[Cloudflare Worker]
     B -->|Durable Objects| C[Session State]
-    B -->|OpenCode SDK| D[AI Agent]
-    D -->|E2B Sandbox| E[Code Execution]
-    D -->|GitHub API| F[PRs]
+    B -->|HTTP| D[sandbox-agent]
+    D -->|ACP stdio| E[AI Agent]
+    E -->|E2B Sandbox| F[Code Execution]
+    E -->|GitHub API| G[PRs]
 ```
 
 ### Tech stack
@@ -182,8 +185,8 @@ graph TD
 | Backend   | Cloudflare Workers (Hono), Durable Objects |
 | Database  | Cloudflare D1 (SQLite)                     |
 | Auth      | GitHub OAuth (Arctic), JWT (jose)          |
-| Sandboxes | E2B (OpenCode SDK)                         |
-| Agents    | OpenCode SDK (Claude, GPT-4, etc.)         |
+| Sandboxes | E2B (sandbox-agent server)                 |
+| Agents    | sandbox-agent + ACP (Claude Code, OpenCode, Codex) |
 | MCP       | Grep, DeepWiki, Exa                       |
 | Real-time | SSE, WebSockets                            |
 
@@ -201,7 +204,7 @@ ship/
 │       │   ├── index.ts
 │       │   ├── routes/       # Hono routes
 │       │   ├── durable-objects/
-│       │   └── lib/          # E2B, OpenCode, GitHub
+│       │   └── lib/          # E2B, sandbox-agent, event-translator
 │       ├── migrations/
 │       └── wrangler.toml
 └── packages/
@@ -234,6 +237,9 @@ npx wrangler d1 execute ship-db-production --file=src/db/schema.sql --env produc
 npx wrangler secret put ANTHROPIC_API_KEY --env production
 npx wrangler secret put API_SECRET --env production
 npx wrangler secret put E2B_API_KEY --env production
+npx wrangler secret put SESSION_SECRET --env production  # Must match web app
+# Optional, for Codex agent:
+# npx wrangler secret put OPENAI_API_KEY --env production
 
 # Deploy
 npx wrangler deploy --env production
