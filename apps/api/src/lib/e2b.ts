@@ -29,6 +29,8 @@ export interface SandboxConfig {
   timeoutMs?: number
   autoPause?: boolean
   metadata?: Record<string, string>
+  /** Env vars for sandbox (e.g. ANTHROPIC_API_KEY, OPENAI_API_KEY). Available to all processes. */
+  envs?: Record<string, string>
 }
 
 // Sandbox info returned after creation/resume
@@ -51,6 +53,7 @@ export async function createSessionSandbox(apiKey: string, config: SandboxConfig
   const timeoutMs = config.timeoutMs ?? 5 * 60 * 1000 // 5-minute default timeout
 
   try {
+    const hasEnvs = config.envs && Object.keys(config.envs).length > 0
     const sandbox = await Sandbox.betaCreate({
       apiKey,
       autoPause: true, // Enable auto-pause for cost control
@@ -59,6 +62,7 @@ export async function createSessionSandbox(apiKey: string, config: SandboxConfig
         sessionId: config.sessionId,
         ...config.metadata,
       },
+      ...(hasEnvs && { envs: config.envs }),
     })
 
     return {
@@ -203,12 +207,14 @@ export class SandboxManager {
 
   /**
    * Provision a new sandbox for this session
+   * @param envs - Optional env vars (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.) for agent auth
    * @returns SandboxInfo
    */
-  async provision(): Promise<SandboxInfo> {
+  async provision(envs?: Record<string, string>): Promise<SandboxInfo> {
     const info = await createSessionSandbox(this.apiKey, {
       sessionId: this.sessionId,
       autoPause: true, // Always enable auto-pause for cost control
+      ...(envs && Object.keys(envs).length > 0 && { envs }),
     })
 
     this._sandboxId = info.id

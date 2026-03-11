@@ -23,8 +23,6 @@ import { generateSessionTitle } from '../lib/generate-session-title'
 import type { Env } from '../env.d'
 
 const CREATE_SESSION_TIMEOUT_MS = 25_000
-const CURSOR_CREATE_SESSION_TIMEOUT_MS = 45_000
-
 const RESUME_SESSION_TIMEOUT_MS = 15_000
 
 async function createAgentSessionWithTimeout(
@@ -33,21 +31,10 @@ async function createAgentSessionWithTimeout(
   repoPath: string,
   config: AgentSessionConfig,
 ) {
-  const timeoutMs = agentType === 'cursor' ? CURSOR_CREATE_SESSION_TIMEOUT_MS : CREATE_SESSION_TIMEOUT_MS
   return Promise.race([
     createAgentSession(client, agentType, repoPath, config),
     new Promise<never>((_, reject) =>
-      setTimeout(
-        () =>
-          reject(
-            new Error(
-              agentType === 'cursor'
-                ? 'Create agent session timed out. Cursor may need more time to authenticate. Verify CURSOR_API_KEY is set and is a Cloud Agents API key (not Settings/API keys).'
-                : 'Create agent session timed out',
-            ),
-          ),
-        timeoutMs,
-      ),
+      setTimeout(() => reject(new Error('Create agent session timed out')), CREATE_SESSION_TIMEOUT_MS),
     ),
   ])
 }
@@ -119,7 +106,6 @@ app.post('/:sessionId', async (c) => {
   const sandboxStatus = meta.sandbox_status
   let sandboxAgentUrl = meta.sandbox_agent_url
   const agentType = meta.agent_type || getDefaultAgentId()
-  const cursorServerConfigured = meta.sandbox_agent_cursor_auth === 'true'
 
   console.log(
     `[chat:${sessionId}] Meta: sandboxId=${sandboxId}, sandboxAgentUrl=${sandboxAgentUrl}, agentSessionId=${agentSessionId}, agentType=${agentType}`,
@@ -136,7 +122,6 @@ app.post('/:sessionId', async (c) => {
       let currentSandboxId: string | undefined = sandboxId
       let currentSandboxAgentUrl: string | undefined = sandboxAgentUrl
       let currentAgentSessionId: string | undefined = agentSessionId
-      let currentCursorServerConfigured = cursorServerConfigured
 
       const isFirstMessage = !currentAgentSessionId
 
@@ -229,23 +214,6 @@ app.post('/:sessionId', async (c) => {
           return
         }
 
-        if (agentType === 'cursor' && currentSandboxAgentUrl && !currentCursorServerConfigured) {
-          console.warn(`[chat:${sessionId}] Cursor sandbox-agent missing auth marker, forcing restart...`)
-          await stub.fetch(
-            new Request(`${doUrl}/meta`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                sandbox_agent_url: '',
-                agent_session_id: '',
-                sandbox_agent_cursor_auth: '',
-              }),
-            }),
-          )
-          currentSandboxAgentUrl = undefined
-          currentAgentSessionId = undefined
-        }
-
         // Start sandbox-agent server if not running
         if (!currentSandboxAgentUrl) {
           console.log(`[chat:${sessionId}] Starting sandbox-agent server...`)
@@ -259,27 +227,9 @@ app.post('/:sessionId', async (c) => {
           })
 
           try {
-            // Build env vars for the agent (per https://cursor.com/docs/cli/acp — CURSOR_API_KEY for non-interactive auth)
             const envVars: Record<string, string> = {}
             if (c.env.ANTHROPIC_API_KEY) envVars.ANTHROPIC_API_KEY = c.env.ANTHROPIC_API_KEY
             if (c.env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = c.env.OPENAI_API_KEY
-            if (c.env.CURSOR_API_KEY?.trim()) envVars.CURSOR_API_KEY = c.env.CURSOR_API_KEY.trim()
-            if (agentType === 'cursor') {
-              console.log(`[chat:${sessionId}] envVars keys for cursor: ${Object.keys(envVars).join(',')}`)
-              if (!c.env.CURSOR_API_KEY?.trim()) {
-                await stream.writeSSE({
-                  event: 'error',
-                  data: JSON.stringify({
-                    error: 'Cursor agent requires CURSOR_API_KEY',
-                    details: 'Set CURSOR_API_KEY in .dev.vars (local) or Wrangler secrets (production). Get the key from Cursor Dashboard → Integrations → Cloud Agents API, or User API Keys (headless Cursor Agent CLI).',
-                    category: 'user-action',
-                    retryable: false,
-                  }),
-                })
-                return
-              }
-              console.log(`[chat:${sessionId}] Cursor auth: CURSOR_API_KEY set`)
-            }
 
             const { Sandbox } = await import('../lib/e2b')
             const sandbox = await Sandbox.connect(currentSandboxId, { apiKey: c.env.E2B_API_KEY })
@@ -295,11 +245,9 @@ app.post('/:sessionId', async (c) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   sandbox_agent_url: url,
-                  sandbox_agent_cursor_auth: agentType === 'cursor' ? 'true' : '',
                 }),
               }),
             )
-            currentCursorServerConfigured = agentType === 'cursor'
 
             // Send URL to frontend
             await stream.writeSSE({
@@ -457,27 +405,10 @@ app.post('/:sessionId', async (c) => {
                   const envVars: Record<string, string> = {}
                   if (c.env.ANTHROPIC_API_KEY) envVars.ANTHROPIC_API_KEY = c.env.ANTHROPIC_API_KEY
                   if (c.env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = c.env.OPENAI_API_KEY
-                  if (c.env.CURSOR_API_KEY?.trim()) envVars.CURSOR_API_KEY = c.env.CURSOR_API_KEY.trim()
-                  if (agentType === 'cursor') {
-                    console.log(`[chat:${sessionId}] resume restart envVars keys for cursor: ${Object.keys(envVars).join(',')}`)
-                  }
-                  if (agentType === 'cursor' && !c.env.CURSOR_API_KEY?.trim()) {
-                    await stream.writeSSE({
-                      event: 'error',
-                      data: JSON.stringify({
-                        error: 'Cursor agent requires CURSOR_API_KEY',
-                        details: 'Set CURSOR_API_KEY in .dev.vars (local) or Wrangler secrets (production). Get the key from Cursor Dashboard → Integrations → Cloud Agents API, or User API Keys (headless Cursor Agent CLI).',
-                        category: 'user-action',
-                        retryable: false,
-                      }),
-                    })
-                    return
-                  }
 
                   const { url } = await startSandboxAgentServer(resumedSandbox, currentSandboxId, agentType, envVars)
                   currentSandboxAgentUrl = url
                   currentAgentSessionId = undefined
-                  currentCursorServerConfigured = agentType === 'cursor'
                   console.log(`[chat:${sessionId}] Sandbox-agent restarted on resumed sandbox at ${url}`)
 
                   // Save updated URL and clear stale agent session
@@ -488,7 +419,6 @@ app.post('/:sessionId', async (c) => {
                       body: JSON.stringify({
                         sandbox_agent_url: url,
                         agent_session_id: '',
-                        sandbox_agent_cursor_auth: agentType === 'cursor' ? 'true' : '',
                       }),
                     }),
                   )
@@ -527,18 +457,22 @@ app.post('/:sessionId', async (c) => {
                     agent_session_id: '',
                     sandbox_id: '',
                     sandbox_status: '',
-                    sandbox_agent_cursor_auth: '',
                   }),
                 }),
               )
               currentSandboxAgentUrl = undefined
               currentAgentSessionId = undefined
-              currentCursorServerConfigured = false
 
               // Re-provision sandbox
               try {
                 const { createSessionSandbox, Sandbox } = await import('../lib/e2b')
-                const sandboxInfo = await createSessionSandbox(c.env.E2B_API_KEY, { sessionId })
+                const reProvisionEnvs: Record<string, string> = {}
+                if (c.env.ANTHROPIC_API_KEY) reProvisionEnvs.ANTHROPIC_API_KEY = c.env.ANTHROPIC_API_KEY
+                if (c.env.OPENAI_API_KEY) reProvisionEnvs.OPENAI_API_KEY = c.env.OPENAI_API_KEY
+                const sandboxInfo = await createSessionSandbox(c.env.E2B_API_KEY, {
+                  sessionId,
+                  ...(Object.keys(reProvisionEnvs).length > 0 && { envs: reProvisionEnvs }),
+                })
                 currentSandboxId = sandboxInfo.id
                 const newSandbox = await Sandbox.connect(currentSandboxId, { apiKey: c.env.E2B_API_KEY })
                 console.log(`[chat:${sessionId}] New sandbox provisioned: ${currentSandboxId}`)
@@ -559,22 +493,6 @@ app.post('/:sessionId', async (c) => {
                 const envVars: Record<string, string> = {}
                 if (c.env.ANTHROPIC_API_KEY) envVars.ANTHROPIC_API_KEY = c.env.ANTHROPIC_API_KEY
                 if (c.env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = c.env.OPENAI_API_KEY
-                if (c.env.CURSOR_API_KEY?.trim()) envVars.CURSOR_API_KEY = c.env.CURSOR_API_KEY.trim()
-                if (agentType === 'cursor') {
-                  console.log(`[chat:${sessionId}] re-provision envVars keys for cursor: ${Object.keys(envVars).join(',')}`)
-                }
-                if (agentType === 'cursor' && !c.env.CURSOR_API_KEY?.trim()) {
-                  await stream.writeSSE({
-                    event: 'error',
-                    data: JSON.stringify({
-                      error: 'Cursor agent requires CURSOR_API_KEY',
-                      details: 'Set CURSOR_API_KEY in .dev.vars (local) or Wrangler secrets (production). Get the key from Cursor Dashboard → Integrations → Cloud Agents API, or User API Keys (headless Cursor Agent CLI).',
-                      category: 'user-action',
-                      retryable: false,
-                    }),
-                  })
-                  return
-                }
 
                 const { url } = await startSandboxAgentServer(newSandbox, currentSandboxId, agentType, envVars)
                 currentSandboxAgentUrl = url
@@ -587,11 +505,9 @@ app.post('/:sessionId', async (c) => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       sandbox_agent_url: url,
-                      sandbox_agent_cursor_auth: agentType === 'cursor' ? 'true' : '',
                     }),
                   }),
                 )
-                currentCursorServerConfigured = agentType === 'cursor'
 
                 // Re-clone repo if needed
                 const repoMeta = await stub.fetch(new Request(`${doUrl}/meta`))

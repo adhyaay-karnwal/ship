@@ -50,21 +50,6 @@ export const AGENTS: Record<string, AgentConfig> = {
     ],
     extensions: [],
   },
-  cursor: {
-    id: 'cursor',
-    name: 'Cursor',
-    sandboxAgentName: 'cursor',
-    requiredEnvVars: ['CURSOR_API_KEY'],
-    modes: [
-      { id: 'agent', label: 'agent' },
-      { id: 'plan', label: 'plan' },
-      { id: 'ask', label: 'ask' },
-    ],
-    models: [
-      { id: 'cursor/default', name: 'Cursor', provider: 'Cursor' },
-    ],
-    extensions: [],
-  },
   opencode: {
     id: 'opencode',
     name: 'OpenCode',
@@ -129,5 +114,5 @@ export function listAgents(): AgentConfig[] {
  * Get the default agent ID
  */
 export function getDefaultAgentId(): string {
-  return 'cursor'
+  return 'opencode'
 }

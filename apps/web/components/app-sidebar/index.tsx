@@ -21,6 +21,7 @@ export function AppSidebar({
   currentSessionId,
   currentSessionTitle,
   onSessionDeleted,
+  onSessionDeleteFailed,
   onNewChat,
   isStreaming = false,
   streamingSessionIds,
@@ -51,19 +52,17 @@ export function AppSidebar({
   )
 
   const handleDeleteSession = async (session: ChatSession) => {
+    setDeletingSessionId(session.id)
+    onSessionDeleted?.(session.id)
     try {
-      setDeletingSessionId(session.id)
       await deleteSession({ sessionId: session.id })
-      onSessionDeleted?.(session.id)
       if (currentSessionId === session.id) {
         router.push('/')
         window.location.href = '/'
-      } else {
-        router.refresh()
       }
     } catch (error) {
       console.error('Failed to delete session:', error)
-      router.refresh()
+      onSessionDeleteFailed?.(session)
     } finally {
       setDeletingSessionId(null)
     }
@@ -93,6 +92,7 @@ export function AppSidebar({
         onClose={() => setSearchOpen(false)}
         sessions={sessions}
         currentSessionId={currentSessionId}
+        currentSessionTitle={currentSessionTitle}
       />
     </Sidebar>
   )

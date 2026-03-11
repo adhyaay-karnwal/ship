@@ -5,7 +5,7 @@
  * sandbox-agent (https://github.com/rivet-dev/sandbox-agent).
  *
  * sandbox-agent runs inside the E2B sandbox and exposes HTTP/SSE API
- * that manages ACP agents (Claude Code, OpenCode, Codex, Cursor) via stdio.
+ * that manages ACP agents (Claude Code, OpenCode, Codex) via stdio.
  */
 
 import {
@@ -97,12 +97,6 @@ async function syncSharedMcpConfigs(client: SandboxAgent, workingDir: string): P
  * start the server, and return the public URL.
  *
  * Replaces startOpenCodeServer() from e2b.ts
- *
- * Env var flow (for Cursor auth troubleshooting):
- * 1. Worker: c.env.CURSOR_API_KEY from Wrangler secrets or .dev.vars
- * 2. chat.ts: builds envVars, passes to startSandboxAgentServer
- * 3. Wrapper script: /tmp/start-agent.sh exports vars then execs sandbox-agent
- * 4. sandbox-agent inherits env; spawns cursor-agent-acp with process.env; cursor-agent gets CURSOR_API_KEY
  */
 export async function startSandboxAgentServer(
   sandbox: Sandbox,
@@ -110,13 +104,6 @@ export async function startSandboxAgentServer(
   agentType: string,
   envVars: Record<string, string>,
 ): Promise<{ url: string }> {
-  // Debug: log env var keys (never values) for Cursor auth troubleshooting
-  const envKeys = Object.keys(envVars)
-  console.log(`[sandbox-agent:${sandboxId}] startSandboxAgentServer envKeys: ${envKeys.join(',') || '(none)'}`)
-  if (agentType === 'cursor') {
-    console.log(`[sandbox-agent:${sandboxId}] Cursor: CURSOR_API_KEY in envVars: ${envVars.CURSOR_API_KEY ? 'yes' : 'no'}`)
-  }
-
   const agentConfig = getAgent(agentType) || getAgent(getDefaultAgentId())!
 
   // Check if sandbox-agent server is already running
@@ -125,19 +112,10 @@ export async function startSandboxAgentServer(
       `curl -sf http://localhost:${SANDBOX_AGENT_PORT}/v1/health --connect-timeout 2 --max-time 3`,
     )
     if (healthResult.exitCode === 0) {
-      // When using Cursor, we must ensure the server was started with CURSOR_API_KEY.
-      // If we reuse an already-running server, it may have been started without it.
-      // So for Cursor, kill the server and restart with envVars.
-      if (agentType !== 'cursor') {
-        const host = sandbox.getHost(SANDBOX_AGENT_PORT)
-        const url = `https://${host}`
-        console.log(`[sandbox-agent:${sandboxId}] Server already running at ${url}`)
-        return { url }
-      }
-      console.log(`[sandbox-agent:${sandboxId}] Cursor agent: restarting server to ensure CURSOR_API_KEY in env`)
-      const killResult = await sandbox.commands.run(`pkill -f "sandbox-agent server" || true`, { timeoutMs: 5000 })
-      console.log(`[sandbox-agent:${sandboxId}] Cursor: pkill exit=${killResult.exitCode}, waiting 3s for process to terminate...`)
-      await new Promise((r) => setTimeout(r, 3000))
+      const host = sandbox.getHost(SANDBOX_AGENT_PORT)
+      const url = `https://${host}`
+      console.log(`[sandbox-agent:${sandboxId}] Server already running at ${url}`)
+      return { url }
     }
   } catch {
     // Server not running, continue with setup
@@ -167,9 +145,6 @@ export async function startSandboxAgentServer(
   }
 
   // Start sandbox-agent server
-  // For Cursor: cursor-agent-acp spawns cursor-agent with process.env; CURSOR_API_KEY must reach
-  // sandbox-agent. E2B's envs can override/replace the env; use a wrapper script that exports
-  // our vars in a shell (inheriting PATH etc) then execs sandbox-agent, so env is reliably passed.
   console.log(`[sandbox-agent:${sandboxId}] Starting server on port ${SANDBOX_AGENT_PORT}...`)
   const serverCmd = `sandbox-agent server --no-token --host 0.0.0.0 --port ${SANDBOX_AGENT_PORT}`
 
@@ -301,10 +276,7 @@ export async function createAgentSession(
     `[sandbox-agent] Creating session for agent: ${agentConfig.sandboxAgentName}, cwd: ${workingDir}, mode: ${config.mode ?? 'default'}, model: ${config.model ?? 'default'}`,
   )
 
-  // Cursor can hang during MCP sync; skip for Cursor to avoid session creation delays
-  if (agentType !== 'cursor') {
-    await syncSharedMcpConfigs(client, workingDir)
-  }
+  await syncSharedMcpConfigs(client, workingDir)
 
   const session = await client.createSession({
     agent: agentConfig.sandboxAgentName,
@@ -361,20 +333,6 @@ export async function validateAgentRuntime(
 
   if (!agentInfo.installed) {
     throw new Error(`${agentConfig.name} is not installed in sandbox-agent`)
-  }
-
-  if (agentType === 'cursor') {
-    console.log(`[sandbox-agent] Cursor validation: installed=${agentInfo.installed}, credentialsAvailable=${agentInfo.credentialsAvailable}, configError=${agentInfo.configError ?? 'none'}`)
-    if (agentInfo.configError) {
-      throw new Error(`Cursor configuration error: ${agentInfo.configError}`)
-    }
-
-    if (!agentInfo.credentialsAvailable) {
-      throw new Error(
-        'Cursor credentials unavailable. Verify CURSOR_API_KEY is set and is a headless Cursor API key compatible with the agent CLI.',
-      )
-    }
-    console.log(`[sandbox-agent] Cursor validation passed`)
   }
 }
 

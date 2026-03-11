@@ -392,8 +392,13 @@ export class SessionDO extends DurableObject<Env> {
       this.sandboxManager = new SandboxManager(apiKey, sessionId)
     }
 
-    // Provision new sandbox
-    const info = await this.sandboxManager.provision()
+    // Build env vars for agent auth (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
+    const envs: Record<string, string> = {}
+    if (this.env.ANTHROPIC_API_KEY) envs.ANTHROPIC_API_KEY = this.env.ANTHROPIC_API_KEY
+    if (this.env.OPENAI_API_KEY) envs.OPENAI_API_KEY = this.env.OPENAI_API_KEY
+
+    // Provision new sandbox with envs baked in
+    const info = await this.sandboxManager.provision(envs)
 
     // Store sandbox ID and status in session_meta
     await this.setSessionMeta('sandbox_id', info.id)

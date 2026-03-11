@@ -13,6 +13,7 @@ export interface DashboardLayoutSidebarProps {
   currentSessionId?: string
   currentSessionTitle?: string
   onSessionDeleted: (id: string) => void
+  onSessionDeleteFailed?: (session: ChatSession) => void
   onNewChat: () => void
   isStreaming: boolean
   streamingSessionIds?: Set<string>
@@ -44,6 +45,7 @@ export function DashboardLayout({
         currentSessionId={sidebarProps.currentSessionId}
         currentSessionTitle={sidebarProps.currentSessionTitle}
         onSessionDeleted={sidebarProps.onSessionDeleted}
+        onSessionDeleteFailed={sidebarProps.onSessionDeleteFailed}
         onNewChat={sidebarProps.onNewChat}
         isStreaming={sidebarProps.isStreaming}
         streamingSessionIds={sidebarProps.streamingSessionIds}

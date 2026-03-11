@@ -11,9 +11,8 @@ import type { CreateSessionParams } from '@/lib/api/types'
 import { sessionStatusStore } from './use-session-status-store'
 
 const DEFAULT_MODES: AgentMode[] = [
-  { id: 'agent', label: 'agent' },
+  { id: 'build', label: 'build' },
   { id: 'plan', label: 'plan' },
-  { id: 'ask', label: 'ask' },
 ]
 
 export interface UseDashboardStateParams {
@@ -61,19 +60,19 @@ export function useDashboardState({ chat, handleSend, processStreamEventForSessi
   const [selectedBranch, setSelectedBranch] = useState<string>('main')
   const [selectedAgent, setSelectedAgent] = useState<AgentInfo | null>(null)
   const [selectedModel, setSelectedModel] = useState<ModelInfo | null>(null)
-  const [mode, setMode] = useState<AgentModeId>('agent')
+  const [mode, setMode] = useState<AgentModeId>('build')
   const [availableModes, setAvailableModes] = useState<AgentMode[]>(DEFAULT_MODES)
   const [prompt, setPrompt] = useState<string>('')
 
   // Agent initialization (runs once when agents load)
   useEffect(() => {
     if (agentsLoading || defaultAgentLoading || agents.length === 0 || selectedAgent) return
-    const agentId = defaultAgentId || 'cursor'
+    const agentId = defaultAgentId || 'opencode'
     const agent = agents.find((a) => a.id === agentId) || agents[0]
     if (agent) {
       setSelectedAgent(agent)
       setAvailableModes(agent.modes)
-      setMode(agent.modes[0]?.id || 'agent')
+      setMode(agent.modes[0]?.id || 'build')
       if (agent.models.length > 0) {
         setSelectedModel(agent.models[0])
       }
@@ -83,7 +82,7 @@ export function useDashboardState({ chat, handleSend, processStreamEventForSessi
   const handleAgentSelect = useCallback((agent: AgentInfo) => {
     setSelectedAgent(agent)
     setAvailableModes(agent.modes)
-    setMode(agent.modes[0]?.id || 'agent')
+    setMode(agent.modes[0]?.id || 'build')
     if (agent.models.length > 0) {
       setSelectedModel(agent.models[0])
     }
@@ -204,8 +203,8 @@ export function useDashboardState({ chat, handleSend, processStreamEventForSessi
           userId,
           repoOwner: data.repoOwner,
           repoName: data.repoName,
-          model: data.model || selectedModel?.id || 'cursor/default',
-          agentType: selectedAgent?.id || 'cursor',
+          model: data.model || selectedModel?.id || 'opencode/big-pickle',
+          agentType: selectedAgent?.id || 'opencode',
           baseBranch: data.baseBranch || selectedBranch || 'main',
           title: initialTitle || undefined,
         })
@@ -293,22 +292,25 @@ export function useDashboardState({ chat, handleSend, processStreamEventForSessi
 
   const handleDeleteSession = useCallback(
     async (sessionId: string) => {
+      const session = chat.localSessions.find((s) => s.id === sessionId)
+      chat.setLocalSessions((prev) => prev.filter((s) => s.id !== sessionId))
+      mutateSessions?.()
+      onSessionDeleted?.()
       try {
         await deleteSession({ sessionId })
-        chat.setLocalSessions((prev) => prev.filter((s) => s.id !== sessionId))
-        mutateSessions?.()
-        onSessionDeleted?.()
         if (chat.activeSessionId === sessionId) {
           chat.setActiveSessionId(null)
           chat.setMessages([])
           router.push('/')
           window.location.href = '/'
-        } else {
-          router.refresh()
         }
       } catch (error) {
         console.error('Failed to delete session:', error)
-        router.refresh()
+        if (session) {
+          chat.setLocalSessions((prev) =>
+            [...prev, session].sort((a, b) => (b.lastActivity ?? 0) - (a.lastActivity ?? 0)),
+          )
+        }
       }
     },
     [chat, deleteSession, mutateSessions, onSessionDeleted, router],

@@ -58,7 +58,6 @@ npx wrangler secret put ANTHROPIC_API_KEY
 npx wrangler secret put API_SECRET
 npx wrangler secret put E2B_API_KEY
 npx wrangler secret put OPENAI_API_KEY      # Optional, for Codex agent
-npx wrangler secret put CURSOR_API_KEY      # Optional, for Cursor agent
 ```
 
 ## Ports
@@ -127,7 +126,7 @@ Ship uses **sandbox-agent** (by Rivet) as its agent runtime, which supports mult
 
 1. An E2B sandbox is provisioned for each session
 2. `sandbox-agent` binary is installed inside the sandbox
-3. The requested agent (Claude Code, OpenCode, Cursor, Codex) is installed via `sandbox-agent install-agent <name>`
+3. The requested agent (Claude Code, OpenCode, Codex) is installed via `sandbox-agent install-agent <name>`
 4. `sandbox-agent server` exposes an HTTP/SSE API inside the sandbox on port 3000
 5. The Cloudflare Worker connects to the sandbox-agent API and translates events to Ship's SSE format
 
@@ -137,18 +136,9 @@ Ship uses **sandbox-agent** (by Rivet) as its agent runtime, which supports mult
 |-------|-------------------|------------------|-------|
 | Claude Code | `claude` | `ANTHROPIC_API_KEY` | default, plan, acceptEdits, bypassPermissions |
 | OpenCode | `opencode` | — | build, plan |
-| Cursor | `cursor` | `CURSOR_API_KEY` | agent, plan, ask |
 | Codex | `codex` | `OPENAI_API_KEY` | read-only, auto, full-access |
 
 Agent configs are defined in `apps/api/src/lib/agent-registry.ts`. Default agent is `opencode`.
-
-#### Cursor agent authentication
-
-Per [Cursor ACP docs](https://cursor.com/docs/cli/acp), Cursor supports pre-authentication via `--api-key` or `CURSOR_API_KEY` env var:
-
-- **Key source**: Use a key from Cursor Dashboard → Integrations (Cloud Agents API) or from the **User API Keys** section that explicitly mentions "headless version of the Cursor Agent CLI" and "Cloud Agent API". **Keys from Settings → API keys will NOT work.**
-- **Setup**: Set in `apps/api/.dev.vars` locally or via `wrangler secret put CURSOR_API_KEY` for production.
-- **Troubleshooting**: If you see "cursor-agent CLI is not authenticated. To authenticate, run: cursor-agent login", verify (1) the key is from Cloud Agents API or User API Keys (headless CLI), not Settings/API keys, and (2) the env var is set in `.dev.vars` or as a Wrangler secret.
 
 ### Key API Files
 
@@ -376,7 +366,6 @@ ANTHROPIC_API_KEY=...
 API_SECRET=...
 E2B_API_KEY=...
 OPENAI_API_KEY=...         # Optional, for Codex agent
-CURSOR_API_KEY=...         # Optional, for Cursor agent
 ```
 
 ## MCP Servers

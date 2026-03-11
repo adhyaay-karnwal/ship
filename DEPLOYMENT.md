@@ -31,7 +31,6 @@ Before deploying, ensure these are set. Session creation and API calls will fail
 | `E2B_API_KEY` | Yes | E2B sandbox provisioning. | `npx wrangler secret put E2B_API_KEY --env production` |
 | `API_SECRET` | Yes | Internal auth between web and API. | `npx wrangler secret put API_SECRET --env production` |
 | `ANTHROPIC_API_KEY` | Optional | For Claude agent. | `npx wrangler secret put ANTHROPIC_API_KEY --env production` |
-| `CURSOR_API_KEY` | Optional | For Cursor agent. | `npx wrangler secret put CURSOR_API_KEY --env production` |
 
 **CLI to check secrets:** `cd apps/api && npx wrangler secret list --env production`
 

@@ -6,7 +6,7 @@ If `README.md` answers "what is this product and how do I use it?", this file an
 
 ## One-line view
 
-Ship is a cloud-hosted chat platform that provisions E2B sandboxes per session, runs multiple AI coding agents (Claude, OpenCode, Cursor, Codex) via the Agent Client Protocol inside those sandboxes, and streams structured events to a Next.js frontend — with human-in-the-loop for permissions and questions.
+Ship is a cloud-hosted chat platform that provisions E2B sandboxes per session, runs multiple AI coding agents (Claude, OpenCode, Codex) via the Agent Client Protocol inside those sandboxes, and streams structured events to a Next.js frontend — with human-in-the-loop for permissions and questions.
 
 ## System shape
 
@@ -118,7 +118,7 @@ AI-specific rendering components:
 ### Agent lifecycle
 
 1. **Sandbox ready** — `sandbox-agent` binary is installed in the sandbox.
-2. **Agent install** — `sandbox-agent install-agent <name>` (claude, opencode, cursor, codex).
+2. **Agent install** — `sandbox-agent install-agent <name>` (claude, opencode, codex).
 3. **Server start** — `sandbox-agent server` runs on port 3000 inside the sandbox.
 4. **Worker connects** — `connectToSandboxAgent(url)` (cached per sandbox URL).
 5. **Session create/resume** — `createAgentSession()` or `resumeAgentSession()`.
@@ -163,10 +163,9 @@ The DO also exposes HTTP RPC endpoints for messages, tasks, meta, sandbox lifecy
 |-------|--------------------|------------------|-------|
 | Claude Code | `claude` | `ANTHROPIC_API_KEY` | default, plan, acceptEdits |
 | OpenCode | `opencode` | — | build, plan |
-| Cursor | `cursor` | `CURSOR_API_KEY` | agent, plan, ask |
 | Codex | `codex` | `OPENAI_API_KEY` | read-only, auto, full-access |
 
-Agent configs are defined in `apps/api/src/lib/agent-registry.ts`. Default agent is `cursor`.
+Agent configs are defined in `apps/api/src/lib/agent-registry.ts`. Default agent is `opencode`.
 
 ### MCP servers
 
@@ -332,7 +331,7 @@ The system is trying to solve a specific product problem:
 
 - give users a chat interface to AI coding agents that work on real code in sandboxes
 - keep auth, sessions, and sandbox state durable across requests
-- support multiple agents (Claude, OpenCode, Cursor, Codex) via one runtime (sandbox-agent)
+- support multiple agents (Claude, OpenCode, Codex) via one runtime (sandbox-agent)
 - make permission and question flows pause and resume cleanly
 - stream structured events (text, reasoning, tools) in real time
 

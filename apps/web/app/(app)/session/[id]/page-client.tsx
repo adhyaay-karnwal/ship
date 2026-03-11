@@ -336,6 +336,7 @@ export function SessionPageClient({ sessionId, userId, user, sessions: initialSe
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         currentSessionId={sessionId}
+        currentSessionTitle={sessionTitle}
         onSessionDeleted={removeSession}
       />
       <SidebarInset>

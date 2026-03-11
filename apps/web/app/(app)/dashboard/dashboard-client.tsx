@@ -346,7 +346,16 @@ export function DashboardClient({
         onSearchChange: state.setSearchQuery,
         currentSessionId: chat.activeSessionId ?? undefined,
         currentSessionTitle: derived.displayTitle,
-        onSessionDeleted: (id) => chat.setLocalSessions((prev) => prev.filter((s) => s.id !== id)),
+        onSessionDeleted: (id) => {
+          chat.setLocalSessions((prev) => prev.filter((s) => s.id !== id))
+          mutateSessions()
+        },
+        onSessionDeleteFailed: (session) => {
+          chat.setLocalSessions((prev) => {
+            if (prev.some((s) => s.id === session.id)) return prev
+            return [...prev, session].sort((a, b) => (b.lastActivity ?? 0) - (a.lastActivity ?? 0))
+          })
+        },
         onNewChat: () => {
           chat.setActiveSessionId(null)
           chat.setMessages([])

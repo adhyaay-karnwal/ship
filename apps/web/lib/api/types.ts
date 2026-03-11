@@ -83,9 +83,8 @@ export interface DefaultModelResponse {
 
 /** All known agent mode IDs across all agents */
 export type AgentModeId =
-  | 'agent' | 'plan' | 'ask'           // Cursor
-  | 'default' | 'acceptEdits'          // Claude Code
-  | 'build'                            // OpenCode
+  | 'build' | 'plan'                    // OpenCode
+  | 'default' | 'acceptEdits'           // Claude Code
   | 'auto' | 'read-only' | 'full-access' // Codex
 
 export interface AgentMode {

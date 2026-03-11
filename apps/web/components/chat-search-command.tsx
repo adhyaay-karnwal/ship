@@ -19,6 +19,7 @@ interface ChatSearchCommandProps {
   onClose: () => void
   sessions: ChatSession[]
   currentSessionId?: string
+  currentSessionTitle?: string
 }
 
 function formatRelativeTime(timestamp: number): string {
@@ -49,7 +50,7 @@ function NewAgentIcon({ className }: { className?: string }) {
   )
 }
 
-export function ChatSearchCommand({ open, onClose, sessions, currentSessionId }: ChatSearchCommandProps) {
+export function ChatSearchCommand({ open, onClose, sessions, currentSessionId, currentSessionTitle }: ChatSearchCommandProps) {
   const router = useRouter()
   const overlayRef = useRef<HTMLDivElement>(null)
 
@@ -100,7 +101,10 @@ export function ChatSearchCommand({ open, onClose, sessions, currentSessionId }:
                   {active
                     .sort((a, b) => b.lastActivity - a.lastActivity)
                     .map((session) => {
-                      const title = session.repoName
+                      const title =
+                        currentSessionId === session.id
+                          ? (currentSessionTitle || session.title || session.repoName)
+                          : (session.title || session.repoName)
                       const sub = `${session.repoOwner}/${session.repoName}`
                       return (
                         <CommandItem
@@ -132,10 +136,12 @@ export function ChatSearchCommand({ open, onClose, sessions, currentSessionId }:
                 <CommandGroup heading="Archived">
                   {archived
                     .sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0))
-                    .map((session) => (
+                    .map((session) => {
+                      const archivedTitle = session.title || session.repoName
+                      return (
                       <CommandItem
                         key={session.id}
-                        value={`${session.repoName} ${session.repoOwner}/${session.repoName}`}
+                        value={`${archivedTitle} ${session.repoOwner}/${session.repoName}`}
                         onSelect={() => {
                           router.push(`/session/${session.id}`)
                           onClose()
@@ -143,12 +149,13 @@ export function ChatSearchCommand({ open, onClose, sessions, currentSessionId }:
                         className="opacity-50"
                       >
                         <ChatIcon className="size-4 shrink-0 text-muted-foreground/40" />
-                        <span className="flex-1 truncate">{session.repoOwner}/{session.repoName}</span>
+                        <span className="flex-1 truncate">{archivedTitle}</span>
                         <span className="text-xs text-muted-foreground/30 shrink-0">
                           {formatRelativeTime(session.archivedAt ?? session.lastActivity)}
                         </span>
                       </CommandItem>
-                    ))}
+                    )
+                    })}
                 </CommandGroup>
               </>
             )}
