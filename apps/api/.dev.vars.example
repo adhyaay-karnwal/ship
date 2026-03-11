@@ -20,6 +20,7 @@ OPENAI_API_KEY=sk-...
 
 # Cursor API Key (required when using Cursor agent)
 # Get from: Cursor Dashboard → Integrations → Cloud Agents API (not Settings/API keys)
+# Per https://cursor.com/docs/cli/acp — pass via --api-key or CURSOR_API_KEY env
 CURSOR_API_KEY=
 
 # Allowed CORS Origins (comma-separated)

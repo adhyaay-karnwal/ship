@@ -23,6 +23,8 @@ import { generateSessionTitle } from '../lib/generate-session-title'
 import type { Env } from '../env.d'
 
 const CREATE_SESSION_TIMEOUT_MS = 25_000
+const CURSOR_CREATE_SESSION_TIMEOUT_MS = 45_000
+
 const RESUME_SESSION_TIMEOUT_MS = 15_000
 
 async function createAgentSessionWithTimeout(
@@ -31,10 +33,21 @@ async function createAgentSessionWithTimeout(
   repoPath: string,
   config: AgentSessionConfig,
 ) {
+  const timeoutMs = agentType === 'cursor' ? CURSOR_CREATE_SESSION_TIMEOUT_MS : CREATE_SESSION_TIMEOUT_MS
   return Promise.race([
     createAgentSession(client, agentType, repoPath, config),
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Create agent session timed out')), CREATE_SESSION_TIMEOUT_MS),
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              agentType === 'cursor'
+                ? 'Create agent session timed out. Cursor may need more time to authenticate. Verify CURSOR_API_KEY is set and is a Cloud Agents API key (not Settings/API keys).'
+                : 'Create agent session timed out',
+            ),
+          ),
+        timeoutMs,
+      ),
     ),
   ])
 }
@@ -252,6 +265,7 @@ app.post('/:sessionId', async (c) => {
             if (c.env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = c.env.OPENAI_API_KEY
             if (c.env.CURSOR_API_KEY?.trim()) envVars.CURSOR_API_KEY = c.env.CURSOR_API_KEY.trim()
             if (agentType === 'cursor') {
+              console.log(`[chat:${sessionId}] envVars keys for cursor: ${Object.keys(envVars).join(',')}`)
               if (!c.env.CURSOR_API_KEY?.trim()) {
                 await stream.writeSSE({
                   event: 'error',
@@ -444,6 +458,9 @@ app.post('/:sessionId', async (c) => {
                   if (c.env.ANTHROPIC_API_KEY) envVars.ANTHROPIC_API_KEY = c.env.ANTHROPIC_API_KEY
                   if (c.env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = c.env.OPENAI_API_KEY
                   if (c.env.CURSOR_API_KEY?.trim()) envVars.CURSOR_API_KEY = c.env.CURSOR_API_KEY.trim()
+                  if (agentType === 'cursor') {
+                    console.log(`[chat:${sessionId}] resume restart envVars keys for cursor: ${Object.keys(envVars).join(',')}`)
+                  }
                   if (agentType === 'cursor' && !c.env.CURSOR_API_KEY?.trim()) {
                     await stream.writeSSE({
                       event: 'error',
@@ -543,6 +560,9 @@ app.post('/:sessionId', async (c) => {
                 if (c.env.ANTHROPIC_API_KEY) envVars.ANTHROPIC_API_KEY = c.env.ANTHROPIC_API_KEY
                 if (c.env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = c.env.OPENAI_API_KEY
                 if (c.env.CURSOR_API_KEY?.trim()) envVars.CURSOR_API_KEY = c.env.CURSOR_API_KEY.trim()
+                if (agentType === 'cursor') {
+                  console.log(`[chat:${sessionId}] re-provision envVars keys for cursor: ${Object.keys(envVars).join(',')}`)
+                }
                 if (agentType === 'cursor' && !c.env.CURSOR_API_KEY?.trim()) {
                   await stream.writeSSE({
                     event: 'error',

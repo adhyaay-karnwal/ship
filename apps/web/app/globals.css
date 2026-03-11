@@ -2,7 +2,28 @@
 @import "tw-animate-css";
 @import "streamdown/styles.css";
 
-/* Mermaid/diagram blocks: shrink wrapper to fit content, remove outline and excess whitespace */
+/* Code blocks: remove outer wrapper div, move language label to bottom */
+:has(> [data-streamdown="code-block"]) {
+  display: contents;
+}
+[data-streamdown="code-block"] {
+  display: flex !important;
+  flex-direction: column !important;
+}
+[data-streamdown="code-block-header"] {
+  order: 2;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+[data-streamdown="code-block-body"] {
+  order: 1;
+}
+
+/* Mermaid/diagram blocks: remove outer wrapper, shrink to fit content */
+:has(> [data-streamdown="mermaid-block"]) {
+  display: contents;
+}
 [data-streamdown="mermaid-block"] {
   width: fit-content !important;
   max-width: 100%;

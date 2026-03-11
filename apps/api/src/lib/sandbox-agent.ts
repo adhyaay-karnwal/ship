@@ -92,6 +92,14 @@ async function syncSharedMcpConfigs(client: SandboxAgent, workingDir: string): P
  * start the server, and return the public URL.
  *
  * Replaces startOpenCodeServer() from e2b.ts
+ *
+ * Env var flow (for Cursor auth troubleshooting):
+ * 1. Worker: c.env.CURSOR_API_KEY from Wrangler secrets or .dev.vars
+ * 2. chat.ts: builds envVars, passes to startSandboxAgentServer
+ * 3. envExports: "export KEY=val && export KEY2=val2" (no values in logs)
+ * 4. serverCmd: envExports + " && sandbox-agent server ..."
+ * 5. sandbox.commands.run(serverCmd): E2B runs in shell; exports apply to that process
+ * 6. sandbox-agent server inherits env; spawns cursor agent (npx @blowmage/cursor-agent-acp) with same env
  */
 export async function startSandboxAgentServer(
   sandbox: Sandbox,
@@ -99,6 +107,13 @@ export async function startSandboxAgentServer(
   agentType: string,
   envVars: Record<string, string>,
 ): Promise<{ url: string }> {
+  // Debug: log env var keys (never values) for Cursor auth troubleshooting
+  const envKeys = Object.keys(envVars)
+  console.log(`[sandbox-agent:${sandboxId}] startSandboxAgentServer envKeys: ${envKeys.join(',') || '(none)'}`)
+  if (agentType === 'cursor') {
+    console.log(`[sandbox-agent:${sandboxId}] Cursor: CURSOR_API_KEY in envVars: ${envVars.CURSOR_API_KEY ? 'yes' : 'no'}`)
+  }
+
   const agentConfig = getAgent(agentType) || getAgent(getDefaultAgentId())!
 
   // Check if sandbox-agent server is already running
@@ -125,9 +140,9 @@ export async function startSandboxAgentServer(
     // Server not running, continue with setup
   }
 
-  // Set environment variables
+  // Set environment variables (shell-safe: single quotes, escape single quotes in value)
   const envExports = Object.entries(envVars)
-    .map(([k, v]) => `export ${k}="${v}"`)
+    .map(([k, v]) => `export ${k}='${String(v).replace(/'/g, "'\"'\"'")}'`)
     .join(' && ')
 
   // Install sandbox-agent binary
@@ -158,6 +173,11 @@ export async function startSandboxAgentServer(
   const serverCmd = envExports
     ? `${envExports} && sandbox-agent server --no-token --host 0.0.0.0 --port ${SANDBOX_AGENT_PORT}`
     : `sandbox-agent server --no-token --host 0.0.0.0 --port ${SANDBOX_AGENT_PORT}`
+
+  // Debug: log that we have env exports (never log actual values)
+  if (envExports) {
+    console.log(`[sandbox-agent:${sandboxId}] serverCmd has env exports, length=${serverCmd.length}`)
+  }
 
   await sandbox.commands.run(serverCmd, {
     background: true,
@@ -274,7 +294,10 @@ export async function createAgentSession(
     `[sandbox-agent] Creating session for agent: ${agentConfig.sandboxAgentName}, cwd: ${workingDir}, mode: ${config.mode ?? 'default'}, model: ${config.model ?? 'default'}`,
   )
 
-  await syncSharedMcpConfigs(client, workingDir)
+  // Cursor can hang during MCP sync; skip for Cursor to avoid session creation delays
+  if (agentType !== 'cursor') {
+    await syncSharedMcpConfigs(client, workingDir)
+  }
 
   const session = await client.createSession({
     agent: agentConfig.sandboxAgentName,

@@ -162,6 +162,8 @@ pnpm dev
 
 ## Architecture
 
+For a detailed architecture overview, see [ARCHITECTURE.md](./ARCHITECTURE.md).
+
 ```mermaid
 graph TD
     A[Next.js Web] -->|SSE| B[Cloudflare Worker]
