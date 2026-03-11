@@ -18,5 +18,7 @@ export interface AppSidebarProps {
   onSessionDeleted?: (sessionId: string) => void
   onNewChat?: () => void
   isStreaming?: boolean
+  /** Session IDs currently streaming (local + from other tabs) for per-session spinner */
+  streamingSessionIds?: Set<string>
   className?: string
 }

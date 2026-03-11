@@ -26,6 +26,7 @@ interface SidebarSessionsListProps {
   currentSessionId?: string
   currentSessionTitle?: string
   isStreaming: boolean
+  streamingSessionIds?: Set<string>
   deletingSessionId: string | null
   onDeleteSession: (session: ChatSession) => void
 }
@@ -35,6 +36,7 @@ export function SidebarSessionsList({
   currentSessionId,
   currentSessionTitle,
   isStreaming,
+  streamingSessionIds,
   deletingSessionId,
   onDeleteSession,
 }: SidebarSessionsListProps) {
@@ -170,7 +172,7 @@ export function SidebarSessionsList({
                           session={session}
                           currentSessionId={currentSessionId}
                           currentSessionTitle={currentSessionTitle}
-                          isStreaming={isStreaming}
+                          isStreamingForSession={streamingSessionIds?.has(session.id) ?? (isStreaming && currentSessionId === session.id)}
                           deletingSessionId={deletingSessionId}
                           onDelete={onDeleteSession}
                         />
@@ -191,7 +193,7 @@ export function SidebarSessionsList({
                   session={session}
                   currentSessionId={currentSessionId}
                   currentSessionTitle={currentSessionTitle}
-                  isStreaming={isStreaming}
+                  isStreamingForSession={streamingSessionIds?.has(session.id) ?? (isStreaming && currentSessionId === session.id)}
                   deletingSessionId={deletingSessionId}
                   onDelete={onDeleteSession}
                 />

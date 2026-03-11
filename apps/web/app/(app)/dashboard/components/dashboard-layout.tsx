@@ -15,6 +15,7 @@ export interface DashboardLayoutSidebarProps {
   onSessionDeleted: (id: string) => void
   onNewChat: () => void
   isStreaming: boolean
+  streamingSessionIds?: Set<string>
 }
 
 export interface DashboardLayoutProps {
@@ -45,6 +46,7 @@ export function DashboardLayout({
         onSessionDeleted={sidebarProps.onSessionDeleted}
         onNewChat={sidebarProps.onNewChat}
         isStreaming={sidebarProps.isStreaming}
+        streamingSessionIds={sidebarProps.streamingSessionIds}
       />
       <SidebarInset>{children}</SidebarInset>
     </SidebarProvider>

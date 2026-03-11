@@ -1,7 +1,9 @@
 'use client'
 
-import { useCallback, useRef, useEffect } from 'react'
+import { useCallback, useRef, useEffect, useState, useMemo } from 'react'
 import { postSessionSync, subscribeSessionSync } from '@/lib/session-sync-channel'
+import { useSyncExternalStore } from 'react'
+import { sessionStatusStore } from './hooks/use-session-status-store'
 import { useSearchParams } from 'next/navigation'
 import { useIsMobile } from '@ship/ui'
 import { useGitHubRepos } from '@/lib/api/hooks/use-repos'
@@ -104,16 +106,15 @@ export function DashboardClient({
     sessions: swrSessions,
     mutate: mutateSessions,
   } = useSessions(userId, {
-    refreshInterval: !chat.activeSessionId ? 8000 : 0,
+    refreshInterval: 8000,
     revalidateOnFocus: true,
   })
 
-  // Sync SWR sessions into local state when on homepage so list/sidebar stay fresh.
+  // Sync SWR sessions into local state so list/sidebar stay fresh across tabs.
   // Merge to preserve optimistic session creates and titles (in localSessions but not yet in swrSessions).
   const prevSwrLenRef = useRef(0)
   const { activeSessionId, setLocalSessions } = chat
   useEffect(() => {
-    if (activeSessionId) return
     if (swrSessions.length === 0 && prevSwrLenRef.current === 0) return
     prevSwrLenRef.current = swrSessions.length
     setLocalSessions((prev) => {
@@ -126,14 +127,55 @@ export function DashboardClient({
       })
       return [...optimisticOnly, ...merged]
     })
-  }, [activeSessionId, swrSessions, setLocalSessions])
+  }, [swrSessions, setLocalSessions])
 
-  // Cross-tab sync: when another tab creates/deletes a session, revalidate
+  // Cross-tab sync: when another tab creates/deletes a session, revalidate; when streaming state changes, update
+  const [streamingFromOtherTabs, setStreamingFromOtherTabs] = useState<Set<string>>(new Set())
   useEffect(() => {
-    return subscribeSessionSync(() => {
-      mutateSessions()
+    return subscribeSessionSync((msg) => {
+      if (msg.type === 'session-created' || msg.type === 'session-deleted' || msg.type === 'sessions-invalidate') {
+        mutateSessions()
+      } else if (msg.type === 'session-streaming') {
+        setStreamingFromOtherTabs((prev) => new Set(prev).add(msg.sessionId))
+      } else if (msg.type === 'session-stopped') {
+        setStreamingFromOtherTabs((prev) => {
+          const next = new Set(prev)
+          next.delete(msg.sessionId)
+          return next
+        })
+      }
     })
   }, [mutateSessions])
+
+  // Cross-tab streaming: broadcast when our sessions start/stop
+  const storeMap = useSyncExternalStore(
+    sessionStatusStore.subscribe,
+    sessionStatusStore.getSnapshot,
+    sessionStatusStore.getSnapshot,
+  )
+  const prevStoreRef = useRef<Map<string, { isRunning: boolean }>>(new Map())
+  useEffect(() => {
+    const toPost: Array<{ type: 'session-streaming' | 'session-stopped'; sessionId: string }> = []
+    for (const [sessionId, status] of storeMap) {
+      const prev = prevStoreRef.current.get(sessionId)?.isRunning ?? false
+      if (status.isRunning !== prev) {
+        toPost.push({ type: status.isRunning ? 'session-streaming' : 'session-stopped', sessionId })
+      }
+      prevStoreRef.current.set(sessionId, { isRunning: status.isRunning })
+    }
+    for (const msg of toPost) {
+      postSessionSync(msg)
+    }
+  }, [storeMap])
+
+  const streamingSessionIds = useMemo(() => {
+    const ids = new Set(streamingFromOtherTabs)
+    if (chat.activeSessionId && chat.isStreaming) ids.add(chat.activeSessionId)
+    for (const [sessionId, status] of storeMap) {
+      if (status.isRunning) ids.add(sessionId)
+    }
+    return ids
+  }, [streamingFromOtherTabs, chat.activeSessionId, chat.isStreaming, storeMap])
 
   const state = useDashboardState({
     chat,
@@ -310,6 +352,7 @@ export function DashboardClient({
           chat.setMessages([])
         },
         isStreaming: chat.isStreaming,
+        streamingSessionIds,
       }}
     >
       <DashboardMainColumn

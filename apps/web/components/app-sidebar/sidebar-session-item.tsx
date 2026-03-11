@@ -12,7 +12,7 @@ interface SessionItemProps {
   session: ChatSession
   currentSessionId?: string
   currentSessionTitle?: string
-  isStreaming: boolean
+  isStreamingForSession: boolean
   deletingSessionId: string | null
   onDelete: (session: ChatSession) => void
 }
@@ -21,12 +21,11 @@ export function SessionItem({
   session,
   currentSessionId,
   currentSessionTitle,
-  isStreaming,
+  isStreamingForSession,
   deletingSessionId,
   onDelete,
 }: SessionItemProps) {
   const isCurrent = currentSessionId === session.id
-  const isCurrentAndStreaming = isStreaming && isCurrent
   const displayTitle = getSessionDisplayTitle(session, {
     preferredTitle: isCurrent ? currentSessionTitle : undefined,
   }) || session.repoName
@@ -42,7 +41,7 @@ export function SessionItem({
             : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground',
         )}
       >
-        {isCurrentAndStreaming && (
+        {isStreamingForSession && (
           <span className="shrink-0 w-2.5 h-2.5 border-[1.5px] border-primary/30 border-t-primary rounded-full animate-spin" />
         )}
         <div className="flex-1 min-w-0">

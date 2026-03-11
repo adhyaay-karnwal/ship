@@ -54,6 +54,11 @@ const REMOVED_SHARED_MCP_NAMES = ['context7'] as const
 
 const MCP_SYNC_TIMEOUT_MS = 25_000
 
+/** Escape a value for use inside single-quoted bash string: ' becomes '\'' */
+function shellEscape(val: string): string {
+  return "'" + val.replace(/'/g, "'\\''") + "'"
+}
+
 async function syncSharedMcpConfigs(client: SandboxAgent, workingDir: string): Promise<void> {
   const timeoutPromise = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error('MCP config sync timed out')), MCP_SYNC_TIMEOUT_MS),
@@ -96,10 +101,8 @@ async function syncSharedMcpConfigs(client: SandboxAgent, workingDir: string): P
  * Env var flow (for Cursor auth troubleshooting):
  * 1. Worker: c.env.CURSOR_API_KEY from Wrangler secrets or .dev.vars
  * 2. chat.ts: builds envVars, passes to startSandboxAgentServer
- * 3. envExports: "export KEY=val && export KEY2=val2" (no values in logs)
- * 4. serverCmd: envExports + " && sandbox-agent server ..."
- * 5. sandbox.commands.run(serverCmd): E2B runs in shell; exports apply to that process
- * 6. sandbox-agent server inherits env; spawns cursor agent (npx @blowmage/cursor-agent-acp) with same env
+ * 3. Wrapper script: /tmp/start-agent.sh exports vars then execs sandbox-agent
+ * 4. sandbox-agent inherits env; spawns cursor-agent-acp with process.env; cursor-agent gets CURSOR_API_KEY
  */
 export async function startSandboxAgentServer(
   sandbox: Sandbox,
@@ -140,11 +143,6 @@ export async function startSandboxAgentServer(
     // Server not running, continue with setup
   }
 
-  // Set environment variables (shell-safe: single quotes, escape single quotes in value)
-  const envExports = Object.entries(envVars)
-    .map(([k, v]) => `export ${k}='${String(v).replace(/'/g, "'\"'\"'")}'`)
-    .join(' && ')
-
   // Install sandbox-agent binary
   console.log(`[sandbox-agent:${sandboxId}] Installing sandbox-agent...`)
   const installResult = await sandbox.commands.run(
@@ -169,20 +167,29 @@ export async function startSandboxAgentServer(
   }
 
   // Start sandbox-agent server
+  // For Cursor: cursor-agent-acp spawns cursor-agent with process.env; CURSOR_API_KEY must reach
+  // sandbox-agent. E2B's envs can override/replace the env; use a wrapper script that exports
+  // our vars in a shell (inheriting PATH etc) then execs sandbox-agent, so env is reliably passed.
   console.log(`[sandbox-agent:${sandboxId}] Starting server on port ${SANDBOX_AGENT_PORT}...`)
-  const serverCmd = envExports
-    ? `${envExports} && sandbox-agent server --no-token --host 0.0.0.0 --port ${SANDBOX_AGENT_PORT}`
-    : `sandbox-agent server --no-token --host 0.0.0.0 --port ${SANDBOX_AGENT_PORT}`
+  const serverCmd = `sandbox-agent server --no-token --host 0.0.0.0 --port ${SANDBOX_AGENT_PORT}`
 
-  // Debug: log that we have env exports (never log actual values)
-  if (envExports) {
-    console.log(`[sandbox-agent:${sandboxId}] serverCmd has env exports, length=${serverCmd.length}`)
+  if (Object.keys(envVars).length > 0) {
+    // Wrapper script: export vars then exec sandbox-agent. Base64 avoids shell-escaping API keys.
+    const scriptLines = [
+      '#!/bin/bash',
+      ...Object.entries(envVars).map(([k, v]) => `export ${k}=${shellEscape(v)}`),
+      `exec ${serverCmd}`,
+    ]
+    const script = scriptLines.join('\n')
+    const bytes = new TextEncoder().encode(script)
+    let binary = ''
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+    const b64 = btoa(binary)
+    const runCmd = `echo '${b64}' | base64 -d > /tmp/start-agent.sh && chmod +x /tmp/start-agent.sh && /tmp/start-agent.sh`
+    await sandbox.commands.run(runCmd, { background: true, timeoutMs: 0 })
+  } else {
+    await sandbox.commands.run(serverCmd, { background: true, timeoutMs: 0 })
   }
-
-  await sandbox.commands.run(serverCmd, {
-    background: true,
-    timeoutMs: 0,
-  })
 
   // Wait for server to be ready
   console.log(`[sandbox-agent:${sandboxId}] Waiting for server health...`)

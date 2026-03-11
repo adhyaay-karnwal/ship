@@ -23,6 +23,7 @@ export function AppSidebar({
   onSessionDeleted,
   onNewChat,
   isStreaming = false,
+  streamingSessionIds,
   className,
 }: AppSidebarProps) {
   const router = useRouter()
@@ -80,6 +81,7 @@ export function AppSidebar({
         currentSessionId={currentSessionId}
         currentSessionTitle={currentSessionTitle}
         isStreaming={isStreaming}
+        streamingSessionIds={streamingSessionIds}
         deletingSessionId={deletingSessionId}
         onDeleteSession={handleDeleteSession}
       />
