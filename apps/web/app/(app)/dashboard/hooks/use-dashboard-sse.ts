@@ -387,7 +387,10 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
           streamStartTimeRef.current = now
         } else return
       }
-      const accumulateSetupStepsRef = { current: true }
+      const hasCompletedAssistant = messagesRef.current.some(
+        (m) => m.role === 'assistant' && (m.content || m.toolInvocations?.length),
+      )
+      const accumulateSetupStepsRef = { current: !hasCompletedAssistant }
       const ctx: SSEHandlerContext = {
         setMessages,
         setIsStreaming,

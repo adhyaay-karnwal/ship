@@ -125,16 +125,20 @@ app.post('/:sessionId', async (c) => {
       let currentAgentSessionId: string | undefined = agentSessionId
       let currentCursorServerConfigured = cursorServerConfigured
 
+      const isFirstMessage = !currentAgentSessionId
+
       try {
-        // Send initial status
-        await stream.writeSSE({
-          event: 'status',
-          data: JSON.stringify({
-            type: 'status',
-            status: 'initializing',
-            message: 'Preparing agent...',
-          }),
-        })
+        // Send initial status (only on first message — follow-ups just show "Thinking...")
+        if (isFirstMessage) {
+          await stream.writeSSE({
+            event: 'status',
+            data: JSON.stringify({
+              type: 'status',
+              status: 'initializing',
+              message: 'Preparing agent...',
+            }),
+          })
+        }
 
         // Wait for sandbox if needed
         if (needsSandboxWait) {
@@ -396,155 +400,258 @@ app.post('/:sessionId', async (c) => {
         if (currentSandboxAgentUrl) {
           const healthy = await checkSandboxAgentHealth(currentSandboxAgentUrl)
           if (!healthy) {
-            console.warn(`[chat:${sessionId}] Sandbox agent unhealthy at ${currentSandboxAgentUrl}, re-provisioning...`)
-            await stream.writeSSE({
-              event: 'status',
-              data: JSON.stringify({
-                type: 'status',
-                status: 'reconnecting',
-                message: 'Reconnecting — sandbox expired, re-provisioning...',
-              }),
-            })
+            console.warn(`[chat:${sessionId}] Sandbox agent unhealthy at ${currentSandboxAgentUrl}`)
 
-            // Clear stale metadata
-            await stub.fetch(
-              new Request(`${doUrl}/meta`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  sandbox_agent_url: '',
-                  agent_session_id: '',
-                  sandbox_id: '',
-                  sandbox_status: '',
-                  sandbox_agent_cursor_auth: '',
-                }),
-              }),
-            )
-            currentSandboxAgentUrl = undefined
-            currentAgentSessionId = undefined
-            currentCursorServerConfigured = false
-
-            // Re-provision sandbox
-            try {
-              const { createSessionSandbox, Sandbox } = await import('../lib/e2b')
-              const sandboxInfo = await createSessionSandbox(c.env.E2B_API_KEY, { sessionId })
-              currentSandboxId = sandboxInfo.id
-              const newSandbox = await Sandbox.connect(currentSandboxId, { apiKey: c.env.E2B_API_KEY })
-              console.log(`[chat:${sessionId}] New sandbox provisioned: ${currentSandboxId}`)
-
-              // Save new sandbox ID
-              await stub.fetch(
-                new Request(`${doUrl}/meta`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    sandbox_id: currentSandboxId,
-                    sandbox_status: 'active',
-                  }),
-                }),
-              )
-
-              // Start sandbox-agent server
-              const envVars: Record<string, string> = {}
-              if (c.env.ANTHROPIC_API_KEY) envVars.ANTHROPIC_API_KEY = c.env.ANTHROPIC_API_KEY
-              if (c.env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = c.env.OPENAI_API_KEY
-              if (c.env.CURSOR_API_KEY?.trim()) envVars.CURSOR_API_KEY = c.env.CURSOR_API_KEY.trim()
-              if (agentType === 'cursor' && !c.env.CURSOR_API_KEY?.trim()) {
+            // Step 1: If we have a sandbox ID, try resuming it (handles paused sandboxes)
+            let resumed = false
+            if (currentSandboxId) {
+              try {
+                console.log(`[chat:${sessionId}] Attempting to resume sandbox ${currentSandboxId}...`)
                 await stream.writeSSE({
-                  event: 'error',
+                  event: 'status',
                   data: JSON.stringify({
-                    error: 'Cursor agent requires CURSOR_API_KEY',
-                    details: 'Set CURSOR_API_KEY in .dev.vars (local) or Wrangler secrets (production). Get the key from Cursor Dashboard → Integrations → Cloud Agents API, or User API Keys (headless Cursor Agent CLI).',
-                    category: 'user-action',
-                    retryable: false,
+                    type: 'status',
+                    status: 'reconnecting',
+                    message: 'Resuming sandbox...',
                   }),
                 })
-                return
-              }
 
-              const { url } = await startSandboxAgentServer(newSandbox, currentSandboxId, agentType, envVars)
-              currentSandboxAgentUrl = url
-              console.log(`[chat:${sessionId}] Re-provisioned sandbox-agent at ${url}`)
+                const { resumeSandbox } = await import('../lib/e2b')
+                await resumeSandbox(c.env.E2B_API_KEY, currentSandboxId)
+                console.log(`[chat:${sessionId}] Sandbox resumed successfully: ${currentSandboxId}`)
 
-              // Save new URL
-              await stub.fetch(
-                new Request(`${doUrl}/meta`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    sandbox_agent_url: url,
-                    sandbox_agent_cursor_auth: agentType === 'cursor' ? 'true' : '',
-                  }),
-                }),
-              )
-              currentCursorServerConfigured = agentType === 'cursor'
-
-              // Re-clone repo if needed
-              const repoMeta = await stub.fetch(new Request(`${doUrl}/meta`))
-              const repoMetaJson = (await repoMeta.json()) as Record<string, string>
-              if (repoMetaJson.repoOwner || repoMetaJson.repo_owner) {
-                const owner = repoMetaJson.repoOwner || repoMetaJson.repo_owner
-                const name = repoMetaJson.repoName || repoMetaJson.repo_name
-                const uid = repoMetaJson.userId || repoMetaJson.user_id
-
-                if (owner && name && uid) {
+                // Re-check sandbox-agent health after resume
+                const healthyAfterResume = await checkSandboxAgentHealth(currentSandboxAgentUrl)
+                if (healthyAfterResume) {
+                  console.log(`[chat:${sessionId}] Sandbox-agent healthy after resume`)
+                  resumed = true
+                } else {
+                  // Sandbox is running but sandbox-agent server needs restart
+                  console.log(`[chat:${sessionId}] Sandbox resumed but agent unhealthy, restarting sandbox-agent server...`)
                   await stream.writeSSE({
                     event: 'status',
                     data: JSON.stringify({
                       type: 'status',
-                      status: 'cloning',
-                      message: `Re-cloning ${owner}/${name}...`,
+                      status: 'reconnecting',
+                      message: 'Restarting agent server on resumed sandbox...',
                     }),
                   })
 
-                  const accountRes = await c.env.DB.prepare(
-                    'SELECT access_token FROM accounts WHERE user_id = ? AND provider = ? LIMIT 1',
+                  const { Sandbox: E2BSandbox } = await import('../lib/e2b')
+                  const resumedSandbox = await E2BSandbox.connect(currentSandboxId, { apiKey: c.env.E2B_API_KEY })
+
+                  const envVars: Record<string, string> = {}
+                  if (c.env.ANTHROPIC_API_KEY) envVars.ANTHROPIC_API_KEY = c.env.ANTHROPIC_API_KEY
+                  if (c.env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = c.env.OPENAI_API_KEY
+                  if (c.env.CURSOR_API_KEY?.trim()) envVars.CURSOR_API_KEY = c.env.CURSOR_API_KEY.trim()
+                  if (agentType === 'cursor' && !c.env.CURSOR_API_KEY?.trim()) {
+                    await stream.writeSSE({
+                      event: 'error',
+                      data: JSON.stringify({
+                        error: 'Cursor agent requires CURSOR_API_KEY',
+                        details: 'Set CURSOR_API_KEY in .dev.vars (local) or Wrangler secrets (production). Get the key from Cursor Dashboard → Integrations → Cloud Agents API, or User API Keys (headless Cursor Agent CLI).',
+                        category: 'user-action',
+                        retryable: false,
+                      }),
+                    })
+                    return
+                  }
+
+                  const { url } = await startSandboxAgentServer(resumedSandbox, currentSandboxId, agentType, envVars)
+                  currentSandboxAgentUrl = url
+                  currentAgentSessionId = undefined
+                  currentCursorServerConfigured = agentType === 'cursor'
+                  console.log(`[chat:${sessionId}] Sandbox-agent restarted on resumed sandbox at ${url}`)
+
+                  // Save updated URL and clear stale agent session
+                  await stub.fetch(
+                    new Request(`${doUrl}/meta`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        sandbox_agent_url: url,
+                        agent_session_id: '',
+                        sandbox_agent_cursor_auth: agentType === 'cursor' ? 'true' : '',
+                      }),
+                    }),
                   )
-                    .bind(uid, 'github')
-                    .first<{ access_token: string }>()
 
-                  if (accountRes?.access_token) {
-                    const repoUrl = `https://github.com/${owner}/${name}.git`
-                    const baseBranch = repoMetaJson.base_branch || 'main'
-                    const branchName = repoMetaJson.current_branch || generateBranchName('agent-task', sessionId)
-                    const authUrl = repoUrl.replace('https://', `https://${accountRes.access_token}@`)
+                  await stream.writeSSE({
+                    event: 'agent-url',
+                    data: JSON.stringify({ type: 'agent-url', url }),
+                  })
+                  resumed = true
+                }
+              } catch (resumeError) {
+                console.warn(`[chat:${sessionId}] Resume failed (sandbox may be terminated):`, safeErrorForLog(resumeError))
+                // Fall through to full re-provisioning
+              }
+            }
 
-                    const cloneResult = await newSandbox.commands.run(`git clone ${authUrl} ${repoPath}`)
-                    if (cloneResult.exitCode === 0) {
-                      await newSandbox.commands.run(`cd ${repoPath} && git config user.name "Ship Agent"`)
-                      await newSandbox.commands.run(`cd ${repoPath} && git config user.email "shipagent@dylansteck.com"`)
-                      await newSandbox.commands.run(`cd ${repoPath} && git checkout ${baseBranch}`)
-                      await newSandbox.commands.run(`cd ${repoPath} && git checkout -b ${branchName}`)
+            // Step 2: If resume didn't work, fall back to full re-provisioning
+            if (!resumed) {
+              console.log(`[chat:${sessionId}] Re-provisioning sandbox...`)
+              await stream.writeSSE({
+                event: 'status',
+                data: JSON.stringify({
+                  type: 'status',
+                  status: 'reconnecting',
+                  message: 'Reconnecting — sandbox expired, re-provisioning...',
+                }),
+              })
 
-                      await stub.fetch(
-                        new Request(`${doUrl}/meta`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ repo_url: repoUrl, current_branch: branchName, base_branch: baseBranch, repo_path: repoPath }),
-                        }),
-                      )
+              // Clear stale metadata
+              await stub.fetch(
+                new Request(`${doUrl}/meta`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    sandbox_agent_url: '',
+                    agent_session_id: '',
+                    sandbox_id: '',
+                    sandbox_status: '',
+                    sandbox_agent_cursor_auth: '',
+                  }),
+                }),
+              )
+              currentSandboxAgentUrl = undefined
+              currentAgentSessionId = undefined
+              currentCursorServerConfigured = false
+
+              // Re-provision sandbox
+              try {
+                const { createSessionSandbox, Sandbox } = await import('../lib/e2b')
+                const sandboxInfo = await createSessionSandbox(c.env.E2B_API_KEY, { sessionId })
+                currentSandboxId = sandboxInfo.id
+                const newSandbox = await Sandbox.connect(currentSandboxId, { apiKey: c.env.E2B_API_KEY })
+                console.log(`[chat:${sessionId}] New sandbox provisioned: ${currentSandboxId}`)
+
+                // Save new sandbox ID
+                await stub.fetch(
+                  new Request(`${doUrl}/meta`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      sandbox_id: currentSandboxId,
+                      sandbox_status: 'active',
+                    }),
+                  }),
+                )
+
+                // Start sandbox-agent server
+                const envVars: Record<string, string> = {}
+                if (c.env.ANTHROPIC_API_KEY) envVars.ANTHROPIC_API_KEY = c.env.ANTHROPIC_API_KEY
+                if (c.env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = c.env.OPENAI_API_KEY
+                if (c.env.CURSOR_API_KEY?.trim()) envVars.CURSOR_API_KEY = c.env.CURSOR_API_KEY.trim()
+                if (agentType === 'cursor' && !c.env.CURSOR_API_KEY?.trim()) {
+                  await stream.writeSSE({
+                    event: 'error',
+                    data: JSON.stringify({
+                      error: 'Cursor agent requires CURSOR_API_KEY',
+                      details: 'Set CURSOR_API_KEY in .dev.vars (local) or Wrangler secrets (production). Get the key from Cursor Dashboard → Integrations → Cloud Agents API, or User API Keys (headless Cursor Agent CLI).',
+                      category: 'user-action',
+                      retryable: false,
+                    }),
+                  })
+                  return
+                }
+
+                const { url } = await startSandboxAgentServer(newSandbox, currentSandboxId, agentType, envVars)
+                currentSandboxAgentUrl = url
+                console.log(`[chat:${sessionId}] Re-provisioned sandbox-agent at ${url}`)
+
+                // Save new URL
+                await stub.fetch(
+                  new Request(`${doUrl}/meta`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      sandbox_agent_url: url,
+                      sandbox_agent_cursor_auth: agentType === 'cursor' ? 'true' : '',
+                    }),
+                  }),
+                )
+                currentCursorServerConfigured = agentType === 'cursor'
+
+                // Re-clone repo if needed
+                const repoMeta = await stub.fetch(new Request(`${doUrl}/meta`))
+                const repoMetaJson = (await repoMeta.json()) as Record<string, string>
+                if (repoMetaJson.repoOwner || repoMetaJson.repo_owner) {
+                  const owner = repoMetaJson.repoOwner || repoMetaJson.repo_owner
+                  const name = repoMetaJson.repoName || repoMetaJson.repo_name
+                  const uid = repoMetaJson.userId || repoMetaJson.user_id
+
+                  if (owner && name && uid) {
+                    await stream.writeSSE({
+                      event: 'status',
+                      data: JSON.stringify({
+                        type: 'status',
+                        status: 'cloning',
+                        message: `Re-cloning ${owner}/${name}...`,
+                      }),
+                    })
+
+                    const accountRes = await c.env.DB.prepare(
+                      'SELECT access_token FROM accounts WHERE user_id = ? AND provider = ? LIMIT 1',
+                    )
+                      .bind(uid, 'github')
+                      .first<{ access_token: string }>()
+
+                    if (accountRes?.access_token) {
+                      const repoUrl = `https://github.com/${owner}/${name}.git`
+                      const baseBranch = repoMetaJson.base_branch || 'main'
+                      const branchName = repoMetaJson.current_branch || generateBranchName('agent-task', sessionId)
+                      const authUrl = repoUrl.replace('https://', `https://${accountRes.access_token}@`)
+
+                      const cloneResult = await newSandbox.commands.run(`git clone ${authUrl} ${repoPath}`)
+                      if (cloneResult.exitCode === 0) {
+                        await newSandbox.commands.run(`cd ${repoPath} && git config user.name "Ship Agent"`)
+                        await newSandbox.commands.run(`cd ${repoPath} && git config user.email "shipagent@dylansteck.com"`)
+                        await newSandbox.commands.run(`cd ${repoPath} && git checkout ${baseBranch}`)
+                        await newSandbox.commands.run(`cd ${repoPath} && git checkout -b ${branchName}`)
+
+                        await stub.fetch(
+                          new Request(`${doUrl}/meta`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ repo_url: repoUrl, current_branch: branchName, base_branch: baseBranch, repo_path: repoPath }),
+                          }),
+                        )
+                      }
                     }
                   }
                 }
-              }
 
-              await stream.writeSSE({
-                event: 'agent-url',
-                data: JSON.stringify({ type: 'agent-url', url }),
-              })
-            } catch (reprovisionError) {
-              console.error(`[chat:${sessionId}] Re-provisioning failed:`, reprovisionError)
-              await stream.writeSSE({
-                event: 'error',
-                data: JSON.stringify({
-                  error: 'Failed to re-provision sandbox',
-                  details: reprovisionError instanceof Error ? reprovisionError.message : 'Unknown error',
-                  category: 'persistent',
-                  retryable: true,
-                }),
-              })
-              return
+                await stream.writeSSE({
+                  event: 'agent-url',
+                  data: JSON.stringify({ type: 'agent-url', url }),
+                })
+              } catch (reprovisionError) {
+                console.error(`[chat:${sessionId}] Re-provisioning failed:`, reprovisionError)
+                await stream.writeSSE({
+                  event: 'error',
+                  data: JSON.stringify({
+                    error: 'Failed to re-provision sandbox',
+                    details: reprovisionError instanceof Error ? reprovisionError.message : 'Unknown error',
+                    category: 'persistent',
+                    retryable: true,
+                  }),
+                })
+                return
+              }
             }
+          }
+        }
+
+        // Keep-alive: refresh sandbox timeout on every message
+        if (currentSandboxId && currentSandboxAgentUrl) {
+          try {
+            const { refreshSandboxTimeout } = await import('../lib/e2b')
+            await refreshSandboxTimeout(c.env.E2B_API_KEY, currentSandboxId)
+            console.log(`[chat:${sessionId}] Refreshed sandbox timeout for ${currentSandboxId}`)
+          } catch (e) {
+            console.warn(`[chat:${sessionId}] Failed to refresh sandbox timeout:`, e)
+            // Non-fatal — continue with the request
           }
         }
 
@@ -802,15 +909,17 @@ app.post('/:sessionId', async (c) => {
           }
         }, EVENT_TIMEOUT_MS)
 
-        // Send prompt status
-        await stream.writeSSE({
-          event: 'status',
-          data: JSON.stringify({
-            type: 'status',
-            status: 'sending-prompt',
-            message: 'Sending request to agent...',
-          }),
-        })
+        // Send prompt status (only on first message)
+        if (isFirstMessage) {
+          await stream.writeSSE({
+            event: 'status',
+            data: JSON.stringify({
+              type: 'status',
+              status: 'sending-prompt',
+              message: 'Sending request to agent...',
+            }),
+          })
+        }
 
         // Send prompt — blocks until turn completes
         try {

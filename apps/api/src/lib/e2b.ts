@@ -283,5 +283,18 @@ export async function getSandboxPortUrl(apiKey: string, sandboxId: string, port:
   return `https://${host}`
 }
 
+/**
+ * Refresh the auto-pause timeout on a running sandbox
+ * Call this on every user message to keep the sandbox alive during active chat
+ *
+ * @param apiKey - E2B API key
+ * @param sandboxId - The sandbox ID to refresh
+ * @param timeoutMs - New timeout in ms (default: 5 minutes)
+ */
+export async function refreshSandboxTimeout(apiKey: string, sandboxId: string, timeoutMs?: number): Promise<void> {
+  const sandbox = await Sandbox.connect(sandboxId, { apiKey })
+  await sandbox.setTimeout(timeoutMs ?? 5 * 60 * 1000)
+}
+
 // Re-export types from E2B SDK for convenience
 export { Sandbox } from '@e2b/code-interpreter'
