@@ -4,7 +4,7 @@
     "build": {
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"],
-      "env": ["SESSION_SECRET", "API_BASE_URL"]
+      "env": ["SESSION_SECRET", "API_BASE_URL", "API_SECRET"]
     },
     "lint": {
       "dependsOn": ["^lint"]

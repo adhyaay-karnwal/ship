@@ -125,7 +125,7 @@ export async function startSandboxAgentServer(
   const agentConfig = getAgent(agentType) || getAgent(getDefaultAgentId())!
   const sandboxToken = generateToken()
 
-  // Check if sandbox-agent server is already running
+  // Check if sandbox-agent server is already running (no token — existing server may have its own)
   try {
     const healthResult = await sandbox.commands.run(
       `curl -sf http://localhost:${SANDBOX_AGENT_PORT}/v1/health --connect-timeout 2 --max-time 3`,
@@ -185,7 +185,7 @@ export async function startSandboxAgentServer(
     healthAttempts++
     try {
       const healthResult = await sandbox.commands.run(
-        `curl -sf http://localhost:${SANDBOX_AGENT_PORT}/v1/health --connect-timeout 2 --max-time 3`,
+        `curl -sf -H "Authorization: Bearer ${sandboxToken}" http://localhost:${SANDBOX_AGENT_PORT}/v1/health --connect-timeout 2 --max-time 3`,
       )
       if (healthResult.exitCode === 0) {
         console.log(`[sandbox-agent:${sandboxId}] Server healthy after ${healthAttempts} attempts (${healthElapsed}ms)`)
@@ -208,11 +208,12 @@ export async function startSandboxAgentServer(
   const url = `https://${host}`
   console.log(`[sandbox-agent:${sandboxId}] Server ready at ${url}`)
 
-  // Verify external connectivity (health endpoint doesn't require token)
+  // Verify external connectivity (health requires Bearer token when --token is used)
   await new Promise((r) => setTimeout(r, 2000))
   for (let i = 0; i < 5; i++) {
     try {
       const res = await fetch(`${url}/v1/health`, {
+        headers: { Authorization: `Bearer ${sandboxToken}` },
         signal: AbortSignal.timeout(5000),
       })
       if (res.ok) {
@@ -231,10 +232,14 @@ export async function startSandboxAgentServer(
  * Check if a sandbox-agent server is healthy.
  * Clears client cache on failure so stale clients aren't reused.
  * Returns true if healthy, false otherwise.
+ * @param token - Required when server was started with --token
  */
-export async function checkSandboxAgentHealth(baseUrl: string): Promise<boolean> {
+export async function checkSandboxAgentHealth(baseUrl: string, token?: string): Promise<boolean> {
   try {
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
     const res = await fetch(`${baseUrl}/v1/health`, {
+      headers,
       signal: AbortSignal.timeout(5000),
     })
     if (res.ok) return true
@@ -263,7 +268,7 @@ export async function connectToSandboxAgent(baseUrl: string, token?: string): Pr
   const cached = clientCache.get(baseUrl)
   if (cached) {
     // Verify cached client is still healthy
-    const healthy = await checkSandboxAgentHealth(baseUrl)
+    const healthy = await checkSandboxAgentHealth(baseUrl, token ?? cached.token)
     if (healthy) {
       cached.lastUsed = Date.now()
       return cached.client

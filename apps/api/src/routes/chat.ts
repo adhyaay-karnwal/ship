@@ -365,7 +365,7 @@ app.post('/:sessionId', async (c) => {
 
         // Health-check existing sandbox-agent URL before use
         if (currentSandboxAgentUrl) {
-          const healthy = await checkSandboxAgentHealth(currentSandboxAgentUrl)
+          const healthy = await checkSandboxAgentHealth(currentSandboxAgentUrl, sandboxAgentToken)
           if (!healthy) {
             console.warn(`[chat:${sessionId}] Sandbox agent unhealthy at ${currentSandboxAgentUrl}`)
 
@@ -388,7 +388,7 @@ app.post('/:sessionId', async (c) => {
                 console.log(`[chat:${sessionId}] Sandbox resumed successfully: ${currentSandboxId}`)
 
                 // Re-check sandbox-agent health after resume
-                const healthyAfterResume = await checkSandboxAgentHealth(currentSandboxAgentUrl)
+                const healthyAfterResume = await checkSandboxAgentHealth(currentSandboxAgentUrl, sandboxAgentToken)
                 if (healthyAfterResume) {
                   console.log(`[chat:${sessionId}] Sandbox-agent healthy after resume`)
                   resumed = true
