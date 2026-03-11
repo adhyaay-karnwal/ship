@@ -14,6 +14,8 @@ interface ToolProps {
   className?: string
   onClick?: () => void
   isSubagent?: boolean
+  /** When true, renders as flat list item (no bg/border) for use inside ThinkingBlock */
+  compact?: boolean
 }
 
 // ============ Tool Icons ============
@@ -235,6 +237,7 @@ function renderToolOutput(
   name: string,
   input: Record<string, unknown> | undefined,
   output: unknown,
+  compact?: boolean,
 ): React.ReactNode | null {
   const lower = name.toLowerCase()
 
@@ -276,7 +279,12 @@ function renderToolOutput(
             )}
           </div>
           {output != null && (
-            <ScrollArea className="rounded border border-border/40 bg-muted/20 max-h-[300px]">
+            <ScrollArea
+              className={cn(
+                'rounded border max-h-[300px]',
+                compact ? 'border-border/20 bg-muted/10' : 'border-border/40 bg-muted/20',
+              )}
+            >
               <pre className="p-3 text-foreground/80 font-mono text-[11px] whitespace-pre-wrap wrap-break-word">
                 {typeof output === 'string' ? output : JSON.stringify(output, null, 2)}
               </pre>
@@ -299,6 +307,7 @@ export function Tool({
   className,
   onClick,
   isSubagent,
+  compact = false,
 }: ToolProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const [showFullOutput, setShowFullOutput] = React.useState(false)
@@ -333,12 +342,13 @@ export function Tool({
   return (
     <CollapsiblePrimitive.Root open={isOpen} onOpenChange={isSubagent ? undefined : setIsOpen}>
       <div
-        className={cn('group/tool', isSubagent && 'cursor-pointer', className)}
+        className={cn('group/tool', isSubagent && 'cursor-pointer', compact && 'border-none', className)}
         onClick={isSubagent ? onClick : undefined}
       >
         <CollapsiblePrimitive.Trigger
           className={cn(
-            'w-full flex items-center gap-2 py-1 -mx-1 px-1 rounded hover:bg-muted/40 transition-colors text-left',
+            'w-full flex items-center gap-2 py-1 -mx-1 px-1 rounded transition-colors text-left',
+            compact ? 'hover:bg-muted/20' : 'hover:bg-muted/40',
             isSubagent && 'pointer-events-none',
           )}
         >
@@ -370,13 +380,23 @@ export function Tool({
         </CollapsiblePrimitive.Trigger>
         {hasDetails && !isSubagent && (
           <CollapsiblePrimitive.Panel>
-            <div className="pl-5 pr-2 py-2 border-l border-border/30 ml-1.5 space-y-4 text-[11px]">
+            <div
+              className={cn(
+                'pl-5 pr-2 py-2 ml-1.5 space-y-4 text-[11px]',
+                !compact && 'border-l border-border/30',
+              )}
+            >
               {input && Object.keys(input).length > 0 && (
                 <div className="space-y-1.5">
                   <p className="font-medium text-muted-foreground/60 text-[10px] uppercase tracking-wider">
                     Input
                   </p>
-                  <ScrollArea className="rounded-lg border border-border/40 bg-muted/20">
+                  <ScrollArea
+                    className={cn(
+                      'rounded-lg',
+                      compact ? 'border border-border/20 bg-muted/10' : 'border border-border/40 bg-muted/20',
+                    )}
+                  >
                     <pre className="p-3.5 text-foreground/80 leading-relaxed font-mono text-[11px] whitespace-pre-wrap wrap-break-word">
                       {JSON.stringify(input, null, 2)}
                     </pre>
@@ -388,9 +408,14 @@ export function Tool({
                   <p className="font-medium text-muted-foreground/60 text-[10px] uppercase tracking-wider">
                     Output
                   </p>
-                  {renderToolOutput(name, input, output) ?? (
+                  {renderToolOutput(name, input, output, compact) ?? (
                     <>
-                      <ScrollArea className="rounded-lg border border-border/40 bg-muted/20 max-h-[400px]">
+                      <ScrollArea
+                        className={cn(
+                          'rounded-lg max-h-[400px]',
+                          compact ? 'border border-border/20 bg-muted/10' : 'border border-border/40 bg-muted/20',
+                        )}
+                      >
                         <pre className="p-3.5 text-foreground/80 leading-relaxed font-mono text-[11px] whitespace-pre-wrap wrap-break-word">
                           {showFullOutput ? fullOutputText : truncatedOutput}
                         </pre>

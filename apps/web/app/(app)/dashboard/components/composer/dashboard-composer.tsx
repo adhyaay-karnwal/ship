@@ -26,7 +26,7 @@ export function DashboardComposer({ context, compactLayout = false }: DashboardC
         className={cn(
           'w-full transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]',
           activeSessionId
-            ? 'mt-auto pb-3 px-3 sm:pb-4 sm:px-6'
+            ? 'mt-auto pb-3 sm:pb-4 px-4 sm:px-8'
             : compactLayout
               ? 'flex flex-col px-3 pt-4 pb-2'
               : 'flex items-start justify-center px-3 sm:px-6 pt-[6vh] sm:pt-[8vh]',
@@ -35,7 +35,7 @@ export function DashboardComposer({ context, compactLayout = false }: DashboardC
         <div
           className={cn(
             'w-full transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]',
-            activeSessionId ? 'max-w-3xl mx-auto' : compactLayout ? 'w-full' : 'max-w-2xl',
+            activeSessionId ? 'max-w-4xl mx-auto' : compactLayout ? 'w-full' : 'max-w-2xl',
           )}
         >
           {/* Repo + branch above the card (Cursor-style) */}

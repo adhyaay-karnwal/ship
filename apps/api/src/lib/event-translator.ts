@@ -292,7 +292,7 @@ export class EventTranslatorState {
         events.push(this.makeTextPart(this.textAccumulator, text))
       } else {
         this.reasoningAccumulator += text
-        events.push(this.makeReasoningPart(this.reasoningAccumulator))
+        events.push(this.makeReasoningPart(this.reasoningAccumulator, text))
       }
     }
 
@@ -308,17 +308,13 @@ export class EventTranslatorState {
       type: 'text',
       text: fullText,
     }
-    const result: ShipSSEEvent = {
+    return {
       type: 'message.part.updated',
-      properties: { part },
+      properties: { part, ...(delta !== undefined ? { delta } : {}) },
     }
-    if (delta !== undefined) {
-      ;(result as Record<string, unknown>).delta = delta
-    }
-    return result
   }
 
-  private makeReasoningPart(fullText: string): ShipSSEEvent {
+  private makeReasoningPart(fullText: string, delta?: string): ShipSSEEvent {
     const messageId = this.ensureMessageId()
     return {
       type: 'message.part.updated',
@@ -330,6 +326,7 @@ export class EventTranslatorState {
           type: 'reasoning',
           text: fullText,
         },
+        ...(delta !== undefined ? { delta } : {}),
       },
     }
   }

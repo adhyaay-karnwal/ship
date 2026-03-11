@@ -94,7 +94,12 @@ export function ReasoningCollapsible({
 
   const chunks: string[] = React.useMemo(() => {
     if (reasoning !== undefined) {
-      if (Array.isArray(reasoning)) return reasoning.filter(Boolean).map(String)
+      if (Array.isArray(reasoning)) {
+        // Parts are cumulative; show only the latest (full) text, not history
+        const filtered = reasoning.filter(Boolean).map(String)
+        const last = filtered[filtered.length - 1]
+        return last ? [last] : []
+      }
       return String(reasoning)
         .split(/\n\n+/)
         .map((s) => s.trim())

@@ -5,7 +5,7 @@ import {
   Message,
   Response,
   Loader,
-  ReasoningCollapsible,
+  ThinkingBlock,
   SessionSetup,
 } from '@ship/ui'
 import { Markdown } from '@/components/chat/markdown'
@@ -32,7 +32,7 @@ export interface MessageItemProps {
 export function MessageItem({
   message,
   isCurrentlyStreaming,
-  streamStartTime,
+  streamStartTime: _streamStartTime,
   streamingStatusSteps,
   statusLabel,
   sessionTodos,
@@ -133,13 +133,6 @@ export function MessageItem({
     message.role === 'assistant' &&
     !!(message.toolInvocations && message.toolInvocations.length > 0)
 
-  const reasoningDuration =
-    isCurrentlyStreaming && streamStartTime
-      ? Math.floor((Date.now() - streamStartTime) / 1000)
-      : message.elapsed != null
-        ? Math.floor(message.elapsed / 1000)
-        : undefined
-
   return (
     <Message
       key={message.id}
@@ -156,20 +149,23 @@ export function MessageItem({
           <SessionSetup steps={message.startupSteps} defaultOpen={false} className="my-1" />
         )}
 
-      {hasReasoning && (
-        <ReasoningCollapsible
+      {(hasReasoning || hasSteps) && (
+        <ThinkingBlock
           reasoning={message.reasoning}
           isStreaming={isCurrentlyStreaming}
-          duration={reasoningDuration}
-        />
-      )}
-      {hasSteps && message.toolInvocations && message.toolInvocations.length > 0 && (
-        <MessageToolList
-          tools={message.toolInvocations}
-          sessionTodos={sessionTodos}
-          todoRenderedRef={todoRenderedRef}
-          onSubagentNavigate={onSubagentNavigate}
-        />
+          duration={
+            message.elapsed != null ? Math.floor(message.elapsed / 1000) : undefined
+          }
+        >
+          {hasSteps && message.toolInvocations && message.toolInvocations.length > 0 && (
+            <MessageToolList
+              tools={message.toolInvocations}
+              sessionTodos={sessionTodos}
+              todoRenderedRef={todoRenderedRef}
+              onSubagentNavigate={onSubagentNavigate}
+            />
+          )}
+        </ThinkingBlock>
       )}
 
       {message.planItems && message.planItems.length > 0 && (

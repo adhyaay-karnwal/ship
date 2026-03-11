@@ -27,7 +27,7 @@ export function MessageToolList({
   onSubagentNavigate,
 }: MessageToolListProps) {
   return (
-    <div className="space-y-2 my-1">
+    <div className="space-y-1">
       {tools.map((tool) => {
         const isTodoTool = tool.toolName.toLowerCase().includes('todo')
         if (isTodoTool && sessionTodos.length > 0 && !todoRenderedRef.current) {
@@ -71,6 +71,7 @@ export function MessageToolList({
             input={tool.args}
             output={tool.result}
             duration={tool.duration}
+            compact
           />
         )
       })}
