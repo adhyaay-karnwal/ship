@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 import { verifySession, getUser } from '@/lib/dal'
 import { fetchSessions, getSession, getChatMessages, type ChatSession } from '@/lib/api'
 import { mapApiMessagesToUI } from '@/lib/ai-elements-adapter'
@@ -12,6 +13,8 @@ export default async function SessionPage({ params }: SessionPageProps) {
   const { id } = await params
   const session = await verifySession()
   const user = await getUser()
+  const cookieStore = await cookies()
+  const apiToken = cookieStore.get('session')?.value ?? ''
 
   let sessions: ChatSession[] = []
   try {
@@ -64,6 +67,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
       initialSessionId={id}
       initialMessages={initialMessages}
       serverTimestamp={serverTimestamp}
+      apiToken={apiToken}
     />
   )
 }

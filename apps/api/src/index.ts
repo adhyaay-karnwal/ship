@@ -1,5 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { authMiddleware } from './middleware/auth'
+import { chatRateLimit, sessionRateLimit } from './middleware/rate-limit'
 import health from './routes/health'
 import users from './routes/users'
 import sessions from './routes/sessions'
@@ -12,7 +14,7 @@ import connectors from './routes/connectors'
 import terminal from './routes/terminal'
 import type { Env } from './env.d'
 
-const app = new Hono<{ Bindings: Env }>()
+const app = new Hono<{ Bindings: Env; Variables: { userId?: string } }>()
 
 // CORS middleware
 app.use(
@@ -29,8 +31,14 @@ app.use(
       // Exact match
       if (allowedSet.has(origin)) return origin
 
-      // Wildcard: *.vercel.app matches any Vercel deployment
-      if (allowedSet.has('*.vercel.app') && origin.endsWith('.vercel.app')) return origin
+      // Project-scoped Vercel preview matching (rejects arbitrary *.vercel.app origins)
+      if (allowedSet.has('*.vercel.app') && origin.endsWith('.vercel.app')) {
+        const vercelProject = c.env.VERCEL_PROJECT_NAME || 'ship'
+        const subdomain = origin.replace('https://', '').replace('.vercel.app', '')
+        if (subdomain.startsWith(`${vercelProject}-`) || subdomain === vercelProject) {
+          return origin
+        }
+      }
 
       return undefined
     },
@@ -39,6 +47,22 @@ app.use(
     exposeHeaders: ['Content-Type', 'Cache-Control', 'Connection'],
   }),
 )
+
+// Auth middleware (all routes except /health and root)
+app.use('/sessions/*', authMiddleware)
+app.use('/sessions', authMiddleware)
+app.use('/chat/*', authMiddleware)
+app.use('/sandbox/*', authMiddleware)
+app.use('/git/*', authMiddleware)
+app.use('/models/*', authMiddleware)
+app.use('/accounts/*', authMiddleware)
+app.use('/users/*', authMiddleware)
+app.use('/connectors/*', authMiddleware)
+app.use('/terminal/*', authMiddleware)
+
+// Rate limiting (after auth so userId is available)
+app.use('/chat/*', chatRateLimit)
+app.post('/sessions', sessionRateLimit)
 
 // Routes
 app.route('/health', health)

@@ -6,6 +6,21 @@
  */
 
 import { API_URL } from '@/lib/config'
+import { getApiToken } from './client'
+
+const API_SECRET = typeof process !== 'undefined' ? process.env?.API_SECRET : undefined
+
+function serverAuthHeaders(extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  // Server-side: use API_SECRET. Client-side: use session JWT from client token store.
+  if (API_SECRET) {
+    headers['Authorization'] = `Bearer ${API_SECRET}`
+  } else {
+    const clientToken = getApiToken()
+    if (clientToken) headers['Authorization'] = `Bearer ${clientToken}`
+  }
+  return { ...headers, ...extra }
+}
 
 // Session types matching API response
 export interface ChatSession {
@@ -34,7 +49,8 @@ export interface CreateSessionData {
  */
 export async function fetchSessions(userId: string): Promise<ChatSession[]> {
   const res = await fetch(`${API_URL}/sessions?userId=${encodeURIComponent(userId)}`, {
-    cache: 'no-store', // Always fetch fresh data
+    headers: serverAuthHeaders(),
+    cache: 'no-store',
   })
 
   if (!res.ok) {
@@ -50,7 +66,7 @@ export async function fetchSessions(userId: string): Promise<ChatSession[]> {
 export async function createSession(data: CreateSessionData): Promise<ChatSession> {
   const res = await fetch(`${API_URL}/sessions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: serverAuthHeaders(),
     body: JSON.stringify(data),
   })
 
@@ -66,6 +82,7 @@ export async function createSession(data: CreateSessionData): Promise<ChatSessio
  */
 export async function getSession(id: string): Promise<ChatSession> {
   const res = await fetch(`${API_URL}/sessions/${encodeURIComponent(id)}`, {
+    headers: serverAuthHeaders(),
     cache: 'no-store',
   })
 
@@ -85,6 +102,7 @@ export async function getSession(id: string): Promise<ChatSession> {
 export async function deleteSession(id: string): Promise<void> {
   const res = await fetch(`${API_URL}/sessions/${encodeURIComponent(id)}`, {
     method: 'DELETE',
+    headers: serverAuthHeaders(),
   })
 
   if (!res.ok) {
@@ -136,7 +154,10 @@ export async function getChatMessages(
   if (options?.limit) params.set('limit', options.limit.toString())
   if (options?.before) params.set('before', options.before)
 
-  const res = await fetch(`${API_URL}/chat/${encodeURIComponent(sessionId)}/messages?${params}`, { cache: 'no-store' })
+  const res = await fetch(`${API_URL}/chat/${encodeURIComponent(sessionId)}/messages?${params}`, {
+    headers: serverAuthHeaders(),
+    cache: 'no-store',
+  })
 
   if (!res.ok) {
     throw new Error('Failed to fetch messages')
@@ -154,10 +175,7 @@ export async function sendChatMessage(sessionId: string, content: string, mode?:
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-    },
+    headers: serverAuthHeaders({ Accept: 'text/event-stream' }),
     body: JSON.stringify({ content, mode }),
     cache: 'no-store',
   })
@@ -171,6 +189,7 @@ export async function sendChatMessage(sessionId: string, content: string, mode?:
 export async function stopChatStream(sessionId: string): Promise<void> {
   await fetch(`${API_URL}/chat/${encodeURIComponent(sessionId)}/stop`, {
     method: 'POST',
+    headers: serverAuthHeaders(),
   })
 }
 
@@ -180,7 +199,7 @@ export async function stopChatStream(sessionId: string): Promise<void> {
  */
 export async function subscribeToChatStream(sessionId: string): Promise<Response> {
   const response = await fetch(`${API_URL}/chat/${encodeURIComponent(sessionId)}/subscribe`, {
-    headers: { Accept: 'text/event-stream' },
+    headers: serverAuthHeaders({ Accept: 'text/event-stream' }),
     cache: 'no-store',
   })
   return response

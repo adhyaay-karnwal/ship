@@ -18,6 +18,12 @@ import {
 import type { Sandbox } from '@e2b/code-interpreter'
 import { getAgent, getDefaultAgentId, type AgentConfig } from './agent-registry'
 
+function generateToken(): string {
+  const array = new Uint8Array(24)
+  crypto.getRandomValues(array)
+  return Array.from(array, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 // Re-export types for convenience
 export type { SandboxAgent, Session, SessionEvent }
 
@@ -26,8 +32,25 @@ export interface AgentSessionConfig {
   model?: string
 }
 
-// Client instance cache per sandbox URL
-const clientCache: Map<string, SandboxAgent> = new Map()
+// Client instance cache per sandbox URL with TTL eviction
+interface CachedClient {
+  client: SandboxAgent
+  token: string
+  lastUsed: number
+}
+
+const clientCache = new Map<string, CachedClient>()
+const CACHE_TTL_MS = 30 * 60 * 1000 // 30 minutes
+
+function evictStaleClients(): void {
+  const now = Date.now()
+  for (const [url, entry] of clientCache) {
+    if (now - entry.lastUsed > CACHE_TTL_MS) {
+      entry.client.dispose().catch(() => {})
+      clientCache.delete(url)
+    }
+  }
+}
 
 // Default port for sandbox-agent server
 const SANDBOX_AGENT_PORT = 3000
@@ -53,11 +76,6 @@ const SHARED_MCP_CONFIGS: Record<string, McpServerConfig> = {
 const REMOVED_SHARED_MCP_NAMES = ['context7'] as const
 
 const MCP_SYNC_TIMEOUT_MS = 25_000
-
-/** Escape a value for use inside single-quoted bash string: ' becomes '\'' */
-function shellEscape(val: string): string {
-  return "'" + val.replace(/'/g, "'\\''") + "'"
-}
 
 async function syncSharedMcpConfigs(client: SandboxAgent, workingDir: string): Promise<void> {
   const timeoutPromise = new Promise<never>((_, reject) =>
@@ -103,8 +121,9 @@ export async function startSandboxAgentServer(
   sandboxId: string,
   agentType: string,
   envVars: Record<string, string>,
-): Promise<{ url: string }> {
+): Promise<{ url: string; token: string }> {
   const agentConfig = getAgent(agentType) || getAgent(getDefaultAgentId())!
+  const sandboxToken = generateToken()
 
   // Check if sandbox-agent server is already running
   try {
@@ -115,7 +134,8 @@ export async function startSandboxAgentServer(
       const host = sandbox.getHost(SANDBOX_AGENT_PORT)
       const url = `https://${host}`
       console.log(`[sandbox-agent:${sandboxId}] Server already running at ${url}`)
-      return { url }
+      // Return empty token — existing server may have its own token stored in DO metadata
+      return { url, token: '' }
     }
   } catch {
     // Server not running, continue with setup
@@ -144,56 +164,51 @@ export async function startSandboxAgentServer(
     // Don't throw — some agents may already be installed
   }
 
-  // Start sandbox-agent server
+  // Start sandbox-agent server — pass env vars via E2B's envs param (no temp files)
   console.log(`[sandbox-agent:${sandboxId}] Starting server on port ${SANDBOX_AGENT_PORT}...`)
-  const serverCmd = `sandbox-agent server --no-token --host 0.0.0.0 --port ${SANDBOX_AGENT_PORT}`
+  const serverCmd = `sandbox-agent server --token ${sandboxToken} --host 0.0.0.0 --port ${SANDBOX_AGENT_PORT}`
 
-  if (Object.keys(envVars).length > 0) {
-    // Wrapper script: export vars then exec sandbox-agent. Base64 avoids shell-escaping API keys.
-    const scriptLines = [
-      '#!/bin/bash',
-      ...Object.entries(envVars).map(([k, v]) => `export ${k}=${shellEscape(v)}`),
-      `exec ${serverCmd}`,
-    ]
-    const script = scriptLines.join('\n')
-    const bytes = new TextEncoder().encode(script)
-    let binary = ''
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-    const b64 = btoa(binary)
-    const runCmd = `echo '${b64}' | base64 -d > /tmp/start-agent.sh && chmod +x /tmp/start-agent.sh && /tmp/start-agent.sh`
-    await sandbox.commands.run(runCmd, { background: true, timeoutMs: 0 })
-  } else {
-    await sandbox.commands.run(serverCmd, { background: true, timeoutMs: 0 })
-  }
+  await sandbox.commands.run(serverCmd, {
+    background: true,
+    timeoutMs: 0,
+    ...(Object.keys(envVars).length > 0 && { envs: envVars }),
+  })
 
-  // Wait for server to be ready
+  // Wait for server to be ready (exponential backoff: 200ms, 400ms, 800ms... cap 5s)
   console.log(`[sandbox-agent:${sandboxId}] Waiting for server health...`)
-  const maxAttempts = 60
-  for (let i = 0; i < maxAttempts; i++) {
+  const MAX_HEALTH_WAIT_MS = 60_000
+  let healthElapsed = 0
+  let healthDelay = 200
+  let healthAttempts = 0
+
+  while (healthElapsed < MAX_HEALTH_WAIT_MS) {
+    healthAttempts++
     try {
       const healthResult = await sandbox.commands.run(
         `curl -sf http://localhost:${SANDBOX_AGENT_PORT}/v1/health --connect-timeout 2 --max-time 3`,
       )
       if (healthResult.exitCode === 0) {
-        console.log(`[sandbox-agent:${sandboxId}] Server healthy after ${i + 1} attempts`)
+        console.log(`[sandbox-agent:${sandboxId}] Server healthy after ${healthAttempts} attempts (${healthElapsed}ms)`)
         break
       }
     } catch {
       // Not ready yet
     }
 
-    if (i === maxAttempts - 1) {
-      throw new Error(`sandbox-agent server failed to start within ${maxAttempts}s`)
+    if (healthElapsed + healthDelay >= MAX_HEALTH_WAIT_MS) {
+      throw new Error(`sandbox-agent server failed to start within ${MAX_HEALTH_WAIT_MS / 1000}s (${healthAttempts} attempts)`)
     }
 
-    await new Promise((r) => setTimeout(r, 1000))
+    await new Promise((r) => setTimeout(r, healthDelay))
+    healthElapsed += healthDelay
+    healthDelay = Math.min(healthDelay * 2, 5000)
   }
 
   const host = sandbox.getHost(SANDBOX_AGENT_PORT)
   const url = `https://${host}`
   console.log(`[sandbox-agent:${sandboxId}] Server ready at ${url}`)
 
-  // Verify external connectivity
+  // Verify external connectivity (health endpoint doesn't require token)
   await new Promise((r) => setTimeout(r, 2000))
   for (let i = 0; i < 5; i++) {
     try {
@@ -209,7 +224,7 @@ export async function startSandboxAgentServer(
     }
   }
 
-  return { url }
+  return { url, token: sandboxToken }
 }
 
 /**
@@ -231,7 +246,7 @@ export async function checkSandboxAgentHealth(baseUrl: string): Promise<boolean>
   console.warn(`[sandbox-agent] Health check failed for ${baseUrl}, clearing cache`)
   const cached = clientCache.get(baseUrl)
   if (cached) {
-    try { await cached.dispose() } catch { /* ignore */ }
+    try { await cached.client.dispose() } catch { /* ignore */ }
     clientCache.delete(baseUrl)
   }
   return false
@@ -240,23 +255,29 @@ export async function checkSandboxAgentHealth(baseUrl: string): Promise<boolean>
 /**
  * Connect to a sandbox-agent server.
  * Health-checks cached clients before reuse, disposes stale ones.
- * Replaces createOpenCodeClientForSandbox()
+ * Evicts TTL-expired entries on each call.
  */
-export async function connectToSandboxAgent(baseUrl: string): Promise<SandboxAgent> {
+export async function connectToSandboxAgent(baseUrl: string, token?: string): Promise<SandboxAgent> {
+  evictStaleClients()
+
   const cached = clientCache.get(baseUrl)
   if (cached) {
     // Verify cached client is still healthy
     const healthy = await checkSandboxAgentHealth(baseUrl)
-    if (healthy) return cached
+    if (healthy) {
+      cached.lastUsed = Date.now()
+      return cached.client
+    }
     // Cache was already cleared by checkSandboxAgentHealth
   }
 
   const client = await SandboxAgent.connect({
     baseUrl,
+    ...(token && { token }),
     waitForHealth: { timeoutMs: 15000 },
   })
 
-  clientCache.set(baseUrl, client)
+  clientCache.set(baseUrl, { client, token: token ?? '', lastUsed: Date.now() })
   return client
 }
 
@@ -418,9 +439,9 @@ export function subscribeToSessionEvents(
  * Dispose of a sandbox-agent client and remove from cache.
  */
 export async function disposeSandboxAgent(baseUrl: string): Promise<void> {
-  const client = clientCache.get(baseUrl)
-  if (client) {
-    await client.dispose()
+  const cached = clientCache.get(baseUrl)
+  if (cached) {
+    await cached.client.dispose()
     clientCache.delete(baseUrl)
   }
 }
@@ -429,9 +450,9 @@ export async function disposeSandboxAgent(baseUrl: string): Promise<void> {
  * Clean up all cached clients.
  */
 export async function cleanupAllClients(): Promise<void> {
-  for (const [url, client] of clientCache) {
+  for (const [, entry] of clientCache) {
     try {
-      await client.dispose()
+      await entry.client.dispose()
     } catch {
       // Ignore cleanup errors
     }

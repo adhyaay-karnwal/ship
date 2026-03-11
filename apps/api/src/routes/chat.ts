@@ -20,6 +20,7 @@ import { getAgent, getDefaultAgentId } from '../lib/agent-registry'
 import { executeWithRetry, classifyError, sanitizeError, safeErrorForLog } from '../lib/error-handler'
 import { generateBranchName } from '../lib/git-workflow'
 import { generateSessionTitle } from '../lib/generate-session-title'
+import { buildAgentEnvVars, writeStatusEvent, writeErrorEvent, StreamStatus } from '../lib/chat-helpers'
 import type { Env } from '../env.d'
 
 const CREATE_SESSION_TIMEOUT_MS = 25_000
@@ -83,6 +84,14 @@ app.post('/:sessionId', async (c) => {
     return c.json({ error: 'Message content required' }, 400)
   }
 
+  const MAX_PROMPT_LENGTH = 100_000
+  if (content.length > MAX_PROMPT_LENGTH) {
+    return c.json(
+      { error: `Prompt too long (${content.length} chars). Maximum is ${MAX_PROMPT_LENGTH}.` },
+      413,
+    )
+  }
+
   // Get DO stub
   const id = c.env.SESSION_DO.idFromName(sessionId)
   const stub = c.env.SESSION_DO.get(id)
@@ -105,6 +114,7 @@ app.post('/:sessionId', async (c) => {
   let sandboxId = meta.sandbox_id
   const sandboxStatus = meta.sandbox_status
   let sandboxAgentUrl = meta.sandbox_agent_url
+  let sandboxAgentToken = meta.sandbox_agent_token || ''
   const agentType = meta.agent_type || getDefaultAgentId()
 
   console.log(
@@ -121,6 +131,7 @@ app.post('/:sessionId', async (c) => {
 
       let currentSandboxId: string | undefined = sandboxId
       let currentSandboxAgentUrl: string | undefined = sandboxAgentUrl
+      let currentSandboxAgentToken: string = sandboxAgentToken
       let currentAgentSessionId: string | undefined = agentSessionId
 
       const isFirstMessage = !currentAgentSessionId
@@ -227,35 +238,28 @@ app.post('/:sessionId', async (c) => {
           })
 
           try {
-            const envVars: Record<string, string> = {}
-            if (c.env.ANTHROPIC_API_KEY) envVars.ANTHROPIC_API_KEY = c.env.ANTHROPIC_API_KEY
-            if (c.env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = c.env.OPENAI_API_KEY
-
             const { Sandbox } = await import('../lib/e2b')
             const sandbox = await Sandbox.connect(currentSandboxId, { apiKey: c.env.E2B_API_KEY })
 
-            const { url } = await startSandboxAgentServer(sandbox, currentSandboxId, agentType, envVars)
+            const { url, token: newToken } = await startSandboxAgentServer(sandbox, currentSandboxId, agentType, buildAgentEnvVars(c.env))
             currentSandboxAgentUrl = url
+            currentSandboxAgentToken = newToken
             console.log(`[chat:${sessionId}] sandbox-agent server started at ${url}`)
 
-            // Save URL
             await stub.fetch(
               new Request(`${doUrl}/meta`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   sandbox_agent_url: url,
+                  sandbox_agent_token: newToken,
                 }),
               }),
             )
 
-            // Send URL to frontend
             await stream.writeSSE({
               event: 'agent-url',
-              data: JSON.stringify({
-                type: 'agent-url',
-                url,
-              }),
+              data: JSON.stringify({ type: 'agent-url', url }),
             })
           } catch (error) {
             console.error(`[chat:${sessionId}] Failed to start sandbox-agent server:`, safeErrorForLog(error))
@@ -311,9 +315,10 @@ app.post('/:sessionId', async (c) => {
 
             const { Sandbox } = await import('../lib/e2b')
             const sandbox = await Sandbox.connect(currentSandboxId, { apiKey: c.env.E2B_API_KEY })
-            const authUrl = repoUrl.replace('https://', `https://${accountRes.access_token}@`)
 
-            const cloneResult = await sandbox.commands.run(`git clone ${authUrl} ${repoPath}`)
+            const cloneResult = await sandbox.commands.run(
+              `git -c http.extraHeader="Authorization: Bearer ${accountRes.access_token}" clone ${repoUrl} ${repoPath}`,
+            )
             if (cloneResult.exitCode !== 0) throw new Error(`Git clone failed: ${cloneResult.stderr}`)
 
             await sandbox.commands.run(`cd ${repoPath} && git config user.name "Ship Agent"`)
@@ -402,22 +407,19 @@ app.post('/:sessionId', async (c) => {
                   const { Sandbox: E2BSandbox } = await import('../lib/e2b')
                   const resumedSandbox = await E2BSandbox.connect(currentSandboxId, { apiKey: c.env.E2B_API_KEY })
 
-                  const envVars: Record<string, string> = {}
-                  if (c.env.ANTHROPIC_API_KEY) envVars.ANTHROPIC_API_KEY = c.env.ANTHROPIC_API_KEY
-                  if (c.env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = c.env.OPENAI_API_KEY
-
-                  const { url } = await startSandboxAgentServer(resumedSandbox, currentSandboxId, agentType, envVars)
+                  const { url, token: restartToken } = await startSandboxAgentServer(resumedSandbox, currentSandboxId, agentType, buildAgentEnvVars(c.env))
                   currentSandboxAgentUrl = url
+                  currentSandboxAgentToken = restartToken
                   currentAgentSessionId = undefined
                   console.log(`[chat:${sessionId}] Sandbox-agent restarted on resumed sandbox at ${url}`)
 
-                  // Save updated URL and clear stale agent session
                   await stub.fetch(
                     new Request(`${doUrl}/meta`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
                         sandbox_agent_url: url,
+                        sandbox_agent_token: restartToken,
                         agent_session_id: '',
                       }),
                     }),
@@ -466,12 +468,10 @@ app.post('/:sessionId', async (c) => {
               // Re-provision sandbox
               try {
                 const { createSessionSandbox, Sandbox } = await import('../lib/e2b')
-                const reProvisionEnvs: Record<string, string> = {}
-                if (c.env.ANTHROPIC_API_KEY) reProvisionEnvs.ANTHROPIC_API_KEY = c.env.ANTHROPIC_API_KEY
-                if (c.env.OPENAI_API_KEY) reProvisionEnvs.OPENAI_API_KEY = c.env.OPENAI_API_KEY
+                const agentEnvs = buildAgentEnvVars(c.env)
                 const sandboxInfo = await createSessionSandbox(c.env.E2B_API_KEY, {
                   sessionId,
-                  ...(Object.keys(reProvisionEnvs).length > 0 && { envs: reProvisionEnvs }),
+                  ...(Object.keys(agentEnvs).length > 0 && { envs: agentEnvs }),
                 })
                 currentSandboxId = sandboxInfo.id
                 const newSandbox = await Sandbox.connect(currentSandboxId, { apiKey: c.env.E2B_API_KEY })
@@ -489,22 +489,18 @@ app.post('/:sessionId', async (c) => {
                   }),
                 )
 
-                // Start sandbox-agent server
-                const envVars: Record<string, string> = {}
-                if (c.env.ANTHROPIC_API_KEY) envVars.ANTHROPIC_API_KEY = c.env.ANTHROPIC_API_KEY
-                if (c.env.OPENAI_API_KEY) envVars.OPENAI_API_KEY = c.env.OPENAI_API_KEY
-
-                const { url } = await startSandboxAgentServer(newSandbox, currentSandboxId, agentType, envVars)
+                const { url, token: reprovisionToken } = await startSandboxAgentServer(newSandbox, currentSandboxId, agentType, buildAgentEnvVars(c.env))
                 currentSandboxAgentUrl = url
+                currentSandboxAgentToken = reprovisionToken
                 console.log(`[chat:${sessionId}] Re-provisioned sandbox-agent at ${url}`)
 
-                // Save new URL
                 await stub.fetch(
                   new Request(`${doUrl}/meta`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       sandbox_agent_url: url,
+                      sandbox_agent_token: reprovisionToken,
                     }),
                   }),
                 )
@@ -537,9 +533,10 @@ app.post('/:sessionId', async (c) => {
                       const repoUrl = `https://github.com/${owner}/${name}.git`
                       const baseBranch = repoMetaJson.base_branch || 'main'
                       const branchName = repoMetaJson.current_branch || generateBranchName('agent-task', sessionId)
-                      const authUrl = repoUrl.replace('https://', `https://${accountRes.access_token}@`)
 
-                      const cloneResult = await newSandbox.commands.run(`git clone ${authUrl} ${repoPath}`)
+                      const cloneResult = await newSandbox.commands.run(
+                        `git -c http.extraHeader="Authorization: Bearer ${accountRes.access_token}" clone ${repoUrl} ${repoPath}`,
+                      )
                       if (cloneResult.exitCode === 0) {
                         await newSandbox.commands.run(`cd ${repoPath} && git config user.name "Ship Agent"`)
                         await newSandbox.commands.run(`cd ${repoPath} && git config user.email "shipagent@dylansteck.com"`)
@@ -607,7 +604,7 @@ app.post('/:sessionId', async (c) => {
 
         // Connect to sandbox-agent
         console.log(`[chat:${sessionId}] Connecting to sandbox-agent at ${currentSandboxAgentUrl}, agentType=${agentType}`)
-        const client = await connectToSandboxAgent(currentSandboxAgentUrl)
+        const client = await connectToSandboxAgent(currentSandboxAgentUrl, currentSandboxAgentToken || undefined)
         await validateAgentRuntime(client, agentType)
         console.log(`[chat:${sessionId}] Agent runtime validated for ${agentType}`)
 
@@ -1100,7 +1097,7 @@ app.post('/:sessionId/stop', async (c) => {
 
   if (meta.agent_session_id && meta.sandbox_agent_url) {
     try {
-      const client = await connectToSandboxAgent(meta.sandbox_agent_url)
+      const client = await connectToSandboxAgent(meta.sandbox_agent_url, meta.sandbox_agent_token || undefined)
       await cancelAgent(client, meta.agent_session_id)
     } catch (error) {
       console.warn(`[chat:${sessionId}] Cancel error:`, error)
@@ -1121,6 +1118,7 @@ app.get('/:sessionId/subscribe', async (c) => {
   const meta = (await metaRes.json()) as Record<string, string>
   const agentSessionId = meta.agent_session_id
   const sandboxAgentUrl = meta.sandbox_agent_url
+  const agentToken = meta.sandbox_agent_token || undefined
 
   if (!agentSessionId || !sandboxAgentUrl) {
     return streamSSE(c, async (stream) => {
@@ -1134,7 +1132,7 @@ app.get('/:sessionId/subscribe', async (c) => {
 
   return streamSSE(c, async (stream) => {
     try {
-      const client = await connectToSandboxAgent(sandboxAgentUrl)
+      const client = await connectToSandboxAgent(sandboxAgentUrl, agentToken)
       const session = await resumeAgentSessionWithTimeout(client, agentSessionId)
 
       if (!session) {
@@ -1191,6 +1189,7 @@ app.get('/:sessionId/subagent/:subagentSessionId/stream', async (c) => {
   const metaRes = await stub.fetch(new Request('https://do/meta'))
   const meta = (await metaRes.json()) as Record<string, string>
   const sandboxAgentUrl = meta.sandbox_agent_url
+  const subagentToken = meta.sandbox_agent_token || undefined
 
   if (!sandboxAgentUrl) {
     return c.json({ error: 'Agent server not available' }, 400)
@@ -1198,7 +1197,7 @@ app.get('/:sessionId/subagent/:subagentSessionId/stream', async (c) => {
 
   return streamSSE(c, async (stream) => {
     try {
-      const client = await connectToSandboxAgent(sandboxAgentUrl)
+      const client = await connectToSandboxAgent(sandboxAgentUrl, subagentToken)
       const session = await resumeAgentSessionWithTimeout(client, subagentSessionId)
 
       if (!session) {
@@ -1383,7 +1382,7 @@ app.post('/:sessionId/permission/:permissionId', async (c) => {
   }
 
   try {
-    const client = await connectToSandboxAgent(meta.sandbox_agent_url)
+    const client = await connectToSandboxAgent(meta.sandbox_agent_url, meta.sandbox_agent_token || undefined)
     const agentSessionId = meta.agent_session_id
     if (!agentSessionId) {
       return c.json({ error: 'No active agent session' }, 400)
@@ -1445,9 +1444,11 @@ app.post('/:sessionId/question/:questionId', async (c) => {
 
   try {
     const url = `${meta.sandbox_agent_url}/opencode/question/${questionId}/reply`
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (meta.sandbox_agent_token) headers['Authorization'] = `Bearer ${meta.sandbox_agent_token}`
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ answers: [[response]] }),
     })
     if (!res.ok) {
@@ -1479,7 +1480,9 @@ app.post('/:sessionId/question/:questionId/reject', async (c) => {
 
   try {
     const url = `${meta.sandbox_agent_url}/opencode/question/${questionId}/reject`
-    const res = await fetch(url, { method: 'POST' })
+    const rejectHeaders: Record<string, string> = {}
+    if (meta.sandbox_agent_token) rejectHeaders['Authorization'] = `Bearer ${meta.sandbox_agent_token}`
+    const res = await fetch(url, { method: 'POST', headers: rejectHeaders })
     if (!res.ok) {
       const text = await res.text()
       console.error(`[chat:${sessionId}] Question reject failed: ${res.status} ${text}`)

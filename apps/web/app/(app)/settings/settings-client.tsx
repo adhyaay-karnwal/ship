@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
+import { setApiToken } from '@/lib/api/client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useIsMobile, SidebarTrigger } from '@ship/ui'
@@ -26,9 +27,13 @@ interface SettingsClientProps {
   userId: string
   user: User
   sessions: ChatSession[]
+  apiToken?: string
 }
 
-export function SettingsClient({ userId, user, sessions }: SettingsClientProps) {
+export function SettingsClient({ userId, user, sessions, apiToken }: SettingsClientProps) {
+  useEffect(() => {
+    if (apiToken) setApiToken(apiToken)
+  }, [apiToken])
   const router = useRouter()
   const isMobile = useIsMobile()
   const [searchQuery, setSearchQuery] = useState('')

@@ -6,6 +6,7 @@ import { useSyncExternalStore } from 'react'
 import { sessionStatusStore } from './hooks/use-session-status-store'
 import { useSearchParams } from 'next/navigation'
 import { useIsMobile } from '@ship/ui'
+import { setApiToken } from '@/lib/api/client'
 import { useGitHubRepos } from '@/lib/api/hooks/use-repos'
 import { useGitHubBranches } from '@/lib/api/hooks/use-branches'
 import { useModels, useDefaultModel, useSessionModel } from '@/lib/api/hooks/use-models'
@@ -35,6 +36,8 @@ interface DashboardClientProps {
   initialMessages?: UIMessage[]
   /** Stable timestamp from server for SSR-safe time formatting (avoids hydration mismatch) */
   serverTimestamp?: number
+  /** Session JWT for API authentication */
+  apiToken?: string
 }
 
 export function DashboardClient({
@@ -44,7 +47,12 @@ export function DashboardClient({
   initialSessionId = null,
   initialMessages,
   serverTimestamp = Math.floor(Date.now() / 1000),
+  apiToken,
 }: DashboardClientProps) {
+  // Set API auth token on mount (session JWT passed from server component)
+  useEffect(() => {
+    if (apiToken) setApiToken(apiToken)
+  }, [apiToken])
   const searchParams = useSearchParams()
   const isMobile = useIsMobile()
   const modeRef = useRef('agent')

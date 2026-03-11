@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useSyncExternalStore } from 'react'
 import { createReconnectingWebSocket, type WebSocketStatus } from '@/lib/websocket'
+import { getApiToken } from '@/lib/api/client'
 import { stopChatStream, getChatMessages, type Message as APIMessage } from '@/lib/api/server'
 import type { UIMessage } from '@/lib/ai-elements-adapter'
 import {
@@ -103,7 +104,8 @@ export function useDashboardChat(
   const connectWebSocket = useCallback((sessionId: string) => {
     wsRef.current?.disconnect()
 
-    const wsUrl = `${API_URL.replace('http', 'ws')}/sessions/${sessionId}/websocket`
+    const token = getApiToken()
+    const wsUrl = `${API_URL.replace('http', 'ws')}/sessions/${sessionId}/websocket${token ? `?token=${encodeURIComponent(token)}` : ''}`
 
     wsRef.current = createReconnectingWebSocket({
       url: wsUrl,
