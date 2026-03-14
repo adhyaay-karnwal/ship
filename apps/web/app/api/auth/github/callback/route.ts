@@ -61,6 +61,7 @@ export async function GET(request: Request): Promise<Response> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.API_SECRET}`,
       },
       body: JSON.stringify({
         githubId: githubUser.id.toString(),
@@ -98,6 +99,7 @@ export async function GET(request: Request): Promise<Response> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.API_SECRET}`,
       },
       body: JSON.stringify({
         userId,
