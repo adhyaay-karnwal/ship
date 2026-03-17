@@ -40,7 +40,7 @@ export function DashboardComposer({ context, compactLayout = false }: DashboardC
         >
           {/* Repo + branch above the card (Cursor-style) */}
           {!activeSessionId && (
-            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 min-h-[32px] px-1.5 pb-1.5">
+            <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5 min-h-[28px] px-1.5 pb-1.5">
               <ClientOnly>
                 <ComposerRepoSelector />
               </ClientOnly>
@@ -63,7 +63,7 @@ export function DashboardComposer({ context, compactLayout = false }: DashboardC
             </div>
 
             {/* Bottom bar inside the card: selectors left, actions right */}
-            <div className="flex items-center gap-1 px-3 h-[42px]">
+            <div className="flex items-center gap-1 px-3 h-[36px]">
               {!activeSessionId && (
                 <div className="shrink min-w-0 overflow-hidden">
                   <ClientOnly>

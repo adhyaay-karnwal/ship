@@ -18,7 +18,7 @@ export function ModeToggle() {
 
   if (availableModes.length <= 1) {
     return (
-      <span className="text-sm text-muted-foreground">
+      <span className="text-xs text-muted-foreground">
         {currentMode?.label ?? mode}
       </span>
     )
@@ -30,12 +30,13 @@ export function ModeToggle() {
         render={
           <Button
             variant="ghost"
+            size="sm"
             disabled={isStreaming}
-            className="group h-auto gap-1 px-0 py-0 rounded-full text-muted-foreground hover:text-foreground hover:bg-transparent disabled:opacity-60 disabled:pointer-events-none"
+            className="group h-auto gap-0.5 px-0 py-0 rounded-full text-muted-foreground hover:text-foreground hover:bg-transparent disabled:opacity-60 disabled:pointer-events-none"
           >
-            <span className="text-sm">{currentMode?.label ?? mode}</span>
+            <span className="text-xs">{currentMode?.label ?? mode}</span>
             <svg
-              className="h-3 w-3 shrink-0 opacity-40 transition-opacity duration-150 group-hover:opacity-100"
+              className="size-2.5 shrink-0 opacity-40 transition-opacity duration-150 group-hover:opacity-100"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
