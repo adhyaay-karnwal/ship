@@ -409,13 +409,14 @@ export async function resumeAgentSession(
   }
 }
 
-// Default timeout for prompt calls (5 minutes)
-const PROMPT_TIMEOUT_MS = 5 * 60 * 1000
-
 /**
  * Send a prompt to an agent session and return when the turn completes.
  * Events stream via session.onEvent() callback registered before calling this.
- * Times out after 5 minutes to prevent indefinite hangs.
+ *
+ * No artificial timeout — safety is provided by:
+ * - Server-side EVENT_TIMEOUT_MS (fires if zero events received)
+ * - Client-side stall detector (90s between events)
+ * - User can cancel via the UI
  *
  * Replaces promptOpenCode()
  */
@@ -425,15 +426,7 @@ export async function promptAgent(
 ): Promise<{ response: unknown }> {
   console.log(`[sandbox-agent] Sending prompt (${content.length} chars) to session ${session.id}`)
 
-  const response = await Promise.race([
-    session.prompt([{ type: 'text', text: content }]),
-    new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject(new Error(`Prompt timed out after ${PROMPT_TIMEOUT_MS / 1000}s`)),
-        PROMPT_TIMEOUT_MS,
-      ),
-    ),
-  ])
+  const response = await session.prompt([{ type: 'text', text: content }])
 
   console.log(`[sandbox-agent] Prompt completed for session ${session.id}`)
   return { response }

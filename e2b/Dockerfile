@@ -16,5 +16,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 # Install sandbox-agent binary
-# Agent installs (claude, opencode, codex) happen at runtime via sandbox-agent install-agent
 RUN curl -fsSL https://releases.rivet.dev/sandbox-agent/0.3.x/install.sh | sh
+
+# Pre-install common agents (avoids ~30s runtime download per agent)
+RUN sandbox-agent install-agent claude || true
+RUN sandbox-agent install-agent opencode || true

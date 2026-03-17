@@ -244,7 +244,10 @@ export function RightSidebar({
   const panelProps = useSessionPanelProps(data)
   const { sandbox } = useSandboxStatus(data.sessionId)
 
-  const desktopSandboxStatus = data.sandboxStatus ?? sandbox?.status ?? undefined
+  const desktopSandboxStatus =
+    (data.sandboxStatus && data.sandboxStatus !== 'unknown')
+      ? data.sandboxStatus
+      : sandbox?.status ?? undefined
 
   const content = (
     <div className="flex flex-col h-full">

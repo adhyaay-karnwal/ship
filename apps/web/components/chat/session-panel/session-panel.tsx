@@ -10,6 +10,7 @@ import { ChangesSection } from './changes-section'
 import { AgentLink } from './agent-link'
 import { SessionActionsSection } from './session-actions-section'
 import { VCSSection } from './vcs-section'
+import { EventsSection } from './events-section'
 
 export function SessionPanel({
   sessionId,
@@ -82,6 +83,9 @@ export function SessionPanel({
 
       {/* Agent link */}
       {agentUrl && <AgentLink url={agentUrl} agentSessionId={agentSessionId} />}
+
+      {/* Events inspector */}
+      <EventsSection sessionId={sessionId} />
 
       {/* Empty state */}
       {!repo && !model && !tokens && !sessionInfo && !agentUrl && messages.length === 0 && (

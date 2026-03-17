@@ -5,6 +5,7 @@ import { sendChatMessage, subscribeToChatStream } from '@/lib/api/server'
 import { postSessionSync } from '@/lib/session-sync-channel'
 import { parseSSEEvent, getEventStatus, extractTextDelta } from '@/lib/sse-parser'
 import { sessionStatusStore } from './use-session-status-store'
+import { eventsStore } from './use-events-store'
 import {
   type UIMessage,
   createUserMessage,
@@ -131,6 +132,13 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
       let lastEventTime = Date.now()
       const onStall = () => {
         if (streamingMessageRef.current && targetSessionId === activeSessionIdRef?.current) {
+          // If we already have assistant content, treat as graceful done instead of error
+          if (assistantTextRef.current.length > 0) {
+            handleDoneOrIdle(ctx, streamStartTimeRef)
+            sessionStatusStore.update(targetSessionId, { isRunning: false, status: 'Done' })
+            postSessionSync({ type: 'session-stopped', sessionId: targetSessionId })
+            return
+          }
           const msgId = streamingMessageRef.current
           setMessages((prev) => {
             const withoutPlaceholder = prev.filter((m) => m.id !== msgId)
@@ -232,6 +240,13 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
                 const event = parseSSEEvent(rawData)
                 if (!event) continue
 
+                eventsStore.addEvent(targetSessionId, {
+                  id: crypto.randomUUID(),
+                  type: event.type,
+                  timestamp: Date.now(),
+                  payload: rawData,
+                })
+
                 switch (event.type) {
                   case 'message.part.updated': {
                     handleMessagePartUpdated(event as any, ctx, scheduleFlush)
@@ -316,6 +331,8 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
 
                   case 'done':
                   case 'session.idle': {
+                    if (timeoutId) { clearTimeout(timeoutId); timeoutId = null }
+                    if (stallTimerId) { clearTimeout(stallTimerId); stallTimerId = null }
                     handleDoneOrIdle(ctx, streamStartTimeRef)
                     sessionStatusStore.update(targetSessionId, {
                       isRunning: false,
@@ -389,6 +406,9 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
             }
           }
         }
+        // Stream ended — clear watchdog timers immediately
+        if (timeoutId) { clearTimeout(timeoutId); timeoutId = null }
+        if (stallTimerId) { clearTimeout(stallTimerId); stallTimerId = null }
         const current = sessionStatusStore.get(targetSessionId)
         if (current?.isRunning) {
           sessionStatusStore.update(targetSessionId, {
@@ -641,6 +661,13 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
                 if (!rawData.type && currentEventType) rawData.type = currentEventType
                 const event = parseSSEEvent(rawData)
                 if (!event) continue
+
+                eventsStore.addEvent(sessionId, {
+                  id: crypto.randomUUID(),
+                  type: event.type,
+                  timestamp: Date.now(),
+                  payload: rawData,
+                })
 
                 switch (event.type) {
                   case 'session.idle':

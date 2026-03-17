@@ -87,6 +87,7 @@ ship/
 │   │   │           ├── sse-event-handlers.ts  # Pure event handler functions
 │   │   │           ├── use-session-sync.ts    # URL/model/repo sync effects
 │   │   │           ├── use-right-sidebar.ts   # Sidebar open/close state
+│   │   │           ├── use-events-store.ts    # Raw SSE events store (per-session, singleton)
 │   │   │           └── use-subagent-stream.ts # Sub-agent event streaming
 │   │   ├── lib/                # Frontend business logic
 │   │   │   ├── ai-elements-adapter.ts  # SSE → UIMessage adapter
@@ -129,8 +130,8 @@ Ship uses **sandbox-agent** (by Rivet) as its agent runtime, which supports mult
 ### How it works
 
 1. An E2B sandbox is provisioned for each session using a custom template (`e2b/Dockerfile`) that extends `e2bdev/desktop:latest`
-2. The custom template has `sandbox-agent` binary and all agent binaries (claude, opencode, codex) pre-installed for fast startup
-3. If binaries are missing (non-custom template fallback), they are installed at runtime
+2. The custom template has `sandbox-agent` binary and common agents (claude, opencode) pre-installed for fast startup (~10s vs ~60s)
+3. If binaries are missing (non-custom template fallback), they are installed at runtime via `sandbox-agent install-agent`
 4. `sandbox-agent server` exposes an HTTP/SSE API inside the sandbox on port 3000
 5. The Cloudflare Worker connects to the sandbox-agent API and translates events to Ship's SSE format
 6. Users can open an interactive desktop stream via the Desktop tab (noVNC via `@e2b/desktop` SDK)
@@ -177,7 +178,7 @@ Agent configs are defined in `apps/api/src/lib/agent-registry.ts`. Default agent
 
 ### Key API Files
 
-- **`sandbox-agent.ts`** — SDK wrapper. Functions: `startSandboxAgentServer`, `connectToSandboxAgent`, `createAgentSession`, `promptAgent`, `cancelAgent`, `subscribeToSessionEvents`. Caches client instances per sandbox URL. Checks for pre-installed binaries before installing (custom template fast path).
+- **`sandbox-agent.ts`** — SDK wrapper. Functions: `startSandboxAgentServer`, `connectToSandboxAgent`, `createAgentSession`, `promptAgent`, `cancelAgent`, `subscribeToSessionEvents`. Caches client instances per sandbox URL. Checks for pre-installed binaries before installing (custom template fast path). `promptAgent` runs without artificial timeout — safety is provided by server-side event timeout, client-side stall detector, and user cancel.
 - **`desktop.ts`** — Desktop stream helpers using `@e2b/desktop` SDK. Functions: `startDesktopStream`, `stopDesktopStream`.
 - **`e2b.ts`** — E2B sandbox provisioning. Supports custom template via `E2B_TEMPLATE_ID` constant.
 - **`event-translator.ts`** — Stateful translator class (`EventTranslatorState`) that maps sandbox-agent's `UniversalEvent` schema to Ship's SSE events. Tracks text/reasoning accumulators, tool call state, and file changes across a session stream.
@@ -311,7 +312,11 @@ Pure functions (no hooks) that dispatch SSE events to React state. All take an `
 
 ### Key UI Patterns
 
-**Streaming optimization**: Text and reasoning use mutable refs (`assistantTextRef`, `reasoningRef`) for accumulation with scheduled flushes via `scheduleFlush()`. Tool updates bypass this and trigger immediate `setMessages`. This prevents excessive re-renders during fast token streaming.
+**Streaming optimization**: Text and reasoning use mutable refs (`assistantTextRef`, `reasoningRef`) for accumulation with scheduled flushes via `scheduleFlush()`. Tool updates bypass this and trigger immediate `setMessages`. This prevents excessive re-renders during fast token streaming. Client-side stall timer (90s) treats stalls with existing content as graceful done, not error.
+
+**Cross-tab sync**: `BroadcastChannel` syncs session lifecycle (created/deleted/streaming/stopped). When Tab B receives `session-streaming` for its currently-viewed session, it calls `resumeStream()` to independently subscribe to the live SSE stream.
+
+**Events inspector**: All raw SSE events are captured in `eventsStore` (singleton, per-session arrays capped at 500). The `EventsSection` component in the Overview tab displays events as a collapsible list with colored dots by category, timestamps, and expand-to-JSON for each event.
 
 **Permission/Question prompts**: Rendered as inline `system` role messages with `type: 'permission'` or `type: 'question'`. Status tracked in `promptData.status` field ('pending' → 'granted'/'denied'/'replied'/'rejected').
 

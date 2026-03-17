@@ -166,6 +166,10 @@ export function DashboardClient({
         mutateSessions()
       } else if (msg.type === 'session-streaming') {
         setStreamingFromOtherTabs((prev) => new Set(prev).add(msg.sessionId))
+        // If this is our active session and we're not already streaming, attach to SSE
+        if (msg.sessionId === chat.activeSessionId && !chat.isStreaming) {
+          resumeStreamRef.current?.(msg.sessionId)
+        }
       } else if (msg.type === 'session-stopped') {
         setStreamingFromOtherTabs((prev) => {
           const next = new Set(prev)
