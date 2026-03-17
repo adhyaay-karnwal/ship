@@ -36,6 +36,11 @@ function createEventsStore() {
       version++
       notify()
     },
+    replaceEvents(sessionId: string, newEvents: RawEvent[]) {
+      events.set(sessionId, newEvents.slice(-500))
+      version++
+      notify()
+    },
     getEvents(sessionId: string): RawEvent[] {
       return events.get(sessionId) ?? []
     },

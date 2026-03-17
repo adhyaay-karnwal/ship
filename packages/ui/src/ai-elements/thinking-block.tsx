@@ -116,7 +116,7 @@ export function ThinkingBlock({
           {getThinkingLabel(isStreaming, duration)}
         </span>
         <svg
-          className={cn('w-3.5 h-3.5 shrink-0 text-muted-foreground/40 transition-transform', !open && '-rotate-90')}
+          className={cn('w-4 h-4 shrink-0 text-muted-foreground/80 transition-transform', !open && '-rotate-90')}
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"

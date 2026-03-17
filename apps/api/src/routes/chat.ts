@@ -813,6 +813,22 @@ app.post('/:sessionId', async (c) => {
                 body: JSON.stringify({ type: 'agent-event', event: agentSessionEvent }),
               }),
             )
+            await stub.fetch(
+              new Request(`${doUrl}/events`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  events: [
+                    {
+                      id: crypto.randomUUID(),
+                      type: 'agent-session',
+                      timestamp: Date.now(),
+                      payload: agentSessionEvent,
+                    },
+                  ],
+                }),
+              }),
+            )
           } catch {
             // Ignore broadcast errors
           }
@@ -827,6 +843,24 @@ app.post('/:sessionId', async (c) => {
         let receivedAiTitle = false
         const EVENT_TIMEOUT_MS = 300000 // 5 min — allow for retries (502, port not open)
         const HEARTBEAT_INTERVAL_MS = 10000
+
+        const pendingEvents: Array<{ id: string; type: string; timestamp: number; payload: unknown }> = []
+        const BATCH_SIZE = 5
+        const flushEventsToPersist = async () => {
+          if (pendingEvents.length === 0) return
+          const batch = pendingEvents.splice(0, pendingEvents.length)
+          try {
+            await stub.fetch(
+              new Request(`${doUrl}/events`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ events: batch }),
+              }),
+            )
+          } catch (e) {
+            console.error(`[chat:${sessionId}] Failed to persist events:`, e)
+          }
+        }
 
         const unsubscribe = subscribeToSessionEvents(session, async (event) => {
           lastEventTime = Date.now()
@@ -843,6 +877,16 @@ app.post('/:sessionId', async (c) => {
               })
             } catch (sseError) {
               console.error(`[chat:${sessionId}] Failed to send SSE event:`, sseError)
+            }
+
+            pendingEvents.push({
+              id: crypto.randomUUID(),
+              type: sseEvent.type,
+              timestamp: Date.now(),
+              payload: sseEvent,
+            })
+            if (pendingEvents.length >= BATCH_SIZE) {
+              await flushEventsToPersist()
             }
 
             // Persist session title to DB when received from agent (any harness)
@@ -881,16 +925,26 @@ app.post('/:sessionId', async (c) => {
         const heartbeatInterval = setInterval(async () => {
           const timeSinceLastEvent = Date.now() - lastEventTime
           if (timeSinceLastEvent > HEARTBEAT_INTERVAL_MS) {
+            const heartbeatPayload = {
+              type: 'heartbeat',
+              message: 'Waiting for agent response...',
+              eventCount,
+              timeSinceLastEvent: Math.floor(timeSinceLastEvent / 1000),
+            }
             try {
               await stream.writeSSE({
                 event: 'heartbeat',
-                data: JSON.stringify({
-                  type: 'heartbeat',
-                  message: 'Waiting for agent response...',
-                  eventCount,
-                  timeSinceLastEvent: Math.floor(timeSinceLastEvent / 1000),
-                }),
+                data: JSON.stringify(heartbeatPayload),
               })
+              pendingEvents.push({
+                id: crypto.randomUUID(),
+                type: 'heartbeat',
+                timestamp: Date.now(),
+                payload: heartbeatPayload,
+              })
+              if (pendingEvents.length >= BATCH_SIZE) {
+                await flushEventsToPersist()
+              }
             } catch {
               // Stream might be closed
             }
@@ -921,14 +975,22 @@ app.post('/:sessionId', async (c) => {
 
         // Send prompt status (only on first message)
         if (isFirstMessage) {
+          const statusPayload = {
+            type: 'status',
+            status: 'sending-prompt',
+            message: 'Sending request to agent...',
+          }
           await stream.writeSSE({
             event: 'status',
-            data: JSON.stringify({
-              type: 'status',
-              status: 'sending-prompt',
-              message: 'Sending request to agent...',
-            }),
+            data: JSON.stringify(statusPayload),
           })
+          pendingEvents.push({
+            id: crypto.randomUUID(),
+            type: 'status',
+            timestamp: Date.now(),
+            payload: statusPayload,
+          })
+          await flushEventsToPersist()
         }
 
         // Send prompt — blocks until turn completes
@@ -1016,6 +1078,7 @@ app.post('/:sessionId', async (c) => {
           clearTimeout(eventTimeout)
           clearInterval(heartbeatInterval)
           unsubscribe()
+          await flushEventsToPersist()
         }
 
         console.log(
@@ -1358,6 +1421,17 @@ app.get('/:sessionId/subagent/:subagentSessionId/stream', async (c) => {
       await stream.close()
     }
   })
+})
+
+// GET /chat/:sessionId/events - Get persisted SSE events for Overview inspector
+app.get('/:sessionId/events', async (c) => {
+  const sessionId = c.req.param('sessionId')
+
+  const id = c.env.SESSION_DO.idFromName(sessionId)
+  const stub = c.env.SESSION_DO.get(id)
+
+  const response = await stub.fetch(new Request('https://do/events'))
+  return new Response(response.body, response)
 })
 
 // GET /chat/:sessionId/messages - Get message history

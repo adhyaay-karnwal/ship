@@ -166,6 +166,30 @@ export async function getChatMessages(
   return res.json()
 }
 
+/** Raw event for Overview inspector */
+export interface RawEvent {
+  id: string
+  type: string
+  timestamp: number
+  payload: unknown
+}
+
+/**
+ * Get persisted SSE events for a session (Overview inspector)
+ */
+export async function getChatEvents(sessionId: string): Promise<RawEvent[]> {
+  const res = await fetch(`${API_URL}/chat/${encodeURIComponent(sessionId)}/events`, {
+    headers: serverAuthHeaders(),
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    return []
+  }
+
+  return res.json()
+}
+
 /**
  * Send a chat message and get streaming response
  * Uses fetch with explicit streaming configuration

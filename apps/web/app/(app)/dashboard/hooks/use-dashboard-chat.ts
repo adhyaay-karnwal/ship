@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect, useSyncExternalStore } from 'react'
 import { createReconnectingWebSocket, type WebSocketStatus } from '@/lib/websocket'
 import { getApiToken } from '@/lib/api/client'
-import { stopChatStream, getChatMessages, type Message as APIMessage } from '@/lib/api/server'
+import { stopChatStream, getChatMessages, getChatEvents, type Message as APIMessage } from '@/lib/api/server'
 import type { UIMessage } from '@/lib/ai-elements-adapter'
 import {
   createErrorMessage,
@@ -14,7 +14,7 @@ import type { ChatSession } from '@/lib/api/server'
 import { API_URL } from '@/lib/config'
 import { useSessionPersistence } from './use-session-persistence'
 import { sessionStatusStore } from './use-session-status-store'
-import { hydrateEventsFromMessages } from './use-events-store'
+import { hydrateEventsFromMessages, eventsStore } from './use-events-store'
 
 export interface UseDashboardChatOptions {
   onAgentEventRef?: React.MutableRefObject<
@@ -218,21 +218,35 @@ export function useDashboardChat(
     if (hadInitialForThisSession) {
       historyLoadedRef.current = activeSessionId
       setMessages(normalizeInitialMessages(rawInitialMessages!))
-      if (initialApiMessages?.length) {
-        hydrateEventsFromMessages(activeSessionId, initialApiMessages)
-      }
+      getChatEvents(activeSessionId).then((events) => {
+        if (events.length > 0) {
+          eventsStore.replaceEvents(activeSessionId, events)
+        } else if (initialApiMessages?.length) {
+          hydrateEventsFromMessages(activeSessionId, initialApiMessages)
+        }
+      })
       onResumeStream?.(activeSessionId)
       return
     }
     if (historyLoadedRef.current === activeSessionId) return
     historyLoadedRef.current = activeSessionId
 
-    getChatMessages(activeSessionId, { limit: 100 })
-      .then((apiMessages) => {
+    Promise.all([
+      getChatMessages(activeSessionId, { limit: 100 }),
+      getChatEvents(activeSessionId),
+    ])
+      .then(([apiMessages, events]) => {
         const uiMessages = mapApiMessagesToUI(apiMessages)
         setMessages(uiMessages)
-        hydrateEventsFromMessages(activeSessionId, apiMessages)
+        if (events.length > 0) {
+          eventsStore.replaceEvents(activeSessionId, events)
+        } else {
+          hydrateEventsFromMessages(activeSessionId, apiMessages)
+        }
         onResumeStream?.(activeSessionId)
+      })
+      .catch((err) => {
+        console.error('Failed to load messages:', err)
       })
       .catch((err) => {
         console.error('Failed to load messages:', err)

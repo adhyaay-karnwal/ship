@@ -912,6 +912,23 @@ export class SessionDO extends DurableObject<Env> {
       return Response.json({ success: true })
     }
 
+    // RPC: Append session events (for Overview inspector persistence)
+    if (url.pathname.endsWith('/events') && request.method === 'POST') {
+      const body = (await request.json()) as { events: Array<{ id: string; type: string; timestamp: number; payload: unknown }> }
+      const existing = await this.getSessionMeta()
+      const current = (existing['session_events'] ? JSON.parse(existing['session_events']) : []) as typeof body.events
+      const updated = [...current, ...(body.events ?? [])].slice(-500)
+      await this.setSessionMeta('session_events', JSON.stringify(updated))
+      return Response.json({ success: true })
+    }
+
+    // RPC: Get session events
+    if (url.pathname.endsWith('/events') && request.method === 'GET') {
+      const meta = await this.getSessionMeta()
+      const events = meta['session_events'] ? JSON.parse(meta['session_events']) : []
+      return Response.json(events)
+    }
+
     // RPC: Provision sandbox
     if (url.pathname.endsWith('/sandbox/provision') && request.method === 'POST') {
       try {
