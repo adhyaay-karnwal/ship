@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { ChatSession } from '@/lib/api/server'
 import { sendChatMessage } from '@/lib/api/server'
 import { parseSSEEvent, getEventStatus, extractTextDelta } from '@/lib/sse-parser'
+import { isAgentHarnessEvent } from '@/lib/sse-types'
 import type { GitHubRepo, ModelInfo, AgentInfo, AgentMode, AgentModeId, User } from '@/lib/api/types'
 import type { useDashboardChat } from './use-dashboard-chat'
 import type { CreateSessionParams } from '@/lib/api/types'
@@ -151,12 +152,14 @@ export function useDashboardState({ chat, handleSend, processStreamEventForSessi
               const rawData = JSON.parse(line.slice(6))
               if (!rawData.type && currentEventType) rawData.type = currentEventType
               const eventType = rawData?.type ?? currentEventType ?? 'unknown'
-              eventsStore.addEvent(sessionId, {
-                id: crypto.randomUUID(),
-                type: eventType,
-                timestamp: Date.now(),
-                payload: rawData,
-              })
+              if (isAgentHarnessEvent(eventType, rawData)) {
+                eventsStore.addEvent(sessionId, {
+                  id: crypto.randomUUID(),
+                  type: eventType,
+                  timestamp: Date.now(),
+                  payload: rawData,
+                })
+              }
               const event = parseSSEEvent(rawData)
               if (!event) continue
 

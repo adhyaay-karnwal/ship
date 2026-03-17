@@ -4,6 +4,7 @@ import { useCallback, useRef } from 'react'
 import { sendChatMessage, subscribeToChatStream } from '@/lib/api/server'
 import { postSessionSync } from '@/lib/session-sync-channel'
 import { parseSSEEvent, getEventStatus, extractTextDelta } from '@/lib/sse-parser'
+import { isAgentHarnessEvent } from '@/lib/sse-types'
 import { sessionStatusStore } from './use-session-status-store'
 import { eventsStore } from './use-events-store'
 import {
@@ -239,14 +240,16 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
                 }
                 const event = parseSSEEvent(rawData)
 
-                // Always capture raw events for inspector (even when parse fails)
+                // Only capture raw events from agent harness (exclude sandbox-ready, heartbeat, etc.)
                 const eventType = event?.type ?? (typeof rawData.type === 'string' ? rawData.type : 'unknown')
-                eventsStore.addEvent(targetSessionId, {
-                  id: crypto.randomUUID(),
-                  type: eventType,
-                  timestamp: Date.now(),
-                  payload: rawData,
-                })
+                if (isAgentHarnessEvent(eventType, rawData)) {
+                  eventsStore.addEvent(targetSessionId, {
+                    id: crypto.randomUUID(),
+                    type: eventType,
+                    timestamp: Date.now(),
+                    payload: rawData,
+                  })
+                }
 
                 if (!event) continue
 
@@ -664,14 +667,16 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
                 if (!rawData.type && currentEventType) rawData.type = currentEventType
                 const event = parseSSEEvent(rawData)
 
-                // Always capture raw events for inspector (even when parse fails)
+                // Only capture raw events from agent harness (exclude sandbox-ready, heartbeat, etc.)
                 const eventType = event?.type ?? (typeof rawData.type === 'string' ? rawData.type : 'unknown')
-                eventsStore.addEvent(sessionId, {
-                  id: crypto.randomUUID(),
-                  type: eventType,
-                  timestamp: Date.now(),
-                  payload: rawData,
-                })
+                if (isAgentHarnessEvent(eventType, rawData)) {
+                  eventsStore.addEvent(sessionId, {
+                    id: crypto.randomUUID(),
+                    type: eventType,
+                    timestamp: Date.now(),
+                    payload: rawData,
+                  })
+                }
 
                 if (!event) continue
 

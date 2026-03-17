@@ -425,3 +425,38 @@ export function isReasoningPart(part: MessagePart): part is ReasoningPart {
 export function isStepFinish(part: MessagePart): part is StepFinishPart {
   return part.type === 'step-finish'
 }
+
+/** Chat-route status values we exclude from Overview (not from agent harness) */
+const CHAT_ROUTE_STATUS_VALUES = new Set([
+  'sandbox-ready',
+  'starting-agent-server',
+  'cloning',
+  'repo-ready',
+  'reconnecting',
+  'initializing',
+  'provisioning',
+  'retrying',
+])
+
+/** Event types emitted by chat route setup, not by agent harness */
+const CHAT_ROUTE_EVENT_TYPES = new Set([
+  'heartbeat',
+  'agent-url',
+  'opencode-url',
+  'server.connected',
+  'server.heartbeat',
+])
+
+/**
+ * Returns true if the event comes from the agent harness (sandbox-agent).
+ * Used to filter Overview events so we only show raw agent events, not
+ * chat-route status like "sandbox ready", heartbeats, etc.
+ */
+export function isAgentHarnessEvent(eventType: string, payload?: unknown): boolean {
+  if (CHAT_ROUTE_EVENT_TYPES.has(eventType)) return false
+  if (eventType === 'status') {
+    const status = (payload as { status?: string })?.status
+    if (typeof status === 'string' && CHAT_ROUTE_STATUS_VALUES.has(status)) return false
+  }
+  return true
+}

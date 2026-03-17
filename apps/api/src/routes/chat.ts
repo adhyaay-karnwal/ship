@@ -936,15 +936,7 @@ app.post('/:sessionId', async (c) => {
                 event: 'heartbeat',
                 data: JSON.stringify(heartbeatPayload),
               })
-              pendingEvents.push({
-                id: crypto.randomUUID(),
-                type: 'heartbeat',
-                timestamp: Date.now(),
-                payload: heartbeatPayload,
-              })
-              if (pendingEvents.length >= BATCH_SIZE) {
-                await flushEventsToPersist()
-              }
+              // Don't persist heartbeat — Overview shows only raw agent harness events
             } catch {
               // Stream might be closed
             }
@@ -984,13 +976,7 @@ app.post('/:sessionId', async (c) => {
             event: 'status',
             data: JSON.stringify(statusPayload),
           })
-          pendingEvents.push({
-            id: crypto.randomUUID(),
-            type: 'status',
-            timestamp: Date.now(),
-            payload: statusPayload,
-          })
-          await flushEventsToPersist()
+          // Don't persist chat-route status — Overview shows only raw agent harness events
         }
 
         // Send prompt — blocks until turn completes
