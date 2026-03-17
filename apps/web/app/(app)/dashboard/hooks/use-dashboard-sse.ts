@@ -238,14 +238,17 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
                   rawData.type = currentEventType
                 }
                 const event = parseSSEEvent(rawData)
-                if (!event) continue
 
+                // Always capture raw events for inspector (even when parse fails)
+                const eventType = event?.type ?? (typeof rawData.type === 'string' ? rawData.type : 'unknown')
                 eventsStore.addEvent(targetSessionId, {
                   id: crypto.randomUUID(),
-                  type: event.type,
+                  type: eventType,
                   timestamp: Date.now(),
                   payload: rawData,
                 })
+
+                if (!event) continue
 
                 switch (event.type) {
                   case 'message.part.updated': {
@@ -660,14 +663,17 @@ export function useDashboardSSE({ chat, modeRef }: UseDashboardSSEParams) {
                 const rawData = JSON.parse(line.slice(6))
                 if (!rawData.type && currentEventType) rawData.type = currentEventType
                 const event = parseSSEEvent(rawData)
-                if (!event) continue
 
+                // Always capture raw events for inspector (even when parse fails)
+                const eventType = event?.type ?? (typeof rawData.type === 'string' ? rawData.type : 'unknown')
                 eventsStore.addEvent(sessionId, {
                   id: crypto.randomUUID(),
-                  type: event.type,
+                  type: eventType,
                   timestamp: Date.now(),
                   payload: rawData,
                 })
+
+                if (!event) continue
 
                 switch (event.type) {
                   case 'session.idle':

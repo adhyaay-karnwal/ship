@@ -118,9 +118,9 @@ const FILTER_TABS: { id: EventCategory; label: string }[] = [
   { id: 'errors', label: 'Errors' },
 ]
 
-export function EventsSection({ sessionId }: { sessionId: string }) {
+export function EventsSection({ sessionId, messageCount = 0 }: { sessionId: string; messageCount?: number }) {
   const events = useEventsStore(sessionId)
-  const [collapsed, setCollapsed] = useState(true)
+  const [collapsed, setCollapsed] = useState(false)
   const [filter, setFilter] = useState<EventCategory>('all')
 
   const filteredEvents = useMemo(() => {
@@ -183,7 +183,7 @@ export function EventsSection({ sessionId }: { sessionId: string }) {
                   onClick={handleCopyAll}
                   className="text-[10px] text-muted-foreground/40 hover:text-foreground transition-colors"
                 >
-                  Copy
+                  Copy all as JSON
                 </button>
                 <button
                   onClick={handleClear}
@@ -198,8 +198,21 @@ export function EventsSection({ sessionId }: { sessionId: string }) {
           {/* Event cards */}
           <div className="space-y-1.5 max-h-[400px] overflow-y-auto pr-0.5">
             {filteredEvents.length === 0 ? (
-              <div className="py-6 text-[11px] text-muted-foreground/30 text-center rounded-lg border border-dashed border-border/20">
-                {events.length === 0 ? 'No events yet' : 'No matching events'}
+              <div className="py-6 px-3 text-[11px] text-muted-foreground/50 text-center rounded-lg border border-dashed border-border/20 space-y-1">
+                {events.length === 0 ? (
+                  messageCount > 0 ? (
+                    <>
+                      <p>No events yet</p>
+                      <p className="text-[10px] text-muted-foreground/40">
+                        Events stream during live sessions. If the agent appears stalled, events may not be arriving.
+                      </p>
+                    </>
+                  ) : (
+                    'No events yet'
+                  )
+                ) : (
+                  'No matching events'
+                )}
               </div>
             ) : (
               filteredEvents.map((event) => <EventCard key={event.id} event={event} />)
