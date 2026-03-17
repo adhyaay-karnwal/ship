@@ -37,7 +37,7 @@ desktop.post('/:sessionId/start', async (c) => {
       return c.json({ error: 'No sandbox provisioned for this session' }, 400)
     }
 
-    // Start desktop stream
+    console.log('[desktop] Starting stream', { sessionId, sandboxId })
     const { streamUrl, authKey } = await startDesktopStream(apiKey, sandboxId)
 
     // Store in DO meta
@@ -50,9 +50,11 @@ desktop.post('/:sessionId/start', async (c) => {
       }),
     })
 
+    console.log('[desktop] Stream started', { sessionId })
     return c.json({ streamUrl })
   } catch (error) {
-    console.error('Error starting desktop stream:', error)
+    const sessionId = c.req.param('sessionId')
+    console.error('[desktop] Error starting stream', { sessionId, error })
     return c.json(
       { error: error instanceof Error ? error.message : 'Failed to start desktop stream' },
       500,
@@ -84,7 +86,7 @@ desktop.post('/:sessionId/stop', async (c) => {
       return c.json({ error: 'No sandbox provisioned for this session' }, 400)
     }
 
-    // Stop desktop stream
+    console.log('[desktop] Stopping stream', { sessionId, sandboxId })
     await stopDesktopStream(apiKey, sandboxId)
 
     // Clear DO meta
@@ -97,9 +99,11 @@ desktop.post('/:sessionId/stop', async (c) => {
       }),
     })
 
+    console.log('[desktop] Stream stopped', { sessionId })
     return c.json({ success: true })
   } catch (error) {
-    console.error('Error stopping desktop stream:', error)
+    const sessionId = c.req.param('sessionId')
+    console.error('[desktop] Error stopping stream', { sessionId, error })
     return c.json(
       { error: error instanceof Error ? error.message : 'Failed to stop desktop stream' },
       500,
