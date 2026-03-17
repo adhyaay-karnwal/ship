@@ -242,12 +242,12 @@ export function RightSidebar({
   onTogglePanel,
 }: RightSidebarProps) {
   const panelProps = useSessionPanelProps(data)
-  const { sandbox } = useSandboxStatus(data.sessionId)
+  const { sandbox, isReady } = useSandboxStatus(data.sessionId)
 
   const desktopSandboxStatus =
     (data.sandboxStatus && data.sandboxStatus !== 'unknown')
       ? data.sandboxStatus
-      : sandbox?.status ?? undefined
+      : isReady ? 'active' : sandbox?.status ?? undefined
 
   const content = (
     <div className="flex flex-col h-full">
@@ -275,7 +275,7 @@ export function RightSidebar({
         <div
           className={cn(
             'border-l border-border/40 bg-sidebar/50 backdrop-blur-sm hidden md:flex flex-col transition-[width] duration-200',
-            expanded ? 'w-[600px]' : 'w-[380px]',
+            expanded ? 'w-[420px]' : 'w-64',
           )}
         >
           {content}

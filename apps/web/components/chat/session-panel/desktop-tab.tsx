@@ -35,7 +35,9 @@ export function DesktopTab({ sessionId, sandboxStatus }: DesktopTabProps) {
   if (!isSandboxReady) {
     return (
       <div className="flex flex-col items-center justify-center size-full gap-3 p-6">
-        <p className="text-sm text-muted-foreground">Waiting for sandbox...</p>
+        <p className="text-sm text-muted-foreground">
+          {sandboxStatus ? 'Waiting for sandbox...' : 'Send a message to start the session'}
+        </p>
       </div>
     )
   }

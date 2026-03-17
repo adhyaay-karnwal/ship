@@ -14,6 +14,7 @@ type Listener = () => void
 function createEventsStore() {
   const events = new Map<string, RawEvent[]>()
   const listeners = new Set<Listener>()
+  let version = 0
 
   function notify() {
     for (const l of listeners) l()
@@ -25,13 +26,14 @@ function createEventsStore() {
       return () => listeners.delete(listener)
     },
     getSnapshot() {
-      return events
+      return version
     },
     addEvent(sessionId: string, event: RawEvent) {
       const existing = events.get(sessionId) ?? []
       // Cap at 500 events per session to avoid memory issues
       const updated = [...existing, event].slice(-500)
       events.set(sessionId, updated)
+      version++
       notify()
     },
     getEvents(sessionId: string): RawEvent[] {
@@ -39,6 +41,7 @@ function createEventsStore() {
     },
     clearEvents(sessionId: string) {
       events.delete(sessionId)
+      version++
       notify()
     },
   }
@@ -48,12 +51,9 @@ function createEventsStore() {
 const store = createEventsStore()
 
 export function useEventsStore(sessionId: string): RawEvent[] {
-  const map = useSyncExternalStore(
-    store.subscribe,
-    store.getSnapshot,
-    store.getSnapshot,
-  )
-  return map.get(sessionId) ?? []
+  useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+  // Re-render triggered by version change, then read current data
+  return store.getEvents(sessionId)
 }
 
 export { store as eventsStore }
