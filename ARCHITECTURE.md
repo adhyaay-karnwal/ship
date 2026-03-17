@@ -113,7 +113,7 @@ AI-specific rendering components:
 3. **First chat** — Chat route waits for sandbox, starts sandbox-agent (skips install if pre-baked in template), clones repo, creates agent session.
 4. **Follow-up chats** — Reuse sandbox and agent session; refresh timeout on each message.
 5. **Unhealthy sandbox** — Try resume; if needed, re-provision and re-clone.
-6. **Delete session** — Soft delete in D1, `POST https://do/sandbox/terminate` for cleanup.
+6. **Delete session** — Hard delete from D1 (messages then session), `POST https://do/sandbox/terminate` for cleanup.
 
 ### Desktop streaming
 

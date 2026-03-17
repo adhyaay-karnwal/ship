@@ -103,7 +103,9 @@ ship/
 │           │   ├── sandbox.ts          # Sandbox management
 │           │   ├── desktop.ts          # Desktop stream start/stop/status
 │           │   ├── models.ts           # Model listing
-│           │   └── git.ts              # Git operations
+│           │   ├── git.ts              # Git operations
+│           │   ├── connectors.ts       # GitHub connector status/enable/disable
+│           │   └── terminal.ts         # Terminal access
 │           ├── lib/
 │           │   ├── sandbox-agent.ts    # sandbox-agent SDK wrapper (with pre-install detection)
 │           │   ├── desktop.ts          # E2B desktop stream helpers (@e2b/desktop)
@@ -167,7 +169,7 @@ Without a template ID, sandboxes use E2B's default image and install everything 
 
 | Agent | sandbox-agent name | Required Env Var | Modes |
 |-------|-------------------|------------------|-------|
-| Claude Code | `claude` | `ANTHROPIC_API_KEY` | default, plan, acceptEdits, bypassPermissions |
+| Claude Code | `claude` | `ANTHROPIC_API_KEY` | default, plan, acceptEdits |
 | OpenCode | `opencode` | — | build, plan |
 | Codex | `codex` | `OPENAI_API_KEY` | read-only, auto, full-access |
 
