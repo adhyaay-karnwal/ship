@@ -1551,6 +1551,9 @@ app.post('/:sessionId/permission/:permissionId', async (c) => {
   const permissionId = c.req.param('permissionId')
 
   const body = await c.req.json<{ reply: 'once' | 'always' | 'reject'; message?: string }>()
+  if (!body.reply || !['once', 'always', 'reject'].includes(body.reply)) {
+    return c.json({ error: 'reply must be once, always, or reject' }, 400)
+  }
 
   const id = c.env.SESSION_DO.idFromName(sessionId)
   const stub = c.env.SESSION_DO.get(id)
@@ -1575,25 +1578,7 @@ app.post('/:sessionId/permission/:permissionId', async (c) => {
       return c.json({ error: 'Agent session not found' }, 400)
     }
 
-    // Map Ship reply format to sandbox-agent/ACP permission reply
-    // ACP uses: "accept", "accept_for_session", "reject"
-    let acpReply: string
-    switch (body.reply) {
-      case 'once':
-        acpReply = 'accept'
-        break
-      case 'always':
-        acpReply = 'accept_for_session'
-        break
-      case 'reject':
-        acpReply = 'reject'
-        break
-    }
-
-    await session.send('permission/reply', {
-      permission_id: permissionId,
-      status: acpReply,
-    })
+    await session.respondPermission(permissionId, body.reply)
 
     return c.json({ success: true })
   } catch (error) {

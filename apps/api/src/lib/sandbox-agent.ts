@@ -446,7 +446,7 @@ export async function cancelAgent(
     // Use the session's send method to cancel via ACP
     const session = await client.getSession(sessionId)
     if (session) {
-      await session.send('session/cancel')
+      await session.rawSend('session/cancel')
     }
   } catch (error) {
     console.warn(`[sandbox-agent] Cancel error (may be expected):`, error)
