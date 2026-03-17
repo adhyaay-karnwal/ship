@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { cn, Skeleton } from '@ship/ui'
 import { useDesktopStream, useStartDesktopStream, useStopDesktopStream } from '@/lib/api/hooks/use-desktop'
 
@@ -11,8 +11,9 @@ interface DesktopTabProps {
 
 export function DesktopTab({ sessionId, sandboxStatus }: DesktopTabProps) {
   const { streamUrl, isActive, isLoading: isCheckingStream, mutate } = useDesktopStream(sessionId)
-  const { startStream, isStarting } = useStartDesktopStream()
+  const { startStream, isStarting, error: startError } = useStartDesktopStream()
   const { stopStream, isStopping } = useStopDesktopStream()
+  const [error, setError] = useState<string | null>(null)
 
   const isProvisioning = sandboxStatus === 'provisioning' || sandboxStatus === 'resuming'
   const isSandboxReady = sandboxStatus === 'active' || sandboxStatus === 'ready'
@@ -23,6 +24,11 @@ export function DesktopTab({ sessionId, sandboxStatus }: DesktopTabProps) {
       mutate()
     }
   }, [isSandboxReady, mutate])
+
+  // Clear error when sandbox status changes
+  useEffect(() => {
+    setError(null)
+  }, [sandboxStatus])
 
   if (isProvisioning) {
     return (
@@ -73,6 +79,7 @@ export function DesktopTab({ sessionId, sandboxStatus }: DesktopTabProps) {
   }
 
   // Sandbox ready, no stream — show start button
+  const displayError = error ?? (startError?.message ? String(startError.message) : null)
   return (
     <div className="flex flex-col items-center justify-center size-full gap-3 p-6">
       {isCheckingStream ? (
@@ -84,8 +91,14 @@ export function DesktopTab({ sessionId, sandboxStatus }: DesktopTabProps) {
           </p>
           <button
             onClick={async () => {
-              await startStream({ sessionId })
-              mutate()
+              setError(null)
+              try {
+                await startStream({ sessionId })
+                mutate()
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : 'Failed to start desktop'
+                setError(msg)
+              }
             }}
             disabled={isStarting}
             className={cn(
@@ -96,6 +109,9 @@ export function DesktopTab({ sessionId, sandboxStatus }: DesktopTabProps) {
           >
             {isStarting ? 'Starting...' : 'Start Desktop'}
           </button>
+          {displayError && (
+            <p className="text-xs text-destructive text-center max-w-[240px]">{displayError}</p>
+          )}
         </>
       )}
     </div>

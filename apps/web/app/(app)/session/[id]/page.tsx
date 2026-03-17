@@ -51,8 +51,10 @@ export default async function SessionPage({ params }: SessionPageProps) {
     : [matchingSession, ...sessions]
 
   let initialMessages: Awaited<ReturnType<typeof mapApiMessagesToUI>> = []
+  let initialApiMessages: Awaited<ReturnType<typeof getChatMessages>> = []
   try {
     const apiMessages = await getChatMessages(id, { limit: 100 })
+    initialApiMessages = apiMessages
     initialMessages = mapApiMessagesToUI(apiMessages)
   } catch (error) {
     console.error('Failed to fetch messages:', error)
@@ -67,6 +69,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
       user={user}
       initialSessionId={id}
       initialMessages={initialMessages}
+      initialApiMessages={initialApiMessages}
       serverTimestamp={serverTimestamp}
       apiToken={apiToken}
     />

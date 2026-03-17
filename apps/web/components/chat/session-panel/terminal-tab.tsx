@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { cn } from '@ship/ui/utils'
 import { API_URL } from '@/lib/config'
+import { getApiToken } from '@/lib/api/client'
 
 interface TerminalTabProps {
   sessionId?: string
@@ -139,7 +140,8 @@ export function TerminalTab({ sessionId, sandboxStatus, sandboxId }: TerminalTab
     function connectWebSocket(term: import('@xterm/xterm').Terminal) {
       if (cancelled) return
 
-      const wsUrl = `${API_URL.replace('http', 'ws')}/terminal/${sessionId}`
+      const token = getApiToken()
+      const wsUrl = `${API_URL.replace('http', 'ws')}/terminal/${sessionId}${token ? `?token=${encodeURIComponent(token)}` : ''}`
 
       // Connection timeout: if we don't connect in 15s, give up
       timeoutTimerRef.current = setTimeout(() => {

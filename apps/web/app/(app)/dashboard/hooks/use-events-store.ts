@@ -56,4 +56,32 @@ export function useEventsStore(sessionId: string): RawEvent[] {
   return store.getEvents(sessionId)
 }
 
+/**
+ * Hydrate events store from persisted message parts (for session reload).
+ * Only adds events when store is empty for this session to avoid duplicates.
+ */
+export function hydrateEventsFromMessages(
+  sessionId: string,
+  apiMessages: Array<{ parts?: string }>,
+): void {
+  if (store.getEvents(sessionId).length > 0) return
+  for (const msg of apiMessages) {
+    if (!msg.parts) continue
+    try {
+      const parts = JSON.parse(msg.parts) as Array<{ type?: string; [k: string]: unknown }>
+      for (const part of parts) {
+        const eventType = part?.type ?? 'message.part.updated'
+        store.addEvent(sessionId, {
+          id: crypto.randomUUID(),
+          type: eventType,
+          timestamp: Date.now(),
+          payload: part,
+        })
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }
+}
+
 export { store as eventsStore }

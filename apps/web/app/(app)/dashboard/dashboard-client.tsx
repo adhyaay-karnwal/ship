@@ -34,6 +34,8 @@ interface DashboardClientProps {
   user: User
   initialSessionId?: string | null
   initialMessages?: UIMessage[]
+  /** Raw API messages with parts, for hydrating events store on reload */
+  initialApiMessages?: Array<{ parts?: string }>
   /** Stable timestamp from server for SSR-safe time formatting (avoids hydration mismatch) */
   serverTimestamp?: number
   /** Session JWT for API authentication */
@@ -46,6 +48,7 @@ export function DashboardClient({
   user,
   initialSessionId = null,
   initialMessages,
+  initialApiMessages,
   serverTimestamp = Math.floor(Date.now() / 1000),
   apiToken,
 }: DashboardClientProps) {
@@ -63,6 +66,7 @@ export function DashboardClient({
   const chat = useDashboardChat(initialSessions, initialSessionId, {
     onAgentEventRef,
     initialMessages,
+    initialApiMessages,
     onResumeStream,
   })
 

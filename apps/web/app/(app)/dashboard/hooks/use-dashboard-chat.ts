@@ -14,6 +14,7 @@ import type { ChatSession } from '@/lib/api/server'
 import { API_URL } from '@/lib/config'
 import { useSessionPersistence } from './use-session-persistence'
 import { sessionStatusStore } from './use-session-status-store'
+import { hydrateEventsFromMessages } from './use-events-store'
 
 export interface UseDashboardChatOptions {
   onAgentEventRef?: React.MutableRefObject<
@@ -21,6 +22,8 @@ export interface UseDashboardChatOptions {
   >
   /** Pre-loaded messages from server (e.g. session page). Skips client fetch when activeSessionId matches. */
   initialMessages?: UIMessage[]
+  /** Raw API messages with parts, for hydrating events store on reload */
+  initialApiMessages?: Array<{ parts?: string }>
   /** Called to resume an active stream (e.g. after page reload). */
   onResumeStream?: (sessionId: string) => void
 }
@@ -43,7 +46,7 @@ export function useDashboardChat(
   initialActiveSessionId: string | null = null,
   options?: UseDashboardChatOptions,
 ) {
-  const { onAgentEventRef, initialMessages: rawInitialMessages, onResumeStream } = options ?? {}
+  const { onAgentEventRef, initialMessages: rawInitialMessages, initialApiMessages, onResumeStream } = options ?? {}
   const [localSessions, setLocalSessions] = useState<ChatSession[]>(initialSessions)
   const [activeSessionId, setActiveSessionId] = useState<string | null>(initialActiveSessionId)
   const [messages, setMessages] = useState<UIMessage[]>(() =>
@@ -215,6 +218,9 @@ export function useDashboardChat(
     if (hadInitialForThisSession) {
       historyLoadedRef.current = activeSessionId
       setMessages(normalizeInitialMessages(rawInitialMessages!))
+      if (initialApiMessages?.length) {
+        hydrateEventsFromMessages(activeSessionId, initialApiMessages)
+      }
       onResumeStream?.(activeSessionId)
       return
     }
@@ -225,6 +231,7 @@ export function useDashboardChat(
       .then((apiMessages) => {
         const uiMessages = mapApiMessagesToUI(apiMessages)
         setMessages(uiMessages)
+        hydrateEventsFromMessages(activeSessionId, apiMessages)
         onResumeStream?.(activeSessionId)
       })
       .catch((err) => {
@@ -234,7 +241,7 @@ export function useDashboardChat(
     return () => {
       historyLoadedRef.current = null
     }
-  }, [activeSessionId, initialActiveSessionId, rawInitialMessages, onResumeStream])
+  }, [activeSessionId, initialActiveSessionId, rawInitialMessages, initialApiMessages, onResumeStream])
 
   const handleStop = useCallback(async () => {
     if (!activeSessionId) return

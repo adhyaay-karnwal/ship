@@ -9,6 +9,7 @@ import type { GitHubRepo, ModelInfo, AgentInfo, AgentMode, AgentModeId, User } f
 import type { useDashboardChat } from './use-dashboard-chat'
 import type { CreateSessionParams } from '@/lib/api/types'
 import { sessionStatusStore } from './use-session-status-store'
+import { eventsStore } from './use-events-store'
 import { postSessionSync } from '@/lib/session-sync-channel'
 
 const DEFAULT_MODES: AgentMode[] = [
@@ -149,6 +150,13 @@ export function useDashboardState({ chat, handleSend, processStreamEventForSessi
             try {
               const rawData = JSON.parse(line.slice(6))
               if (!rawData.type && currentEventType) rawData.type = currentEventType
+              const eventType = rawData?.type ?? currentEventType ?? 'unknown'
+              eventsStore.addEvent(sessionId, {
+                id: crypto.randomUUID(),
+                type: eventType,
+                timestamp: Date.now(),
+                payload: rawData,
+              })
               const event = parseSSEEvent(rawData)
               if (!event) continue
 
