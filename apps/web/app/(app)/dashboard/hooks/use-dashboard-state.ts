@@ -46,7 +46,7 @@ export interface UseDashboardStateParams {
     userId: string
     user: User
     mutateSessions?: () => void
-    onSessionCreated?: () => void
+    onSessionCreated?: (sessionId: string) => void
     onSessionDeleted?: () => void
   }
   data: {
@@ -256,7 +256,7 @@ export function useDashboardState({ chat, handleSend, processStreamEventForSessi
           }
           chat.setLocalSessions((prev) => [newSessionData, ...prev])
           mutateSessions?.()
-          onSessionCreated?.()
+          onSessionCreated?.(newSession.id)
 
           // Fire-and-forget: send the prompt to the server without navigating.
           // The agent runs server-side; the session list polls for live status.

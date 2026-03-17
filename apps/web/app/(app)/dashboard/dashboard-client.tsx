@@ -153,15 +153,19 @@ export function DashboardClient({
   }, [swrSessions, chat.activeSessionId, sessionsLoading, router, chat.setActiveSessionId, chat.setMessages])
 
   // Sync SWR sessions into local state so list/sidebar stay fresh across tabs.
-  // Merge to preserve optimistic session creates and titles (in localSessions but not yet in swrSessions).
-  const prevSwrLenRef = useRef(0)
+  // Merge: swrSessions is source of truth. Only preserve pending creates (not yet in API).
+  // This ensures deletes sync across tabs/devices (session gone from API = removed from list).
+  const pendingCreateIdsRef = useRef<Set<string>>(new Set())
   const { activeSessionId, setLocalSessions } = chat
   useEffect(() => {
-    if (swrSessions.length === 0 && prevSwrLenRef.current === 0) return
-    prevSwrLenRef.current = swrSessions.length
+    if (sessionsLoading) return
+    const swrIds = new Set(swrSessions.map((s) => s.id))
+    // Remove from pending any that now appear in API
+    for (const id of swrIds) pendingCreateIdsRef.current.delete(id)
     setLocalSessions((prev) => {
-      const swrIds = new Set(swrSessions.map((s) => s.id))
-      const optimisticOnly = prev.filter((s) => !swrIds.has(s.id))
+      const optimisticOnly = prev.filter(
+        (s) => !swrIds.has(s.id) && pendingCreateIdsRef.current.has(s.id),
+      )
       // Preserve optimistic titles when API returns session without title
       const merged = swrSessions.map((s) => {
         const p = prev.find((x) => x.id === s.id)
@@ -169,7 +173,7 @@ export function DashboardClient({
       })
       return [...optimisticOnly, ...merged]
     })
-  }, [swrSessions, setLocalSessions])
+  }, [swrSessions, sessionsLoading, setLocalSessions])
 
   // Cross-tab sync: when another tab creates/deletes a session, revalidate; when streaming state changes, update
   const [streamingFromOtherTabs, setStreamingFromOtherTabs] = useState<Set<string>>(new Set())
@@ -233,7 +237,10 @@ export function DashboardClient({
       userId,
       user,
       mutateSessions,
-      onSessionCreated: () => postSessionSync({ type: 'session-created' }),
+      onSessionCreated: (sessionId) => {
+        pendingCreateIdsRef.current.add(sessionId)
+        postSessionSync({ type: 'session-created' })
+      },
       onSessionDeleted: () => postSessionSync({ type: 'session-deleted' }),
     },
     data: {
