@@ -386,7 +386,7 @@ export function DashboardClient({
 
   return (
     <DashboardLayout
-      defaultOpen={!!chat.activeSessionId}
+      defaultOpen={!chat.activeSessionId}
       sidebarProps={{
         sessions: chat.localSessions,
         user,

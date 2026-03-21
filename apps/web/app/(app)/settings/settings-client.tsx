@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react'
 import { setApiToken } from '@/lib/api/client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useIsMobile, SidebarTrigger } from '@ship/ui'
+import { useIsMobile, SidebarTrigger, useSidebar } from '@ship/ui'
 import { ConnectorSettings } from '@/components/settings/connector-settings'
 import { Card, CardContent } from '@ship/ui'
 import {
@@ -14,6 +14,7 @@ import {
   useDefaultAgent,
   useFilteredGitHubRepos,
   useDefaultRepo,
+  useSessions,
 } from '@/lib/api'
 import type { ChatSession } from '@/lib/api/server'
 import type { User } from '@/lib/api/types'
@@ -30,12 +31,22 @@ interface SettingsClientProps {
   apiToken?: string
 }
 
-export function SettingsClient({ userId, user, sessions, apiToken }: SettingsClientProps) {
+function SettingsSidebarTrigger() {
+  const { state } = useSidebar()
+  if (state !== 'collapsed') return null
+  return <SidebarTrigger className="size-3.5 cursor-pointer text-muted-foreground hover:text-foreground" />
+}
+
+export function SettingsClient({ userId, user, sessions: initialSessions, apiToken }: SettingsClientProps) {
   // Set API auth token synchronously so SWR fetches have it before they run
   if (apiToken) setApiToken(apiToken)
   const router = useRouter()
   const isMobile = useIsMobile()
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Use SWR for sessions so deletes are reflected immediately
+  const { sessions: swrSessions } = useSessions(userId, { revalidateOnFocus: true })
+  const sessions = swrSessions.length > 0 ? swrSessions : initialSessions
 
   // Agent hooks
   const { agents, isLoading: agentsLoading } = useAgents()
@@ -112,6 +123,7 @@ export function SettingsClient({ userId, user, sessions, apiToken }: SettingsCli
       {/* Desktop header */}
       {!isMobile && (
         <div className="flex items-center gap-2 mb-6">
+          <SettingsSidebarTrigger />
           <h1 className="text-lg font-semibold text-foreground">Settings</h1>
         </div>
       )}
@@ -178,7 +190,7 @@ export function SettingsClient({ userId, user, sessions, apiToken }: SettingsCli
         isStreaming: false,
       }}
     >
-      <div className="min-h-screen bg-muted/30">
+      <div className="min-h-screen bg-background">
         {settingsContent}
       </div>
     </DashboardLayout>

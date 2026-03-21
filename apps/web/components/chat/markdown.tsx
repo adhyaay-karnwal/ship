@@ -119,7 +119,7 @@ export function Markdown({ content, className, isAnimating = false }: MarkdownPr
   return (
     <div className={cn('text-[14.5px] max-w-none break-words leading-relaxed', className)}>
       <Streamdown
-        plugins={{ code, mermaid }}
+        plugins={{ code, mermaid } as never}
         components={customComponents}
         animated={{ animation: 'fadeIn' }}
         isAnimating={isAnimating}
