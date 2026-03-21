@@ -27,14 +27,14 @@ export function SidebarHeaderSection({ onSearchOpen, onNewChat }: SidebarHeaderP
       <SidebarHeaderPrimitive>
         <div className="flex items-center justify-between px-2 py-1 group-data-[collapsible=icon]:justify-center">
           <div className="flex items-center gap-1">
-            <SidebarTrigger className="size-4 cursor-pointer text-muted-foreground hover:text-foreground" />
+            <SidebarTrigger className="size-3.5 cursor-pointer text-muted-foreground hover:text-foreground" />
             <button
               type="button"
               onClick={onSearchOpen}
-              className="size-4 flex items-center justify-center cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+              className="size-3.5 flex items-center justify-center cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
               title="Search (⌘K)"
             >
-              <HugeiconsIcon icon={Search01Icon} strokeWidth={2} className="size-4" />
+              <HugeiconsIcon icon={Search01Icon} strokeWidth={2} className="size-3.5" />
             </button>
           </div>
         </div>

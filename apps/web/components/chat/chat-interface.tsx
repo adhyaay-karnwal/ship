@@ -95,7 +95,7 @@ export function ChatInterface({
       />
 
       {/* Input Area */}
-      <div className="border-t bg-white dark:bg-background p-3 sm:p-4">
+      <div className="bg-white dark:bg-background px-3 sm:px-4 pb-3 sm:pb-4 pt-2">
         <div className="max-w-3xl mx-auto">
           <EnhancedPromptInput
             onSend={handleSend}

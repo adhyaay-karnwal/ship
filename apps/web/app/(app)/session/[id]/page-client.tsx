@@ -342,21 +342,20 @@ export function SessionPageClient({ sessionId, userId, user, sessions: initialSe
       <SidebarInset>
         <div className="flex h-screen flex-col relative bg-white dark:bg-background">
           {/* Header */}
-          <header className="flex items-center border-b bg-white dark:bg-background/95 px-4 py-2 relative z-10">
-            <div className="flex items-center gap-2.5 min-w-0">
-              {/* Status dot */}
-              {agentStatus !== 'idle' && (
-                <div className="relative flex items-center justify-center size-4 shrink-0">
-                  <div className={`size-2 rounded-full ${agentStatus === 'error' ? 'bg-red-500' : 'bg-green-500'} ${agentStatus !== 'error' ? 'animate-pulse' : ''}`} />
+          <header className="flex items-center border-b border-border/40 bg-white dark:bg-background/95 px-3 h-10 relative z-10">
+            <div className="flex items-center gap-2 min-w-0">
+              {/* Status indicator */}
+              {agentStatus !== 'idle' ? (
+                <div className="relative flex items-center justify-center size-3.5 shrink-0">
+                  <div className={`size-1.5 rounded-full ${agentStatus === 'error' ? 'bg-red-500' : 'bg-green-500'} ${agentStatus !== 'error' ? 'animate-pulse' : ''}`} />
                 </div>
-              )}
-              {agentStatus === 'idle' && (
-                <svg className="size-4 shrink-0 text-muted-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              ) : (
+                <svg className="size-3.5 shrink-0 text-muted-foreground/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                 </svg>
               )}
               {/* Title */}
-              <span className="text-sm text-muted-foreground truncate">
+              <span className="text-xs text-muted-foreground truncate">
                 {sessionTitle
                   ? sessionTitle
                   : sessionInfo.repoOwner && sessionInfo.repoName
@@ -365,7 +364,7 @@ export function SessionPageClient({ sessionId, userId, user, sessions: initialSe
               </span>
               {/* Branch */}
               {sessionInfo.branch && (
-                <span className="text-sm text-muted-foreground/50 shrink-0">{sessionInfo.branch}</span>
+                <span className="text-xs text-muted-foreground/40 shrink-0">{sessionInfo.branch}</span>
               )}
             </div>
           </header>
