@@ -3,17 +3,19 @@
 import { useState, useCallback, useRef, useEffect, useSyncExternalStore } from 'react'
 import { createReconnectingWebSocket, type WebSocketStatus } from '@/lib/websocket'
 import { getApiToken } from '@/lib/api/client'
-import { stopChatStream, getChatMessages, type Message as APIMessage } from '@/lib/api/server'
+import { stopChatStream, getChatMessages, getChatEvents, type Message as APIMessage } from '@/lib/api/server'
 import type { UIMessage } from '@/lib/ai-elements-adapter'
 import {
   createErrorMessage,
   createAssistantPlaceholder,
   mapApiMessagesToUI,
+  replayEventsToMessages,
 } from '@/lib/ai-elements-adapter'
 import type { ChatSession } from '@/lib/api/server'
 import { API_URL } from '@/lib/config'
 import { useSessionPersistence } from './use-session-persistence'
 import { sessionStatusStore } from './use-session-status-store'
+import { hydrateEventsFromMessages, eventsStore } from './use-events-store'
 
 export interface UseDashboardChatOptions {
   onAgentEventRef?: React.MutableRefObject<
@@ -21,6 +23,8 @@ export interface UseDashboardChatOptions {
   >
   /** Pre-loaded messages from server (e.g. session page). Skips client fetch when activeSessionId matches. */
   initialMessages?: UIMessage[]
+  /** Raw API messages with parts, for hydrating events store and event replay on reload */
+  initialApiMessages?: Array<{ id: string; role: string; content: string; createdAt: number; parts?: string }>
   /** Called to resume an active stream (e.g. after page reload). */
   onResumeStream?: (sessionId: string) => void
 }
@@ -43,7 +47,7 @@ export function useDashboardChat(
   initialActiveSessionId: string | null = null,
   options?: UseDashboardChatOptions,
 ) {
-  const { onAgentEventRef, initialMessages: rawInitialMessages, onResumeStream } = options ?? {}
+  const { onAgentEventRef, initialMessages: rawInitialMessages, initialApiMessages, onResumeStream } = options ?? {}
   const [localSessions, setLocalSessions] = useState<ChatSession[]>(initialSessions)
   const [activeSessionId, setActiveSessionId] = useState<string | null>(initialActiveSessionId)
   const [messages, setMessages] = useState<UIMessage[]>(() =>
@@ -215,17 +219,41 @@ export function useDashboardChat(
     if (hadInitialForThisSession) {
       historyLoadedRef.current = activeSessionId
       setMessages(normalizeInitialMessages(rawInitialMessages!))
+      getChatEvents(activeSessionId).then((events) => {
+        if (events.length > 0) {
+          eventsStore.replaceEvents(activeSessionId, events)
+          // Replay events to ensure identical tool-call state across tabs/reloads
+          if (initialApiMessages?.length) {
+            setMessages(replayEventsToMessages(initialApiMessages, events))
+          }
+        } else if (initialApiMessages?.length) {
+          hydrateEventsFromMessages(activeSessionId, initialApiMessages)
+        }
+      })
       onResumeStream?.(activeSessionId)
       return
     }
     if (historyLoadedRef.current === activeSessionId) return
     historyLoadedRef.current = activeSessionId
 
-    getChatMessages(activeSessionId, { limit: 100 })
-      .then((apiMessages) => {
-        const uiMessages = mapApiMessagesToUI(apiMessages)
+    Promise.all([
+      getChatMessages(activeSessionId, { limit: 100 }),
+      getChatEvents(activeSessionId),
+    ])
+      .then(([apiMessages, events]) => {
+        // When events exist, replay them to derive messages — ensures identical state across tabs/reloads
+        const uiMessages =
+          events.length > 0 ? replayEventsToMessages(apiMessages, events) : mapApiMessagesToUI(apiMessages)
         setMessages(uiMessages)
+        if (events.length > 0) {
+          eventsStore.replaceEvents(activeSessionId, events)
+        } else {
+          hydrateEventsFromMessages(activeSessionId, apiMessages)
+        }
         onResumeStream?.(activeSessionId)
+      })
+      .catch((err) => {
+        console.error('Failed to load messages:', err)
       })
       .catch((err) => {
         console.error('Failed to load messages:', err)
@@ -234,7 +262,7 @@ export function useDashboardChat(
     return () => {
       historyLoadedRef.current = null
     }
-  }, [activeSessionId, initialActiveSessionId, rawInitialMessages, onResumeStream])
+  }, [activeSessionId, initialActiveSessionId, rawInitialMessages, initialApiMessages, onResumeStream])
 
   const handleStop = useCallback(async () => {
     if (!activeSessionId) return

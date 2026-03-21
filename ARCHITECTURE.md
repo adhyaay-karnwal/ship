@@ -66,7 +66,7 @@ This package hosts the API and session orchestration.
 
 Responsibilities:
 
-- mounts Hono routes: `/health`, `/users`, `/sessions`, `/chat`, `/sandbox`, `/git`, `/models`, `/accounts`, `/connectors`, `/terminal`
+- mounts Hono routes: `/health`, `/users`, `/sessions`, `/chat`, `/sandbox`, `/git`, `/models`, `/accounts`, `/connectors`, `/terminal`, `/desktop`
 - creates and manages Session Durable Objects (one per chat session)
 - provisions E2B sandboxes per session and starts sandbox-agent inside them
 - connects to sandbox-agent, creates or resumes agent sessions, and streams events
@@ -109,21 +109,30 @@ AI-specific rendering components:
 ### Session lifecycle
 
 1. **Create session** — `POST /sessions` inserts into D1, starts background DO init + `POST https://do/sandbox/provision`.
-2. **Sandbox provisioning** — SessionDO calls `SandboxManager.provision()` → `Sandbox.betaCreate()`, stores `sandbox_id` in `session_meta`.
-3. **First chat** — Chat route waits for sandbox, starts sandbox-agent, clones repo, creates agent session.
+2. **Sandbox provisioning** — SessionDO calls `SandboxManager.provision()` → `Sandbox.betaCreate()` (with custom template if configured), stores `sandbox_id` in `session_meta`.
+3. **First chat** — Chat route waits for sandbox, starts sandbox-agent (skips install if pre-baked in template), clones repo, creates agent session.
 4. **Follow-up chats** — Reuse sandbox and agent session; refresh timeout on each message.
 5. **Unhealthy sandbox** — Try resume; if needed, re-provision and re-clone.
-6. **Delete session** — Soft delete in D1, `POST https://do/sandbox/terminate` for cleanup.
+6. **Delete session** — Hard delete from D1 (messages then session), `POST https://do/sandbox/terminate` for cleanup.
+
+### Desktop streaming
+
+Users can open an interactive Linux desktop for any active sandbox:
+
+1. **Start stream** — `POST /desktop/:sessionId/start` → connects via `@e2b/desktop` SDK, starts noVNC stream with auth.
+2. **View desktop** — Stream URL is loaded in an iframe (noVNC web client, fully interactive with mouse + keyboard).
+3. **State persistence** — Stream URL and auth key are stored in Session DO meta (`desktop_stream_url`, `desktop_stream_auth_key`), so the stream survives page refreshes.
+4. **Stop stream** — `POST /desktop/:sessionId/stop` → stops stream, clears DO meta.
 
 ### Agent lifecycle
 
-1. **Sandbox ready** — `sandbox-agent` binary is installed in the sandbox.
-2. **Agent install** — `sandbox-agent install-agent <name>` (claude, opencode, codex).
+1. **Sandbox ready** — `sandbox-agent` binary is pre-installed in the custom E2B template (or installed at runtime as fallback).
+2. **Agent install** — Common agents (claude, opencode) are pre-installed in the template for fast startup; falls back to `sandbox-agent install-agent <name>` at runtime.
 3. **Server start** — `sandbox-agent server` runs on port 3000 inside the sandbox.
 4. **Worker connects** — `connectToSandboxAgent(url)` (cached per sandbox URL).
 5. **Session create/resume** — `createAgentSession()` or `resumeAgentSession()`.
 6. **MCP sync** — Shared MCP configs (Grep, DeepWiki, Exa) registered before session creation.
-7. **Prompt** — `promptAgent(session, content)`; events stream in via `subscribeToSessionEvents()`.
+7. **Prompt** — `promptAgent(session, content)` runs without artificial timeout; safety from server-side event timeout, client stall detector, and user cancel.
 8. **Event translation** — `EventTranslatorState.translateEvent(event)` maps to Ship SSE.
 9. **Dispose** — `disposeSandboxAgent(url)` when done.
 
@@ -282,9 +291,9 @@ DashboardClient (orchestrator — state, routing, session lifecycle)
 │   └── ComposerFooter
 └── RightSidebar (session stats, todos, file diffs, VCS link)
     ├── Git tab (diff, review, commits)
-    ├── Desktop tab (iframe embed)
+    ├── Desktop tab (interactive noVNC desktop stream via @e2b/desktop)
     ├── Terminal tab (xterm.js)
-    └── Overview tab (SessionPanel)
+    └── Overview tab (SessionPanel + EventsSection)
 ```
 
 ### Data flow: SSE → UIMessage → Render
@@ -297,6 +306,14 @@ DashboardClient (orchestrator — state, routing, session lifecycle)
 
 - Text and reasoning accumulate in `assistantTextRef` and `reasoningRef`; `scheduleFlush()` batches `setMessages` to limit re-renders.
 - Tool updates bypass the batch and trigger immediate `setMessages`.
+- Client-side stall timer (90s) treats stalls with existing content as graceful done, not error.
+- All raw SSE events are captured in `eventsStore` for the Events inspector in the Overview tab.
+
+### Cross-tab sync
+
+- `BroadcastChannel` syncs session lifecycle events (created/deleted/streaming/stopped) across tabs.
+- When a tab receives `session-streaming` for its currently-viewed session and isn't already streaming, it calls `resumeStream()` to independently subscribe to the live SSE stream.
+- `resumeStream` has a guard against double-subscribing (`isStreamingRef`).
 
 ### Sub-agent navigation
 
@@ -317,6 +334,7 @@ DashboardClient (orchestrator — state, routing, session lifecycle)
 | `/sessions` | Session CRUD, sandbox provisioning |
 | `/chat` | SSE streaming, messages, permission/question replies |
 | `/sandbox` | Sandbox lifecycle |
+| `/desktop` | Desktop stream start/stop/status |
 
 ### Deployment
 

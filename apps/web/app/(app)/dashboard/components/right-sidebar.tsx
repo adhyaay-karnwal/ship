@@ -11,14 +11,12 @@ import {
 } from '@ship/ui'
 import { OverviewTab } from '@/components/chat/session-panel/overview-tab'
 import { GitTab } from '@/components/chat/session-panel/git-tab'
-import { DesktopTab } from '@/components/chat/session-panel/desktop-tab'
 import { TerminalTab } from '@/components/chat/session-panel/terminal-tab'
 import { useSandboxStatus } from '@/lib/api/hooks/use-sessions'
 import type { SessionPanelData, RightSidebarTab } from '../types'
 
 const TABS: { id: RightSidebarTab; label: string }[] = [
   { id: 'git', label: 'Git' },
-  { id: 'desktop', label: 'Desktop' },
   { id: 'terminal', label: 'Terminal' },
   { id: 'overview', label: 'Overview' },
 ]
@@ -193,27 +191,18 @@ function TabContent({
   activeTab,
   data,
   panelProps,
-  desktopAgentUrl,
   desktopSandboxStatus,
   sandbox,
 }: {
   activeTab: RightSidebarTab
   data: SessionPanelData
   panelProps: ReturnType<typeof useSessionPanelProps>
-  desktopAgentUrl: string | undefined
   desktopSandboxStatus: string | undefined
   sandbox: { sandboxId?: string | null; status?: string | null } | undefined
 }) {
   switch (activeTab) {
     case 'git':
       return <GitTab diffs={data.fileDiffs} sessionInfo={data.sessionInfo ?? undefined} />
-    case 'desktop':
-      return (
-        <DesktopTab
-          agentUrl={desktopAgentUrl}
-          sandboxStatus={desktopSandboxStatus}
-        />
-      )
     case 'terminal':
       return (
         <TerminalTab
@@ -244,11 +233,12 @@ export function RightSidebar({
   onTogglePanel,
 }: RightSidebarProps) {
   const panelProps = useSessionPanelProps(data)
-  const { sandbox } = useSandboxStatus(data.sessionId)
+  const { sandbox, isReady } = useSandboxStatus(data.sessionId)
 
-  // Desktop tab: use agentUrl from chat/SSE, fallback to sandbox API when empty
-  const desktopAgentUrl = data.agentUrl || sandbox?.sandboxAgentUrl || undefined
-  const desktopSandboxStatus = data.sandboxStatus ?? sandbox?.status ?? undefined
+  const desktopSandboxStatus =
+    (data.sandboxStatus && data.sandboxStatus !== 'unknown')
+      ? data.sandboxStatus
+      : isReady ? 'active' : sandbox?.status ?? undefined
 
   const content = (
     <div className="flex flex-col h-full">
@@ -263,7 +253,6 @@ export function RightSidebar({
           activeTab={activeTab}
           data={data}
           panelProps={panelProps}
-          desktopAgentUrl={desktopAgentUrl}
           desktopSandboxStatus={desktopSandboxStatus}
           sandbox={sandbox}
         />
@@ -277,7 +266,7 @@ export function RightSidebar({
         <div
           className={cn(
             'border-l border-border/40 bg-sidebar/50 backdrop-blur-sm hidden md:flex flex-col transition-[width] duration-200',
-            expanded ? 'w-[600px]' : 'w-[380px]',
+            expanded ? 'w-[520px]' : 'w-[340px]',
           )}
         >
           {content}

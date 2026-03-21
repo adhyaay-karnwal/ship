@@ -4,7 +4,7 @@ import { useCallback, useRef, useEffect, useState, useMemo } from 'react'
 import { postSessionSync, subscribeSessionSync } from '@/lib/session-sync-channel'
 import { useSyncExternalStore } from 'react'
 import { sessionStatusStore } from './hooks/use-session-status-store'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useIsMobile } from '@ship/ui'
 import { setApiToken } from '@/lib/api/client'
 import { useGitHubRepos } from '@/lib/api/hooks/use-repos'
@@ -34,6 +34,8 @@ interface DashboardClientProps {
   user: User
   initialSessionId?: string | null
   initialMessages?: UIMessage[]
+  /** Raw API messages with parts, for hydrating events store and event replay on reload */
+  initialApiMessages?: Array<{ id: string; role: string; content: string; createdAt: number; parts?: string }>
   /** Stable timestamp from server for SSR-safe time formatting (avoids hydration mismatch) */
   serverTimestamp?: number
   /** Session JWT for API authentication */
@@ -46,6 +48,7 @@ export function DashboardClient({
   user,
   initialSessionId = null,
   initialMessages,
+  initialApiMessages,
   serverTimestamp = Math.floor(Date.now() / 1000),
   apiToken,
 }: DashboardClientProps) {
@@ -63,6 +66,7 @@ export function DashboardClient({
   const chat = useDashboardChat(initialSessions, initialSessionId, {
     onAgentEventRef,
     initialMessages,
+    initialApiMessages,
     onResumeStream,
   })
 
@@ -95,6 +99,13 @@ export function DashboardClient({
 
   const { handleSend, processStreamEventForSession, resumeStream } = useDashboardSSE({ chat, modeRef })
 
+  const handleRetryLastMessage = useCallback(() => {
+    const lastUserMsg = [...chat.messages].reverse().find((m) => m.role === 'user')
+    if (lastUserMsg?.content) {
+      handleSend(lastUserMsg.content)
+    }
+  }, [chat.messages, handleSend])
+
   useEffect(() => {
     resumeStreamRef.current = resumeStream
     return () => {
@@ -124,24 +135,41 @@ export function DashboardClient({
   const { createSession, isCreating } = useCreateSession()
   const { deleteSession } = useDeleteSession()
   const { sessionModelId } = useSessionModel(chat.activeSessionId ?? undefined)
+  const router = useRouter()
   const {
     sessions: swrSessions,
+    isLoading: sessionsLoading,
     mutate: mutateSessions,
   } = useSessions(userId, {
-    refreshInterval: 8000,
+    refreshInterval: 3000, // Poll every 3s for cross-device sync (e.g. create on phone, see on Mac)
     revalidateOnFocus: true,
   })
 
+  // When active session is deleted elsewhere (other tab or device), auto-route to homepage
+  useEffect(() => {
+    if (sessionsLoading || !chat.activeSessionId) return
+    const stillExists = swrSessions.some((s) => s.id === chat.activeSessionId)
+    if (!stillExists) {
+      chat.setActiveSessionId(null)
+      chat.setMessages([])
+      router.push('/')
+    }
+  }, [swrSessions, chat.activeSessionId, sessionsLoading, router, chat.setActiveSessionId, chat.setMessages])
+
   // Sync SWR sessions into local state so list/sidebar stay fresh across tabs.
-  // Merge to preserve optimistic session creates and titles (in localSessions but not yet in swrSessions).
-  const prevSwrLenRef = useRef(0)
+  // Merge: swrSessions is source of truth. Only preserve pending creates (not yet in API).
+  // This ensures deletes sync across tabs/devices (session gone from API = removed from list).
+  const pendingCreateIdsRef = useRef<Set<string>>(new Set())
   const { activeSessionId, setLocalSessions } = chat
   useEffect(() => {
-    if (swrSessions.length === 0 && prevSwrLenRef.current === 0) return
-    prevSwrLenRef.current = swrSessions.length
+    if (sessionsLoading) return
+    const swrIds = new Set(swrSessions.map((s) => s.id))
+    // Remove from pending any that now appear in API
+    for (const id of swrIds) pendingCreateIdsRef.current.delete(id)
     setLocalSessions((prev) => {
-      const swrIds = new Set(swrSessions.map((s) => s.id))
-      const optimisticOnly = prev.filter((s) => !swrIds.has(s.id))
+      const optimisticOnly = prev.filter(
+        (s) => !swrIds.has(s.id) && pendingCreateIdsRef.current.has(s.id),
+      )
       // Preserve optimistic titles when API returns session without title
       const merged = swrSessions.map((s) => {
         const p = prev.find((x) => x.id === s.id)
@@ -149,7 +177,7 @@ export function DashboardClient({
       })
       return [...optimisticOnly, ...merged]
     })
-  }, [swrSessions, setLocalSessions])
+  }, [swrSessions, sessionsLoading, setLocalSessions])
 
   // Cross-tab sync: when another tab creates/deletes a session, revalidate; when streaming state changes, update
   const [streamingFromOtherTabs, setStreamingFromOtherTabs] = useState<Set<string>>(new Set())
@@ -159,6 +187,10 @@ export function DashboardClient({
         mutateSessions()
       } else if (msg.type === 'session-streaming') {
         setStreamingFromOtherTabs((prev) => new Set(prev).add(msg.sessionId))
+        // If this is our active session and we're not already streaming, attach to SSE
+        if (msg.sessionId === chat.activeSessionId && !chat.isStreaming) {
+          resumeStreamRef.current?.(msg.sessionId)
+        }
       } else if (msg.type === 'session-stopped') {
         setStreamingFromOtherTabs((prev) => {
           const next = new Set(prev)
@@ -209,7 +241,10 @@ export function DashboardClient({
       userId,
       user,
       mutateSessions,
-      onSessionCreated: () => postSessionSync({ type: 'session-created' }),
+      onSessionCreated: (sessionId) => {
+        pendingCreateIdsRef.current.add(sessionId)
+        postSessionSync({ type: 'session-created' })
+      },
       onSessionDeleted: () => postSessionSync({ type: 'session-deleted' }),
     },
     data: {
@@ -409,6 +444,7 @@ export function DashboardClient({
           onPermissionReply: handlePermissionReply,
           onQuestionReply: handleQuestionReply,
           onQuestionSkip: handleQuestionSkip,
+          onRetry: handleRetryLastMessage,
         }}
         sessions={{
           localSessions: chat.localSessions,

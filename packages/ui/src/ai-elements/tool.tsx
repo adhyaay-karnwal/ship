@@ -363,14 +363,14 @@ export function Tool({
             )}
             {isSubagent ? (
               <svg
-                className="w-4 h-4 text-muted-foreground/40"
+                className="w-4 h-4 text-muted-foreground/80"
                 fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
             ) : hasDetails ? (
               <svg
-                className={cn('w-3.5 h-3.5 text-muted-foreground/40 transition-transform', !isOpen && '-rotate-90')}
+                className={cn('w-4 h-4 text-muted-foreground/80 transition-transform', !isOpen && '-rotate-90')}
                 fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />

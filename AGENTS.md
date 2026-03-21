@@ -87,6 +87,7 @@ ship/
 │   │   │           ├── sse-event-handlers.ts  # Pure event handler functions
 │   │   │           ├── use-session-sync.ts    # URL/model/repo sync effects
 │   │   │           ├── use-right-sidebar.ts   # Sidebar open/close state
+│   │   │           ├── use-events-store.ts    # Raw SSE events store (per-session, singleton)
 │   │   │           └── use-subagent-stream.ts # Sub-agent event streaming
 │   │   ├── lib/                # Frontend business logic
 │   │   │   ├── ai-elements-adapter.ts  # SSE → UIMessage adapter
@@ -101,13 +102,17 @@ ship/
 │           │   ├── chat.ts             # SSE streaming chat endpoint
 │           │   ├── sessions.ts         # Session CRUD
 │           │   ├── sandbox.ts          # Sandbox management
+│           │   ├── desktop.ts          # Desktop stream start/stop/status
 │           │   ├── models.ts           # Model listing
-│           │   └── git.ts              # Git operations
+│           │   ├── git.ts              # Git operations
+│           │   ├── connectors.ts       # GitHub connector status/enable/disable
+│           │   └── terminal.ts         # Terminal access
 │           ├── lib/
-│           │   ├── sandbox-agent.ts    # sandbox-agent SDK wrapper
+│           │   ├── sandbox-agent.ts    # sandbox-agent SDK wrapper (with pre-install detection)
+│           │   ├── desktop.ts          # E2B desktop stream helpers (@e2b/desktop)
 │           │   ├── agent-registry.ts   # Agent config registry
 │           │   ├── event-translator.ts # UniversalEvent → Ship SSE translator
-│           │   └── e2b.ts              # E2B sandbox management
+│           │   └── e2b.ts              # E2B sandbox management (custom template support)
 │           ├── durable-objects/
 │           │   └── session.ts          # Session Durable Object
 │           └── env.d.ts                # Environment type definitions
@@ -124,17 +129,48 @@ Ship uses **sandbox-agent** (by Rivet) as its agent runtime, which supports mult
 
 ### How it works
 
-1. An E2B sandbox is provisioned for each session
-2. `sandbox-agent` binary is installed inside the sandbox
-3. The requested agent (Claude Code, OpenCode, Codex) is installed via `sandbox-agent install-agent <name>`
+1. An E2B sandbox is provisioned for each session using a custom template (`e2b/Dockerfile`) that extends `e2bdev/desktop:latest`
+2. The custom template has `sandbox-agent` binary and common agents (claude, opencode) pre-installed for fast startup (~10s vs ~60s)
+3. If binaries are missing (non-custom template fallback), they are installed at runtime via `sandbox-agent install-agent`
 4. `sandbox-agent server` exposes an HTTP/SSE API inside the sandbox on port 3000
 5. The Cloudflare Worker connects to the sandbox-agent API and translates events to Ship's SSE format
+6. Users can open an interactive desktop stream via the Desktop tab (noVNC via `@e2b/desktop` SDK)
+
+### Building the custom E2B template
+
+The custom template pre-bakes sandbox-agent + agent binaries for faster sandbox startup (~10s vs ~60s).
+
+```bash
+# Install E2B CLI
+npm i -g @e2b/cli
+
+# Login to E2B
+e2b auth login
+
+# Build the template (from repo root — uses e2b.toml + e2b/Dockerfile)
+e2b template build
+```
+
+After the build completes, copy the template ID from the output and set it:
+
+1. **Local dev**: Set `E2B_TEMPLATE_ID` in `apps/api/src/lib/e2b.ts`:
+   ```typescript
+   export const E2B_TEMPLATE_ID = '<your-template-id>'
+   ```
+
+2. **Production**: Set as a Cloudflare Workers env var or secret:
+   ```bash
+   cd apps/api
+   npx wrangler secret put E2B_TEMPLATE_ID --env production
+   ```
+
+Without a template ID, sandboxes use E2B's default image and install everything at runtime (backwards compatible).
 
 ### Supported Agents
 
 | Agent | sandbox-agent name | Required Env Var | Modes |
 |-------|-------------------|------------------|-------|
-| Claude Code | `claude` | `ANTHROPIC_API_KEY` | default, plan, acceptEdits, bypassPermissions |
+| Claude Code | `claude` | `ANTHROPIC_API_KEY` | default, plan, acceptEdits |
 | OpenCode | `opencode` | — | build, plan |
 | Codex | `codex` | `OPENAI_API_KEY` | read-only, auto, full-access |
 
@@ -142,7 +178,9 @@ Agent configs are defined in `apps/api/src/lib/agent-registry.ts`. Default agent
 
 ### Key API Files
 
-- **`sandbox-agent.ts`** — SDK wrapper. Functions: `startSandboxAgentServer`, `connectToSandboxAgent`, `createAgentSession`, `promptAgent`, `cancelAgent`, `subscribeToSessionEvents`. Caches client instances per sandbox URL.
+- **`sandbox-agent.ts`** — SDK wrapper. Functions: `startSandboxAgentServer`, `connectToSandboxAgent`, `createAgentSession`, `promptAgent`, `cancelAgent`, `subscribeToSessionEvents`. Caches client instances per sandbox URL. Checks for pre-installed binaries before installing (custom template fast path). `promptAgent` runs without artificial timeout — safety is provided by server-side event timeout, client-side stall detector, and user cancel.
+- **`desktop.ts`** — Desktop stream helpers using `@e2b/desktop` SDK. Functions: `startDesktopStream`, `stopDesktopStream`.
+- **`e2b.ts`** — E2B sandbox provisioning. Supports custom template via `E2B_TEMPLATE_ID` constant.
 - **`event-translator.ts`** — Stateful translator class (`EventTranslatorState`) that maps sandbox-agent's `UniversalEvent` schema to Ship's SSE events. Tracks text/reasoning accumulators, tool call state, and file changes across a session stream.
 - **`agent-registry.ts`** — Registry of `AgentConfig` objects with `getAgent()`, `listAgents()`, and `getDefaultAgentId()` helpers.
 
@@ -274,7 +312,11 @@ Pure functions (no hooks) that dispatch SSE events to React state. All take an `
 
 ### Key UI Patterns
 
-**Streaming optimization**: Text and reasoning use mutable refs (`assistantTextRef`, `reasoningRef`) for accumulation with scheduled flushes via `scheduleFlush()`. Tool updates bypass this and trigger immediate `setMessages`. This prevents excessive re-renders during fast token streaming.
+**Streaming optimization**: Text and reasoning use mutable refs (`assistantTextRef`, `reasoningRef`) for accumulation with scheduled flushes via `scheduleFlush()`. Tool updates bypass this and trigger immediate `setMessages`. This prevents excessive re-renders during fast token streaming. Client-side stall timer (90s) treats stalls with existing content as graceful done, not error.
+
+**Cross-tab sync**: `BroadcastChannel` syncs session lifecycle (created/deleted/streaming/stopped). When Tab B receives `session-streaming` for its currently-viewed session, it calls `resumeStream()` to independently subscribe to the live SSE stream.
+
+**Events inspector**: All raw SSE events are captured in `eventsStore` (singleton, per-session arrays capped at 500). The `EventsSection` component in the Overview tab displays events as a collapsible list with colored dots by category, timestamps, and expand-to-JSON for each event.
 
 **Permission/Question prompts**: Rendered as inline `system` role messages with `type: 'permission'` or `type: 'question'`. Status tracked in `promptData.status` field ('pending' → 'granted'/'denied'/'replied'/'rejected').
 
@@ -378,7 +420,22 @@ Shared MCP (Model Context Protocol) servers are registered per repo directory th
 
 ## Browser Testing with agent-browser + Brave CDP
 
-### Setup
+### Setup (auto-connect — preferred)
+
+Auto-discover and connect to your running Brave/Chrome:
+
+```bash
+agent-browser --auto-connect open http://localhost:3000
+```
+
+Or set the env var to always auto-connect:
+
+```bash
+export AGENT_BROWSER_AUTO_CONNECT=1
+agent-browser open http://localhost:3000
+```
+
+### Setup (manual CDP)
 
 1. Quit Brave Browser completely
 2. Relaunch with remote debugging:
@@ -401,7 +458,47 @@ Shared MCP (Model Context Protocol) servers are registered per repo directory th
 
 ## Testing
 
-(To be added)
+### Real-time API log monitoring
+
+Use `wrangler tail` to stream production logs in real time:
+
+```bash
+cd apps/api
+npx wrangler tail ship-api-production
+```
+
+This shows all `console.log`/`console.warn`/`console.error` output from the Worker, including:
+- Sandbox provisioning steps (`[sandbox-agent:...]`)
+- Chat route events (`[chat:...]`)
+- D1 write-through warnings
+- SSE streaming lifecycle
+
+### Testing CUJs (Critical User Journeys)
+
+**New session flow:**
+1. Navigate to `localhost:3000` (or production URL)
+2. Select a repo from the dropdown
+3. Type a prompt and click the send button (arrow icon, bottom-right of composer)
+4. Watch SSE stream in network tab (filter by `EventStream`)
+5. Verify sandbox provisions, agent starts, and messages stream
+
+**Returning to an old session:**
+1. Click an existing session in the left sidebar
+2. Messages should load from D1 if the DO was evicted
+3. Sending a new prompt should re-provision sandbox if needed
+
+**Settings page:**
+1. Navigate to `/settings`
+2. Connectors section should load without errors
+3. GitHub connector shows connected/disconnected status
+
+### Verifying D1 message persistence
+
+```bash
+cd apps/api
+npx wrangler d1 execute ship-db --remote --command "SELECT count(*) FROM chat_messages"
+npx wrangler d1 execute ship-db --remote --command "SELECT * FROM chat_messages ORDER BY created_at DESC LIMIT 5"
+```
 
 ## PR Guidelines
 

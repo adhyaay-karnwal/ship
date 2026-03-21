@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation'
 import type { ChatSession } from '@/lib/api/server'
 import { sendChatMessage } from '@/lib/api/server'
 import { parseSSEEvent, getEventStatus, extractTextDelta } from '@/lib/sse-parser'
+import { isAgentHarnessEvent } from '@/lib/sse-types'
 import type { GitHubRepo, ModelInfo, AgentInfo, AgentMode, AgentModeId, User } from '@/lib/api/types'
 import type { useDashboardChat } from './use-dashboard-chat'
 import type { CreateSessionParams } from '@/lib/api/types'
 import { sessionStatusStore } from './use-session-status-store'
+import { eventsStore } from './use-events-store'
 import { postSessionSync } from '@/lib/session-sync-channel'
 
 const DEFAULT_MODES: AgentMode[] = [
@@ -46,7 +48,7 @@ export interface UseDashboardStateParams {
     userId: string
     user: User
     mutateSessions?: () => void
-    onSessionCreated?: () => void
+    onSessionCreated?: (sessionId: string) => void
     onSessionDeleted?: () => void
   }
   data: {
@@ -149,6 +151,15 @@ export function useDashboardState({ chat, handleSend, processStreamEventForSessi
             try {
               const rawData = JSON.parse(line.slice(6))
               if (!rawData.type && currentEventType) rawData.type = currentEventType
+              const eventType = rawData?.type ?? currentEventType ?? 'unknown'
+              if (isAgentHarnessEvent(eventType, rawData)) {
+                eventsStore.addEvent(sessionId, {
+                  id: crypto.randomUUID(),
+                  type: eventType,
+                  timestamp: Date.now(),
+                  payload: rawData,
+                })
+              }
               const event = parseSSEEvent(rawData)
               if (!event) continue
 
@@ -256,7 +267,7 @@ export function useDashboardState({ chat, handleSend, processStreamEventForSessi
           }
           chat.setLocalSessions((prev) => [newSessionData, ...prev])
           mutateSessions?.()
-          onSessionCreated?.()
+          onSessionCreated?.(newSession.id)
 
           // Fire-and-forget: send the prompt to the server without navigating.
           // The agent runs server-side; the session list polls for live status.

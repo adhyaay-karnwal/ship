@@ -45,6 +45,8 @@ export interface UIMessage {
   type?: 'error' | 'pr-notification' | 'permission' | 'question'
   errorCategory?: 'transient' | 'persistent' | 'user-action' | 'fatal'
   retryable?: boolean
+  /** Raw error message before formatting (shown in Details when formatted would mask it) */
+  rawErrorMessage?: string
   // Wall-clock elapsed time in ms (set when streaming completes)
   elapsed?: number
   // Plan items from PlanPart events
@@ -253,6 +255,7 @@ export function createErrorMessage(
   content: string,
   category: UIMessage['errorCategory'] = 'persistent',
   retryable = false,
+  rawErrorMessage?: string,
 ): UIMessage {
   return {
     id: `error-${Date.now()}`,
@@ -261,6 +264,7 @@ export function createErrorMessage(
     type: 'error',
     errorCategory: category,
     retryable,
+    rawErrorMessage,
     createdAt: new Date(),
   }
 }
@@ -513,6 +517,74 @@ export function mapApiMessagesToUI(apiMessages: ApiMessage[]): UIMessage[] {
     }
     return uiMsg
   })
+}
+
+/** Raw event from getChatEvents (Overview inspector persistence) */
+export interface RawEvent {
+  id: string
+  type: string
+  timestamp: number
+  payload: unknown
+}
+
+/**
+ * Replay persisted SSE events to derive messages with full tool invocations.
+ * When events exist, they are the canonical source — messages from API may have
+ * incomplete/compacted parts. Replaying ensures identical state across tabs/reloads.
+ */
+export function replayEventsToMessages(
+  apiMessages: Array<{ id: string; role: string; content: string; createdAt: number; parts?: string }>,
+  events: RawEvent[],
+): UIMessage[] {
+  const base = mapApiMessagesToUI(apiMessages as ApiMessage[])
+  const partEvents = events.filter((e) => {
+    if (e.type !== 'message.part.updated') return false
+    const payload = e.payload as Record<string, unknown>
+    const part = payload?.properties && (payload.properties as Record<string, unknown>)?.part
+    return part && typeof (part as Record<string, unknown>).type === 'string'
+  })
+  if (partEvents.length === 0) return base
+
+  // Map part.messageID (from translator) -> assistant message index (by first appearance order)
+  const msgIdToAsstIndex = new Map<string, number>()
+  let asstIndex = 0
+  for (const e of partEvents) {
+    const part = ((e.payload as Record<string, unknown>).properties as Record<string, unknown>)
+      ?.part as Record<string, unknown>
+    const msgId = part?.messageID as string
+    if (msgId && !msgIdToAsstIndex.has(msgId)) {
+      msgIdToAsstIndex.set(msgId, asstIndex++)
+    }
+  }
+
+  const asstIndices: number[] = []
+  base.forEach((m, i) => {
+    if (m.role === 'assistant') asstIndices.push(i)
+  })
+
+  const mockTextRef = { current: '' }
+  const mockReasoningRef = { current: '' }
+  let lastMsgIdx = -1
+  let result = [...base]
+
+  for (const e of partEvents) {
+    const props = (e.payload as Record<string, unknown>).properties as Record<string, unknown>
+    const part = props?.part as MessagePart
+    const delta = props?.delta as string | undefined
+    const msgId = (part as Record<string, unknown>)?.messageID as string
+    const asstIdx = msgIdToAsstIndex.get(msgId)
+    if (asstIdx === undefined || asstIdx >= asstIndices.length) continue
+    const msgIdx = asstIndices[asstIdx]
+    if (msgIdx !== lastMsgIdx) {
+      mockTextRef.current = ''
+      mockReasoningRef.current = ''
+      lastMsgIdx = msgIdx
+    }
+    const streamingMsgId = result[msgIdx]!.id
+    result = processPartUpdated(part, delta, streamingMsgId, result, mockTextRef, mockReasoningRef)
+  }
+
+  return result
 }
 
 // ============ UI Tool State Mapping ============
