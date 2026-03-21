@@ -144,10 +144,7 @@ export function SettingsClient({ userId, user, sessions: initialSessions, apiTok
       )}
 
       <div className="mb-6">
-        <div className="flex items-center gap-2">
-          {!isMobile && <SettingsSidebarTrigger />}
-          <h1 className="text-lg font-semibold text-foreground">Settings</h1>
-        </div>
+        <h1 className="text-lg font-semibold text-foreground">Settings</h1>
         <p className="text-xs text-muted-foreground mt-1">Manage your preferences</p>
       </div>
 
@@ -209,7 +206,12 @@ export function SettingsClient({ userId, user, sessions: initialSessions, apiTok
         isStreaming: false,
       }}
     >
-      <div className="min-h-screen">
+      <div className="min-h-screen relative">
+        {!isMobile && (
+          <div className="fixed top-3 left-3 z-10">
+            <SettingsSidebarTrigger />
+          </div>
+        )}
         {settingsContent}
       </div>
     </DashboardLayout>
