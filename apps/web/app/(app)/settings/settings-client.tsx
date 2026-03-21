@@ -9,7 +9,6 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Search01Icon, PlusSignIcon } from '@hugeicons/core-free-icons'
 import { UserDropdown } from '@/components/user-dropdown'
 import { ConnectorSettings } from '@/components/settings/connector-settings'
-import { Card, CardContent } from '@ship/ui'
 import {
   useModels,
   useDefaultModel,
@@ -62,25 +61,18 @@ function SettingsSidebarTrigger() {
 }
 
 export function SettingsClient({ userId, user, sessions: initialSessions, apiToken }: SettingsClientProps) {
-  // Set API auth token synchronously so SWR fetches have it before they run
   if (apiToken) setApiToken(apiToken)
   const router = useRouter()
   const isMobile = useIsMobile()
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Use SWR for sessions so deletes are reflected immediately
   const { sessions: swrSessions } = useSessions(userId, { revalidateOnFocus: true })
   const sessions = swrSessions.length > 0 ? swrSessions : initialSessions
 
-  // Agent hooks
   const { agents, isLoading: agentsLoading } = useAgents()
   const { defaultAgentId, isLoading: defaultAgentLoading } = useDefaultAgent(userId)
-
-  // Model hooks
   const { models: availableModels, isLoading: modelsLoading } = useModels()
   const { defaultModelId, isLoading: defaultModelLoading } = useDefaultModel(userId)
-
-  // Repo hooks
   const {
     repos,
     isLoading: reposLoading,
@@ -90,7 +82,6 @@ export function SettingsClient({ userId, user, sessions: initialSessions, apiTok
   } = useFilteredGitHubRepos(userId, '')
   const { defaultRepoFullName, isLoading: defaultRepoLoading } = useDefaultRepo(userId)
 
-  // Track selected agent to filter models
   const [selectedAgentId, setSelectedAgentId] = useState<string>('')
 
   useEffect(() => {
@@ -119,77 +110,67 @@ export function SettingsClient({ userId, user, sessions: initialSessions, apiTok
       <div className="size-4 border-2 border-muted border-t-foreground rounded-full animate-spin" />
     </div>
   ) : (
-    <div className="mx-auto max-w-2xl px-4 py-6">
+    <div className="mx-auto max-w-2xl px-4 py-8">
       {/* Mobile header */}
       {isMobile && (
-        <div className="flex items-center gap-2 px-3 pt-3 pb-1.5 -mx-4 -mt-6 mb-4">
-          <div className="flex items-center gap-2 ml-auto">
-            <nav className="flex items-center gap-0.5">
-              <Link
-                href="/"
-                className="px-1.5 py-1 text-sm transition-colors text-muted-foreground hover:text-foreground"
-              >
-                Agents
-              </Link>
-              <Link
-                href="/settings"
-                className="px-1.5 py-1 text-sm transition-colors text-foreground font-medium"
-              >
-                Settings
-              </Link>
-            </nav>
-            <UserDropdown user={user} />
-          </div>
+        <div className="flex items-center justify-between px-3 pt-3 pb-1.5 -mx-4 -mt-8 mb-6">
+          <Link
+            href="/"
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <span className="text-base leading-none">&lsaquo;</span>
+            Back to Agents
+          </Link>
+          <UserDropdown user={user} />
         </div>
       )}
 
-      <div className="mb-6">
-        <h1 className="text-lg font-semibold text-foreground">Settings</h1>
-        <p className="text-xs text-muted-foreground mt-1">Manage your preferences</p>
-      </div>
+      <h1 className="text-xl font-semibold text-foreground mb-8">Settings</h1>
 
-      <div className="space-y-3 mb-8">
-        <DefaultAgentCard
-          userId={userId}
-          agents={agents}
-          defaultAgentId={defaultAgentId}
-          onAgentChange={setSelectedAgentId}
-        />
-
-        {agentModels.length > 1 && (
-          <DefaultModelCard
+      {/* Preferences */}
+      <section className="mb-8">
+        <h2 className="text-sm font-medium text-muted-foreground mb-3">Preferences</h2>
+        <div className="rounded-lg border border-border overflow-hidden divide-y divide-border">
+          <DefaultAgentCard
             userId={userId}
-            models={agentModels}
-            defaultModelId={defaultModelId}
+            agents={agents}
+            defaultAgentId={defaultAgentId}
+            onAgentChange={setSelectedAgentId}
           />
-        )}
-
-        <DefaultRepoCard
-          userId={userId}
-          repos={repos}
-          reposLoading={reposLoading}
-          reposLoadMore={reposLoadMore}
-          reposHasMore={reposHasMore ?? false}
-          reposLoadingMore={reposLoadingMore ?? false}
-          defaultRepoFullName={defaultRepoFullName}
-        />
-      </div>
+          {agentModels.length > 1 && (
+            <DefaultModelCard
+              userId={userId}
+              models={agentModels}
+              defaultModelId={defaultModelId}
+            />
+          )}
+          <DefaultRepoCard
+            userId={userId}
+            repos={repos}
+            reposLoading={reposLoading}
+            reposLoadMore={reposLoadMore}
+            reposHasMore={reposHasMore ?? false}
+            reposLoadingMore={reposLoadingMore ?? false}
+            defaultRepoFullName={defaultRepoFullName}
+          />
+        </div>
+      </section>
 
       {/* Integrations */}
-      <h2 className="text-sm font-medium text-muted-foreground mb-3">Integrations</h2>
-      <div className="space-y-3 mb-8">
-        <Card className="shadow-sm">
-          <CardContent className="pt-4">
-            <ConnectorSettings userId={userId} />
-          </CardContent>
-        </Card>
-      </div>
+      <section className="mb-8">
+        <h2 className="text-sm font-medium text-muted-foreground mb-3">Integrations</h2>
+        <div className="rounded-lg border border-border overflow-hidden">
+          <ConnectorSettings userId={userId} />
+        </div>
+      </section>
 
       {/* Data */}
-      <h2 className="text-sm font-medium text-muted-foreground mb-3">Data</h2>
-      <div className="space-y-3">
-        <DeleteAllSessionsCard userId={userId} />
-      </div>
+      <section>
+        <h2 className="text-sm font-medium text-muted-foreground mb-3">Data</h2>
+        <div className="rounded-lg border border-border overflow-hidden">
+          <DeleteAllSessionsCard userId={userId} />
+        </div>
+      </section>
     </div>
   )
 
