@@ -64,7 +64,7 @@ export function SidebarSessionsList({
   return (
     <div className="flex-1 overflow-y-auto">
       {/* Sessions list */}
-      <div className="px-2 group-data-[collapsible=icon]:hidden">
+      <div className="px-2 pt-2 group-data-[collapsible=icon]:hidden">
         {groupByRepo ? (
           /* Grouped by repo view */
           repoEntries.map(([repoKey, repoSessions]) => {
