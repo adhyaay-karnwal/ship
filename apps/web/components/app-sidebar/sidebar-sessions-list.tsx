@@ -64,33 +64,30 @@ export function SidebarSessionsList({
   return (
     <div className="flex-1 overflow-y-auto">
       {/* Sessions list */}
-      <div className="px-2 pt-2 group-data-[collapsible=icon]:hidden">
+      <div className="px-2 pt-4 group-data-[collapsible=icon]:hidden">
         {groupByRepo ? (
           /* Grouped by repo view */
           repoEntries.map(([repoKey, repoSessions]) => {
             const isExpanded = !collapsedRepos.has(repoKey)
-            const repoName = repoKey.split('/')[1] ?? repoKey
 
             return (
-              <div key={repoKey} className="mb-2">
+              <div key={repoKey} className="mb-3">
                 <button
                   type="button"
                   onClick={() => toggleRepo(repoKey)}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-sidebar-accent transition-colors group/repo"
+                  className="w-full flex items-center gap-1 px-2 py-1 text-left group/repo"
                 >
-                  <FolderIcon className="size-4 shrink-0 text-muted-foreground/60 group-hover/repo:text-muted-foreground transition-colors" />
-                  <span className="text-xs font-medium text-muted-foreground flex-1 truncate">{repoName}</span>
-                  <span className="text-[10px] text-muted-foreground/40">{repoSessions.length}</span>
+                  <span className="text-xs text-muted-foreground/60 flex-1 truncate">{repoKey}</span>
                   <ChevronIcon
                     className={cn(
-                      'size-3.5 shrink-0 text-muted-foreground/40 transition-transform duration-150',
-                      isExpanded ? 'rotate-0' : '-rotate-90',
+                      'size-3 shrink-0 text-muted-foreground/30 transition-transform duration-150',
+                      isExpanded ? 'rotate-90' : 'rotate-0',
                     )}
                   />
                 </button>
 
                 {isExpanded && (
-                  <div className="mt-0.5 ml-3 pl-3 border-l border-sidebar-border/60 space-y-0.5">
+                  <div className="mt-0.5 space-y-0.5">
                     {repoSessions
                       .sort((a, b) => b.lastActivity - a.lastActivity)
                       .map((session) => (
