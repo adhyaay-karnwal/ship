@@ -5,6 +5,8 @@ import { setApiToken } from '@/lib/api/client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useIsMobile, SidebarTrigger, useSidebar } from '@ship/ui'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Search01Icon } from '@hugeicons/core-free-icons'
 import { ConnectorSettings } from '@/components/settings/connector-settings'
 import { Card, CardContent } from '@ship/ui'
 import {
@@ -34,7 +36,21 @@ interface SettingsClientProps {
 function SettingsSidebarTrigger() {
   const { state } = useSidebar()
   if (state !== 'collapsed') return null
-  return <SidebarTrigger className="size-3.5 cursor-pointer text-muted-foreground hover:text-foreground" />
+  return (
+    <div className="flex items-center gap-1 shrink-0">
+      <SidebarTrigger className="size-3.5 cursor-pointer text-muted-foreground hover:text-foreground" />
+      <button
+        type="button"
+        onClick={() => {
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))
+        }}
+        className="size-3.5 flex items-center justify-center cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+        title="Search (⌘K)"
+      >
+        <HugeiconsIcon icon={Search01Icon} strokeWidth={2} className="size-3.5" />
+      </button>
+    </div>
+  )
 }
 
 export function SettingsClient({ userId, user, sessions: initialSessions, apiToken }: SettingsClientProps) {
