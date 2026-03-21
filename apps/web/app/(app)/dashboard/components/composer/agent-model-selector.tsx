@@ -15,6 +15,11 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Tick02Icon } from '@hugeicons/core-free-icons'
 import { useComposer } from './composer-context'
 
+function shortenModelName(name: string): string {
+  // "Claude Opus 4.6" → "Opus 4.6", "Claude Sonnet 4.6" → "Sonnet 4.6"
+  return name.replace(/^Claude\s+/i, '')
+}
+
 export function AgentModelSelector() {
   const {
     selectedAgent,
@@ -29,16 +34,18 @@ export function AgentModelSelector() {
 
   const loading = agentsLoading || modelsLoading
 
-  // Build trigger label: "AgentName ModelName" or just "AgentName" if single model
+  // Build trigger label: show short model name (e.g. "Opus 4.6")
   let triggerLabel = 'Select agent'
   if (loading) {
     triggerLabel = 'Loading...'
   } else if (selectedAgent) {
     const agentModels = selectedAgent.models ?? []
-    if (agentModels.length <= 1 || !selectedModel) {
-      triggerLabel = selectedAgent.name
+    if (selectedModel) {
+      triggerLabel = shortenModelName(selectedModel.name)
+    } else if (agentModels.length === 1) {
+      triggerLabel = shortenModelName(agentModels[0].name)
     } else {
-      triggerLabel = `${selectedAgent.name} ${selectedModel.name}`
+      triggerLabel = selectedAgent.name
     }
   }
 
