@@ -39,7 +39,7 @@ export function DashboardComposer({ context, compactLayout = false }: DashboardC
         >
           {/* Repo + branch above the card (Cursor-style) */}
           {!activeSessionId && (
-            <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5 min-h-[28px] px-1.5 pb-1.5">
+            <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5 min-h-[28px] px-0.5 pb-1.5">
               <ClientOnly>
                 <ComposerRepoSelector />
               </ClientOnly>
@@ -58,19 +58,19 @@ export function DashboardComposer({ context, compactLayout = false }: DashboardC
               <ComposerTextarea />
             </div>
 
-            {/* Bottom bar inside the card: selectors left, actions right */}
+            {/* Bottom bar inside the card: + mode button, model selector, spacer, submit */}
             <div className="flex items-center gap-1 px-3 h-[36px]">
-              {!activeSessionId && (
-                <div className="shrink min-w-0 overflow-hidden">
-                  <ClientOnly>
-                    <AgentModelSelector />
-                  </ClientOnly>
-                </div>
-              )}
-              <div className="ml-2">
+              <div className="flex items-center gap-1.5">
                 <ClientOnly>
                   <ModeToggle />
                 </ClientOnly>
+                {!activeSessionId && (
+                  <div className="shrink min-w-0 overflow-hidden">
+                    <ClientOnly>
+                      <AgentModelSelector />
+                    </ClientOnly>
+                  </div>
+                )}
               </div>
               <div className="flex-1" />
               <div className="flex items-center gap-2 shrink-0">
