@@ -64,7 +64,7 @@ export function SidebarSessionsList({
   return (
     <div className="flex-1 overflow-y-auto">
       {/* Sessions list */}
-      <div className="px-2 pt-4 group-data-[collapsible=icon]:hidden">
+      <div className="px-2 pt-6 group-data-[collapsible=icon]:hidden">
         {groupByRepo ? (
           /* Grouped by repo view */
           repoEntries.map(([repoKey, repoSessions]) => {
@@ -81,7 +81,7 @@ export function SidebarSessionsList({
                   <ChevronIcon
                     className={cn(
                       'size-3 shrink-0 text-muted-foreground/30 transition-transform duration-150',
-                      isExpanded ? 'rotate-90' : 'rotate-0',
+                      isExpanded ? 'rotate-0' : '-rotate-90',
                     )}
                   />
                 </button>
