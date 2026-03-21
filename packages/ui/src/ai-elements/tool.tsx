@@ -154,7 +154,7 @@ function renderToolOutput(
       const fileName = path.split('/').pop() ?? path
       const lang = getLanguageFromPath(fileName)
 
-      return fileContent != null ? (
+      return fileContent ? (
         <CodeBlock code={fileContent} language={lang} className="my-0" />
       ) : null
     }
@@ -181,7 +181,8 @@ export function Tool({
 
   const isReadTool = isFileReadTool(name, input, output)
   const inputSummary = input && Object.keys(input).length > 0 ? getInputSummary(name, input) : null
-  const hasDetails = (input && Object.keys(input).length > 0) || output !== undefined
+  const hasOutput = output !== undefined && (typeof output !== 'string' || output.length > 0)
+  const hasDetails = (input && Object.keys(input).length > 0 && !isReadTool) || hasOutput
 
   const [truncatedOutput, isOutputTruncated] = output !== undefined ? formatOutput(output) : ['', false]
   const fullOutputText =
@@ -271,7 +272,7 @@ export function Tool({
                   </ScrollArea>
                 </div>
               )}
-              {output !== undefined && (
+              {hasOutput && (
                 <div className={cn('space-y-1.5', isReadTool && 'space-y-0')}>
                   {!isReadTool && (
                     <p className="font-medium text-muted-foreground/60 text-[10px] uppercase tracking-wider">
