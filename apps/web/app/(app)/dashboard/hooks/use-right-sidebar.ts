@@ -27,7 +27,7 @@ export function useRightSidebar() {
 
   const [activeTab, setActiveTabState] = useState<RightSidebarTab>(() => {
     const saved = readStorage(TAB_STORAGE_KEY, 'overview')
-    const valid: RightSidebarTab[] = ['git', 'desktop', 'terminal', 'overview']
+    const valid: RightSidebarTab[] = ['git', 'terminal', 'overview']
     return valid.includes(saved as RightSidebarTab)
       ? (saved as RightSidebarTab)
       : 'overview'

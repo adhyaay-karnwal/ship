@@ -11,14 +11,12 @@ import {
 } from '@ship/ui'
 import { OverviewTab } from '@/components/chat/session-panel/overview-tab'
 import { GitTab } from '@/components/chat/session-panel/git-tab'
-import { DesktopTab } from '@/components/chat/session-panel/desktop-tab'
 import { TerminalTab } from '@/components/chat/session-panel/terminal-tab'
 import { useSandboxStatus } from '@/lib/api/hooks/use-sessions'
 import type { SessionPanelData, RightSidebarTab } from '../types'
 
 const TABS: { id: RightSidebarTab; label: string }[] = [
   { id: 'git', label: 'Git' },
-  { id: 'desktop', label: 'Desktop' },
   { id: 'terminal', label: 'Terminal' },
   { id: 'overview', label: 'Overview' },
 ]
@@ -205,13 +203,6 @@ function TabContent({
   switch (activeTab) {
     case 'git':
       return <GitTab diffs={data.fileDiffs} sessionInfo={data.sessionInfo ?? undefined} />
-    case 'desktop':
-      return (
-        <DesktopTab
-          sessionId={data.sessionId}
-          sandboxStatus={desktopSandboxStatus}
-        />
-      )
     case 'terminal':
       return (
         <TerminalTab

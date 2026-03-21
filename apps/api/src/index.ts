@@ -12,7 +12,6 @@ import models from './routes/models'
 import accounts from './routes/accounts'
 import connectors from './routes/connectors'
 import terminal from './routes/terminal'
-import desktop from './routes/desktop'
 import type { Env } from './env.d'
 
 const app = new Hono<{ Bindings: Env; Variables: { userId?: string } }>()
@@ -60,7 +59,6 @@ app.use('/accounts/*', authMiddleware)
 app.use('/users/*', authMiddleware)
 app.use('/connectors/*', authMiddleware)
 app.use('/terminal/*', authMiddleware)
-app.use('/desktop/*', authMiddleware)
 
 // Rate limiting (after auth so userId is available)
 app.use('/chat/*', chatRateLimit)
@@ -77,7 +75,6 @@ app.route('/models', models)
 app.route('/accounts', accounts)
 app.route('/connectors', connectors)
 app.route('/terminal', terminal)
-app.route('/desktop', desktop)
 
 // Root endpoint
 app.get('/', (c) => {
