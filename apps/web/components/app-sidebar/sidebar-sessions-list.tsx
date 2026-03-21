@@ -63,11 +63,6 @@ export function SidebarSessionsList({
 
   return (
     <div className="flex-1 overflow-y-auto">
-      {/* Sessions header */}
-      <div className="px-3 py-2 flex items-center justify-between group-data-[collapsible=icon]:hidden">
-        <span className="text-[11px] font-medium text-muted-foreground/60">Agents</span>
-      </div>
-
       {/* Sessions list */}
       <div className="px-2 group-data-[collapsible=icon]:hidden">
         {groupByRepo ? (

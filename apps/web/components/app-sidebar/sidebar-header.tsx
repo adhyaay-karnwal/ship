@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Search01Icon,
-  Add01Icon,
+  Navigation03Icon,
 } from '@hugeicons/core-free-icons'
 import {
   SidebarHeader as SidebarHeaderPrimitive,
@@ -27,42 +27,29 @@ export function SidebarHeaderSection({ onSearchOpen, onNewChat }: SidebarHeaderP
       <SidebarHeaderPrimitive>
         <div className="flex items-center justify-between px-2 py-1 group-data-[collapsible=icon]:justify-center">
           <div className="flex items-center gap-1">
-            <SidebarTrigger className="size-4.5 cursor-pointer text-muted-foreground hover:text-foreground" />
+            <SidebarTrigger className="size-4 cursor-pointer text-muted-foreground hover:text-foreground" />
             <button
               type="button"
               onClick={onSearchOpen}
-              className="size-4.5 flex items-center justify-center cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+              className="size-4 flex items-center justify-center cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
               title="Search (⌘K)"
             >
-              <HugeiconsIcon icon={Search01Icon} strokeWidth={2} className="size-4.5" />
+              <HugeiconsIcon icon={Search01Icon} strokeWidth={2} className="size-4" />
             </button>
           </div>
         </div>
       </SidebarHeaderPrimitive>
 
-      {/* Top nav: New Chat + feature items */}
+      {/* Top nav: New Agent */}
       <div className="px-2 pt-3 pb-1">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               render={<button type="button" onClick={() => (onNewChat ? onNewChat() : router.push('/'))} />}
             >
-              <HugeiconsIcon icon={Add01Icon} strokeWidth={2} className="size-4 text-muted-foreground/50 shrink-0" />
+              <HugeiconsIcon icon={Navigation03Icon} strokeWidth={2} className="size-4 text-muted-foreground/50 shrink-0" />
               <span className="text-sm font-normal text-foreground/75 group-data-[collapsible=icon]:hidden">
-                New chat
-              </span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton render={<button type="button" />}>
-              <svg className="size-4 shrink-0 text-muted-foreground/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="7" height="7" rx="1" />
-                <rect x="14" y="3" width="7" height="7" rx="1" />
-                <rect x="3" y="14" width="7" height="7" rx="1" />
-                <rect x="14" y="14" width="7" height="7" rx="1" />
-              </svg>
-              <span className="text-sm font-normal text-foreground/75 group-data-[collapsible=icon]:hidden">
-                Dashboard
+                New Agent
               </span>
             </SidebarMenuButton>
           </SidebarMenuItem>

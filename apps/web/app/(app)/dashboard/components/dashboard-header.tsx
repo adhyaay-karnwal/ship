@@ -9,7 +9,7 @@ import {
   useIsMobile,
 } from '@ship/ui'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { ArrowLeft01Icon } from '@hugeicons/core-free-icons'
+import { ArrowLeft01Icon, Search01Icon } from '@hugeicons/core-free-icons'
 import type { WebSocketStatus } from '@/lib/websocket'
 import { UserDropdown } from '@/components/user-dropdown'
 
@@ -97,7 +97,19 @@ export function DashboardHeader({
   return (
     <header className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 relative z-10">
       {showSidebarTrigger && (
-        <SidebarTrigger className="size-5 cursor-pointer text-muted-foreground hover:text-foreground shrink-0" />
+        <div className="flex items-center gap-1 shrink-0">
+          <SidebarTrigger className="size-4 cursor-pointer text-muted-foreground hover:text-foreground" />
+          <button
+            type="button"
+            onClick={() => {
+              document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))
+            }}
+            className="size-4 flex items-center justify-center cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+            title="Search (⌘K)"
+          >
+            <HugeiconsIcon icon={Search01Icon} strokeWidth={2} className="size-4" />
+          </button>
+        </div>
       )}
       {activeSessionId && isMobile && (
         <Link
