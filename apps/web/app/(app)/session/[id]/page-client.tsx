@@ -342,22 +342,32 @@ export function SessionPageClient({ sessionId, userId, user, sessions: initialSe
       <SidebarInset>
         <div className="flex h-screen flex-col relative bg-white dark:bg-background">
           {/* Header */}
-          <header className="flex items-center justify-between border-b bg-white dark:bg-background/95 px-4 py-3 relative z-10">
-            <div className="flex items-center gap-3">
-              <div>
-                <h1 className="font-semibold text-foreground">
-                  {sessionTitle
-                    ? sessionTitle
-                    : sessionInfo.repoOwner && sessionInfo.repoName
-                      ? `${sessionInfo.repoOwner}/${sessionInfo.repoName}`
-                      : 'Session'}
-                </h1>
-                {sessionInfo.repoOwner && sessionInfo.repoName && sessionTitle && (
-                  <p className="text-xs text-muted-foreground">{sessionInfo.repoOwner}/{sessionInfo.repoName}</p>
-                )}
-              </div>
+          <header className="flex items-center border-b bg-white dark:bg-background/95 px-4 py-2 relative z-10">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {/* Status dot */}
+              {agentStatus !== 'idle' && (
+                <div className="relative flex items-center justify-center size-4 shrink-0">
+                  <div className={`size-2 rounded-full ${agentStatus === 'error' ? 'bg-red-500' : 'bg-green-500'} ${agentStatus !== 'error' ? 'animate-pulse' : ''}`} />
+                </div>
+              )}
+              {agentStatus === 'idle' && (
+                <svg className="size-4 shrink-0 text-muted-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+              {/* Title */}
+              <span className="text-sm text-muted-foreground truncate">
+                {sessionTitle
+                  ? sessionTitle
+                  : sessionInfo.repoOwner && sessionInfo.repoName
+                    ? `${sessionInfo.repoOwner}/${sessionInfo.repoName}`
+                    : 'Session'}
+              </span>
+              {/* Branch */}
+              {sessionInfo.branch && (
+                <span className="text-sm text-muted-foreground/50 shrink-0">{sessionInfo.branch}</span>
+              )}
             </div>
-
           </header>
 
           {/* Main content: Chat + Side Panel */}
