@@ -59,6 +59,15 @@ function SettingsSidebarTrigger() {
   )
 }
 
+/** Closes sidebar on mount — must render inside SidebarProvider */
+function SidebarAutoClose() {
+  const { setOpen } = useSidebar()
+  useEffect(() => {
+    setOpen(false)
+  }, [setOpen])
+  return null
+}
+
 export function SettingsClient({ userId, user, sessions: initialSessions, apiToken }: SettingsClientProps) {
   if (apiToken) setApiToken(apiToken)
   const router = useRouter()
@@ -188,7 +197,7 @@ export function SettingsClient({ userId, user, sessions: initialSessions, apiTok
 
   return (
     <DashboardLayout
-      defaultOpen={!isMobile}
+      defaultOpen={false}
       sidebarProps={{
         sessions,
         user,
@@ -200,6 +209,7 @@ export function SettingsClient({ userId, user, sessions: initialSessions, apiTok
       }}
     >
       <div className="min-h-screen relative">
+        <SidebarAutoClose />
         {!isMobile && (
           <div className="fixed top-3 left-3 z-10">
             <SettingsSidebarTrigger />

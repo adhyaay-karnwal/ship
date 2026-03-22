@@ -89,9 +89,13 @@ function validateModelWithFallback(modelId: string): boolean {
   // Handle legacy IDs for backwards compatibility (without opencode/ prefix)
   const legacyIds = ['kimi-k2.5-free', 'big-pickle', 'glm-4.7-free']
   if (legacyIds.includes(modelId)) return true
-  
+
   // Check if it's the new format with opencode/ prefix
-  return FALLBACK_MODELS.some((m) => m.id === modelId)
+  if (FALLBACK_MODELS.some((m) => m.id === modelId)) return true
+
+  // Check agent-specific models (e.g. codex/default)
+  const agents = listAgents()
+  return agents.some((a) => a.models.some((m) => m.id === modelId))
 }
 
 /**
