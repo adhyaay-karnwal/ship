@@ -8,6 +8,7 @@ export default async function SettingsPage() {
   const user = await getUser()
   const cookieStore = await cookies()
   const apiToken = cookieStore.get('session')?.value ?? ''
+  const sidebarOpen = cookieStore.get('sidebar_state')?.value === 'true'
 
   let sessions: ChatSession[] = []
   try {
@@ -22,6 +23,7 @@ export default async function SettingsPage() {
       user={user}
       sessions={sessions}
       apiToken={apiToken}
+      sidebarDefaultOpen={sidebarOpen}
     />
   )
 }

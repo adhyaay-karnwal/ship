@@ -28,6 +28,7 @@ import { AgentModelRow } from './agent-model-row'
 interface SettingsClientProps {
   userId: string
   user: User
+  sidebarDefaultOpen: boolean
   sessions: ChatSession[]
   apiToken?: string
 }
@@ -69,7 +70,7 @@ function SidebarAutoClose() {
   return null
 }
 
-export function SettingsClient({ userId, user, sessions: initialSessions, apiToken }: SettingsClientProps) {
+export function SettingsClient({ userId, user, sessions: initialSessions, apiToken, sidebarDefaultOpen }: SettingsClientProps) {
   if (apiToken) setApiToken(apiToken)
   const router = useRouter()
   const isMobile = useIsMobile()
@@ -198,7 +199,7 @@ export function SettingsClient({ userId, user, sessions: initialSessions, apiTok
 
   return (
     <DashboardLayout
-      defaultOpen={false}
+      defaultOpen={sidebarDefaultOpen}
       sidebarProps={{
         sessions,
         user,

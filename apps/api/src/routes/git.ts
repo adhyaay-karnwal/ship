@@ -8,7 +8,7 @@
  * - POST /git/pr - Create draft PR
  *
  * Pattern: Routes orchestrate SessionDO + GitWorkflow + GitHubClient
- * Security: User's GitHub token retrieved from session, passed per-operation
+ * Security: User's GitHub token retrieved from D1 accounts table, passed per-operation
  */
 
 import { Hono } from 'hono'
@@ -18,6 +18,15 @@ import { createGitHubClient, parseRepoUrl } from '../lib/github'
 import { Sandbox } from '@e2b/code-interpreter'
 
 const git = new Hono<{ Bindings: Env }>()
+
+/** Look up the user's GitHub OAuth token from the D1 accounts table. */
+async function getGitHubToken(db: D1Database, userId: string): Promise<string | null> {
+  const row = await db
+    .prepare('SELECT access_token FROM accounts WHERE user_id = ? AND provider = ? LIMIT 1')
+    .bind(userId, 'github')
+    .first<{ access_token: string }>()
+  return row?.access_token ?? null
+}
 
 /**
  * POST /git/clone
@@ -64,13 +73,18 @@ git.post('/clone', async (c) => {
       return c.json({ error: 'Session has no sandbox' }, 404)
     }
 
-    // Get user's GitHub token from session meta
+    // Get user ID from session meta, then fetch GitHub token from D1
     const metaResponse = await doStub.fetch('http://do/meta')
     const meta = (await metaResponse.json()) as Record<string, string>
-    const githubToken = meta['github_token']
+    const userId = meta['userId'] || meta['user_id']
 
+    if (!userId) {
+      return c.json({ error: 'User ID not found in session' }, 401)
+    }
+
+    const githubToken = await getGitHubToken(c.env.DB, userId)
     if (!githubToken) {
-      return c.json({ error: 'GitHub token not found in session' }, 401)
+      return c.json({ error: 'GitHub token not found for user' }, 401)
     }
 
     // Connect to sandbox
@@ -225,14 +239,19 @@ git.post('/push', async (c) => {
       return c.json({ error: 'Session has no sandbox' }, 404)
     }
 
-    // Get GitHub token and branch name from session meta
+    // Get user ID and branch from session meta, then fetch GitHub token from D1
     const metaResponse = await doStub.fetch('http://do/meta')
     const meta = (await metaResponse.json()) as Record<string, string>
-    const githubToken = meta['github_token']
+    const userId = meta['userId'] || meta['user_id']
     const branchName = providedBranchName || meta['current_branch']
 
+    if (!userId) {
+      return c.json({ error: 'User ID not found in session' }, 401)
+    }
+
+    const githubToken = await getGitHubToken(c.env.DB, userId)
     if (!githubToken) {
-      return c.json({ error: 'GitHub token not found in session' }, 401)
+      return c.json({ error: 'GitHub token not found for user' }, 401)
     }
 
     if (!branchName) {
@@ -294,15 +313,20 @@ git.post('/pr', async (c) => {
     const doId = c.env.SESSION_DO.idFromName(sessionId)
     const doStub = c.env.SESSION_DO.get(doId)
 
-    // Get GitHub token and repo info from session meta
+    // Get user ID and repo info from session meta, then fetch GitHub token from D1
     const metaResponse = await doStub.fetch('http://do/meta')
     const meta = (await metaResponse.json()) as Record<string, string>
-    const githubToken = meta['github_token']
+    const userId = meta['userId'] || meta['user_id']
     const repoUrl = meta['repo_url']
     const branchName = meta['current_branch']
 
+    if (!userId) {
+      return c.json({ error: 'User ID not found in session' }, 401)
+    }
+
+    const githubToken = await getGitHubToken(c.env.DB, userId)
     if (!githubToken) {
-      return c.json({ error: 'GitHub token not found in session' }, 401)
+      return c.json({ error: 'GitHub token not found for user' }, 401)
     }
 
     if (!repoUrl || !branchName) {
