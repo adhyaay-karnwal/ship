@@ -227,6 +227,19 @@ pnpm deploy:prod   # production Worker (see apps/api/wrangler.toml)
 
 **Web** (Next.js) is meant to run in **Docker** (see `apps/web/Dockerfile`), for example on [Coolify](https://coolify.io/docs/applications/nextjs). Build context must be the **repository root** so `packages/*` workspace deps resolve.
 
+### Coolify (web)
+
+Point Coolify at this repo and set:
+
+| Field                 | Value                  |
+| --------------------- | ---------------------- |
+| Build Pack            | `Dockerfile`           |
+| Base Directory        | `/`                    |
+| Dockerfile Location   | `/apps/web/Dockerfile` |
+| Ports Exposes         | `3000`                 |
+
+Anything else (Install/Build/Start commands, Custom Docker Options) can stay empty — the Dockerfile handles it. If you leave Build Pack on Nixpacks, the build will fail with `Unsupported URL Type "workspace:"` because Nixpacks runs `npm i` and npm doesn't speak pnpm workspaces.
+
 ### Manual commands — Cloudflare Worker (API)
 
 ```bash
